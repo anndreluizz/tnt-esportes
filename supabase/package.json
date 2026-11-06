@@ -1,0 +1,16 @@
+{
+  "name": "tnt-esportes-banco",
+  "version": "1.0.0",
+  "description": "Banco de dados do TNT Esportes (Supabase)",
+  "main": "index.js",
+  "scripts": {
+    "test": "node testar.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15"
+  }
+}
