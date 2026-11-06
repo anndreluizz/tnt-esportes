@@ -1,0 +1,11 @@
+{
+  "name": "TNT Esportes",
+  "short_name": "TNT Esportes",
+  "description": "Gestão de campeonatos da Secretaria Municipal de Esportes de Tonantins",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#103d27",
+  "theme_color": "#103d27",
+  "icons": [{"src": "icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}
