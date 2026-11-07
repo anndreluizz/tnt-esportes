@@ -47,7 +47,7 @@ const dmy = d => d.split('-').reverse().join('/')
 const fdt = iso => new Date(iso).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'})
 const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0')
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)
-const cfgOf = c => SPORTS[c.sport] || SPORTS.Futsal
+const cfgOf = c => { const r = regras(c); return {half: r.tempo, fouls: r.faltas} }
 const ageRange = c => c.maxAge ? `${c.minAge} a ${c.maxAge} anos` : `a partir de ${c.minAge} anos`
 const stat = (v, l, cls = '') => `<div class="card stat ${cls}"><b>${v}</b><span>${l}</span></div>`
 const spill = s => `<span class="pill ${SPILL[s][0]}">${SPILL[s][1]}</span>`
@@ -100,29 +100,41 @@ function manageForm(c, m) {
     <div class="btns span2"><button class="btn">Registrar</button><button type="button" class="btn ghost" data-act="manage" data-id="">Cancelar</button></div></form>`
 }
 
+const KO_PLURAL = {oitavas: 'Oitavas de final', quartas: 'Quartas de final', semi: 'Semifinais'}
 function table(c, g) {
-  return `<div class="card"><h3>Grupo ${g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
-  ${standings(c, g).map((r, i) => `<tr class="${i < 2 ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l"><b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
-  </tbody></table></div><p class="note"><span class="qmark"></span>Classificam-se para a semifinal${groupDone(c, g) ? ' · grupo encerrado' : ''}</p></div>`
+  const pts = formato(c) === 'pontos', q = pts ? 1 : 2
+  const note = pts ? 'Campeão: quem somar mais pontos' : `Classificam-se para ${regras(c).grupos === 4 ? 'as quartas de final' : 'a semifinal'}${groupDone(c, g) ? ' · grupo encerrado' : ''}`
+  return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
+  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l"><b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
+  </tbody></table></div><p class="note"><span class="qmark"></span>${note}</p></div>`
 }
+const tables = c => formato(c) === 'mata' ? '' : `<div class="grid ${groupsOf(c).length > 1 ? 'g2' : ''}">${groupsOf(c).map(g => table(c, g)).join('')}</div>`
 
 function bracket(c) {
-  const semis = c.matches.filter(m => m.phase === 'semi'), fin = c.matches.find(m => m.phase === 'final'), third = c.matches.find(m => m.phase === 'terceiro')
+  const fin = c.matches.find(m => m.phase === 'final'), third = c.matches.find(m => m.phase === 'terceiro')
   if (!fin) return ''
   const box = (m, cls = '') => {
     const w = winner(m), [h, a] = score(m), d = isDone(m)
     const line = (k, s) => `<div class="bteam ${w && w === m[k] ? 'win' : ''}"><span>${side(c, m, k)}</span><b>${d ? s : ''}</b></div>`
     return `<div class="bbox ${cls}">${line('home', h)}${line('away', a)}<div class="bmeta"><span>${m.title}</span><span>${d ? (m.pen ? `pênaltis ${m.pen[0]}×${m.pen[1]}` : m.wo ? 'W.O.' : 'encerrado') : `${dm(m.date)} · ${m.time}`}</span></div></div>`
   }
-  return `<div class="card"><h3>Mata-mata <small>1º A × 2º B e 1º B × 2º A · empate decidido nos pênaltis</small></h3><div class="bracket">
-    <div><div class="bt">Semifinais</div>${semis.map(m => box(m)).join('')}</div>
-    <div><div class="bt">Final</div>${box(fin, 'final')}<div class="bt">3º lugar</div>${box(third)}</div></div></div>`
+  const cols = ['oitavas', 'quartas', 'semi'].map(f => c.matches.filter(m => m.phase === f)).filter(x => x.length)
+  const sub = formato(c) === 'mata' ? 'eliminatória' : regras(c).grupos === 4 ? '1º de um grupo × 2º de outro' : '1º A × 2º B e 1º B × 2º A'
+  return `<div class="card"><h3>Mata-mata <small>${sub} · empate decidido nos pênaltis</small></h3><div class="bracket" style="--cols:${cols.length + 1}">
+    ${cols.map(ms => `<div><div class="bt">${KO_PLURAL[ms[0].phase]}</div>${ms.map(m => box(m)).join('')}</div>`).join('')}
+    <div><div class="bt">Final</div>${box(fin, 'final')}${third ? `<div class="bt">3º lugar</div>${box(third)}` : ''}</div></div></div>`
 }
 function banner(c) {
-  const ch = champion(c); if (!ch) return ''
-  const fin = c.matches.find(m => m.phase === 'final'), th = c.matches.find(m => m.phase === 'terceiro')
+  const [ch, vice, terc] = podium(c); if (!ch) return ''
   return `<div class="banner">${IC.trophy}<div><span class="eyebrow" style="color:var(--g9)">Campeão · ${esc(c.name)}</span><b>${esc(T(c, ch).name)}</b>
-    <span class="sub" style="color:var(--g9)">Vice: ${esc(T(c, loser(fin)).name)}${winner(th) ? ` · 3º lugar: ${esc(T(c, winner(th)).name)}` : ''}</span></div></div>`
+    <span class="sub" style="color:var(--g9)">${vice ? `Vice: ${esc(T(c, vice).name)}` : ''}${terc ? ` · 3º lugar: ${esc(T(c, terc).name)}` : ''}</span></div></div>`
+}
+// seções da tabela de jogos: rodadas, fases do mata-mata, final
+function fixtureSections(c, sec) {
+  const rounds = [...new Set(c.matches.filter(m => m.phase === 'grupos').map(m => m.round))].sort((a, b) => a - b)
+  return rounds.map(r => sec(`Rodada ${r}`, c.matches.filter(m => m.phase === 'grupos' && m.round === r).sort(byDate))).join('')
+    + ['oitavas', 'quartas', 'semi'].map(f => sec(KO_PLURAL[f], c.matches.filter(m => m.phase === f).sort(byDate))).join('')
+    + sec(c.matches.some(m => m.phase === 'terceiro') ? 'Disputa de 3º lugar e final' : 'Final', c.matches.filter(m => m.phase === 'terceiro' || m.phase === 'final').sort(byDate))
 }
 const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div class="why">Motivo: ${esc(l.why)}</div>` : ''}<div class="sub">${esc(l.who)} · ${fdt(l.at)}</div></div></div>`
 
@@ -164,7 +176,7 @@ function vPainel() {
   const {susp, st} = discipline(c)
   const disc = c.players.map(p => {
     const nx = nextMatches(c, p.team)[0], why = nx && susp[nx.id]?.[p.id]
-    const tag = why ? `<span class="pill red" title="${esc(why)}">Suspenso no próximo jogo</span>` : st[p.id].y === 2 ? '<span class="pill amber">Pendurado · 2 amarelos</span>' : ''
+    const tag = why ? `<span class="pill red" title="${esc(why)}">Suspenso no próximo jogo</span>` : st[p.id].pendurado ? `<span class="pill amber">Pendurado · ${st[p.id].y} amarelo${st[p.id].y > 1 ? 's' : ''}</span>` : ''
     return tag && `<div class="row"><div class="ath">${avatar(p, 30)}<div><b>${esc(p.name)}</b> <span class="sub">nº ${p.num}</span><div class="sub">${esc(T(c, p.team).name)}${why ? ' · ' + esc(why) : ''}</div></div></div>${tag}</div>`
   }).join('')
   const nb = nextBatch(c)
@@ -183,6 +195,22 @@ function sponsorsBar(c) {
   if (!c.sponsors?.length) return ''
   return `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${c.sponsors.map(s => s.logo ? `<img src="${esc(s.logo)}" alt="${esc(s.name)}" title="${esc(s.name)}">` : `<b>${esc(s.name)}</b>`).join('')}</div>`
 }
+function regrasCampos(c) {
+  const r = c ? regras(c) : regrasPadrao(Object.keys(SPORTS)[0]), f = c ? formato(c) : 'grupos', trava = c && c.status !== 'inscricoes' ? 'disabled' : ''
+  const num = (k, l, min, max, dica = '') => `<label>${l}<input name="r_${k}" type="number" min="${min}" max="${max}" value="${r[k] ?? ''}" ${dica ? `placeholder="${dica}"` : 'required'}></label>`
+  return `<div class="formatos span2">${Object.entries(FORMATOS).map(([k, x]) => `<label class="formato"><input type="radio" name="format" value="${k}" ${k === f ? 'checked' : ''} ${trava}><b>${x.nome}</b><span>${x.desc}</span></label>`).join('')}</div>
+    ${trava ? '<p class="note span2">O formato não muda depois do sorteio. As regras de pontos e cartões podem ser ajustadas.</p>' : ''}
+    <label class="so-grupos">Número de grupos<select name="r_grupos" ${trava}><option value="2" ${r.grupos === 2 ? 'selected' : ''}>2 grupos (semifinal) · 4 a 40 equipes</option><option value="4" ${r.grupos === 4 ? 'selected' : ''}>4 grupos (quartas de final) · 8 a 40 equipes</option></select></label>
+    <label class="chk so-pontos"><input type="checkbox" name="r_returno" ${r.returno ? 'checked' : ''} ${trava}> Turno e returno (ida e volta)</label>
+    <label class="chk so-mata-mata"><input type="checkbox" name="r_terceiro" ${r.terceiro ? 'checked' : ''} ${trava}> Disputa de 3º lugar</label>
+    ${num('tempo', 'Minutos de cada tempo', 5, 60)}${num('vitoria', 'Pontos por vitória', 1, 5)}${num('empate', 'Pontos por empate', 0, 3)}
+    ${num('amarelos', 'Amarelos para suspensão', 2, 5)}${num('vermelho', 'Jogos de suspensão (vermelho)', 1, 5)}${num('wo', 'Placar do W.O. (gols)', 1, 10)}
+    ${num('faltas', 'Faltas por tempo até o tiro livre', 3, 10, 'sem limite')}`
+}
+document.addEventListener('change', e => {   // trocou a modalidade num campeonato novo: tempo e faltas da modalidade
+  if (e.target.name !== 'sport' || !e.target.closest?.('#champform')) return
+  const f = e.target.form, p = regrasPadrao(e.target.value); f.r_tempo.value = p.tempo; f.r_faltas.value = p.faltas ?? ''
+})
 let patN = 100
 function patRow(s, i = patN++) {   // um patrocinador; adicionar e remover mexem só na tela, salva tudo junto no fim
   return `<div class="pat"><button type="button" class="x" data-rmpat title="Remover patrocinador" aria-label="Remover patrocinador">×</button>
@@ -211,11 +239,12 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
     <label>Telefone / WhatsApp do responsável<input name="respPhone" type="tel" maxlength="20" value="${v('responsiblePhone')}" placeholder="(97) 9 9999-9999"></label>` : ''}
     <label>Início<input name="start" type="date" required value="${v('start', '2027-03-06')}"></label>
     <label>Local<input name="venue" maxlength="60" value="${v('venue')}" placeholder="Quadra Poliesportiva Municipal"></label>`)}
-  ${REAL ? step(3, 'Inscrições', `
+  ${step(3, 'Formato e regras', regrasCampos(c))}
+  ${REAL ? step(4, 'Inscrições', `
     <label>Inscrições até<input name="regUntil" type="date" value="${v('regUntil')}"></label>
     <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
     <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo, o link para de aceitar inscrições.</p>`)
-  + step(4, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>',
+  + step(5, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>',
       `<div class="pats span2">${sp.map(patRow).join('')}<button type="button" class="addpat" data-addpat>+ Adicionar patrocinador</button></div>`) : ''}
   <div class="btns" style="margin-top:12px"><button class="btn">${c ? 'Salvar alterações' : 'Criar e abrir inscrições'}</button>${c ? '<button type="button" class="btn ghost" data-act="editchamp" data-id="">Cancelar</button>' : ''}</div>
   </form></div>`
@@ -226,11 +255,12 @@ function vCamps() {
     return `<div class="card"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px">${clogo(c.logo)}<h3 style="font-size:22px">${esc(c.name)}</h3></div>
       <p class="sub">${ageRange(c)} · início ${dmy(c.start)} · ${esc(c.venue)}</p>
+      <p class="sub"><b>${FORMATOS[formato(c)].nome}</b>${formato(c) === 'grupos' ? ` · ${regras(c).grupos} grupos` : ''}</p>
       ${c.responsible ? `<p class="sub">Responsável: ${esc(c.responsible)}${c.responsiblePhone ? ' · ' + esc(c.responsiblePhone) : ''}</p>` : ''}
       <p class="sub">${c.teams.length} equipes · ${c.players.length} atletas · ${c.matches.length ? `${done}/${c.matches.length} jogos` : 'tabela após o sorteio'}${ch ? ` · campeão: <b>${esc(T(c, ch).name)}</b>` : ''}</p>
       ${c.regUntil ? `<p class="sub">Inscrições até ${dmy(c.regUntil)}</p>` : ''}${sponsorsBar(c)}
       <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button>
-        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}</div></div>`
+        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}<button class="btn ghost sm" data-act="reg" data-id="${c.id}">Regulamento</button></div></div>`
   }).join('')
   const editing = S.champs.find(c => c.id === ui.editChamp)
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
@@ -319,15 +349,12 @@ function vInscricoes() {
 
 function vJogos() {
   const c = C()
-  const head = `<div class="head"><div><div class="eyebrow">Classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">Desempate: pontos, vitórias, saldo, gols marcados</span></div>`
-  if (!c.matches.length) return head + `<div class="card empty">A tabela é gerada automaticamente depois do sorteio dos grupos.<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button></div></div>`
+  const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: pontos, vitórias, saldo, gols marcados'}</span></div>`
+  if (!c.matches.length) return head + `<div class="card empty">A tabela é gerada automaticamente depois do sorteio.<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button></div></div>`
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
-  const rounds = [...new Set(c.matches.filter(m => m.phase === 'grupos').map(m => m.round))]
-  return head + banner(c) + `<div class="grid g2">${table(c, 'A')}${table(c, 'B')}</div><div class="mt">${bracket(c)}</div>
-  <div class="card mt"><h3>Tabela de jogos</h3>
-    ${rounds.map(r => sec(`Rodada ${r}`, c.matches.filter(m => m.phase === 'grupos' && m.round === r).sort(byDate))).join('')}
-    ${sec('Semifinais', c.matches.filter(m => m.phase === 'semi'))}${sec('Disputa de 3º lugar e final', c.matches.filter(m => m.phase === 'terceiro' || m.phase === 'final'))}</div>`
+  return head + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
+  <div class="card mt"><h3>Tabela de jogos</h3>${fixtureSections(c, sec)}</div>`
 }
 
 /* ---------- súmula (celular do árbitro) ---------- */
@@ -427,6 +454,13 @@ const sameSet = (a, b) => [...a].sort().join() === [...b].sort().join()
 // semente final = sha256(semente secreta + entrada pública dita na hora): ninguém escolhe antes uma semente favorável
 const finalSeed = async (seed, entrada) => (await sha(seed + entrada)).slice(0, 16)
 const drawInfo = d => `<p class="sub">Compromisso publicado antes (SHA-256):</p><code class="hash">${d.hash}</code><p class="sub">Semente revelada depois:</p><code class="hash">${d.seed}</code><p class="sub">Entrada pública: <b>${esc(d.entrada)}</b> · semente final: <code>${d.final}</code></p>`
+// grupos: mesma composição; pontos corridos e mata-mata: mesma ordem
+const sameDraw = (c, a, b) => Object.keys(b).every(g => formato(c) === 'grupos' ? sameSet(a[g] || [], b[g]) : (a[g] || []).join() === b[g].join())
+const drawTitle = (c, g) => formato(c) === 'grupos' ? 'Grupo ' + g : formato(c) === 'mata' ? 'Ordem da chave' : 'Ordem da tabela'
+function drawCards(c, groups) {
+  const gs = groups ? Object.keys(groups) : [...'ABCDEFGH'.slice(0, drawN(c))], num = formato(c) !== 'grupos'
+  return `<div class="grid ${gs.length > 1 ? 'g2' : ''} mt">${gs.map(g => `<div class="card"><h3>${drawTitle(c, g)}</h3>${groups ? groups[g].map((id, i) => `<div class="team-chip">${num ? `<b>${i + 1}º</b> ` : ''}${esc(T(c, id).name)}</div>`).join('') : '<p class="sub">Aguardando sorteio.</p>'}</div>`).join('')}</div>`
+}
 function verifyForm(c) {
   const v = ui.verify && ui.verify.cid === c.id ? ui.verify : null
   const target = (ui.draw && ui.draw.cid === c.id && ui.draw.hash) || c.draw?.hash
@@ -434,23 +468,22 @@ function verifyForm(c) {
     <label>Entrada pública<input name="entrada" required minlength="3" placeholder="ex.: 07 21 33" value="${esc(v ? v.entrada : '')}" autocomplete="off"></label><button class="btn">Conferir sorteio</button></form>
   ${v ? `<p class="sub" style="margin-top:10px">Hash calculado:</p><code class="hash">${v.hash}</code><p class="sub">Semente final: <code>${v.final}</code></p>
     ${target ? `<span class="pill ${v.hash === target ? 'green' : 'red'}">${v.hash === target ? 'Igual ao compromisso publicado' : 'Diferente do compromisso publicado'}</span>` : ''}
-    ${c.draw ? ` <span class="pill ${sameSet(v.groups.A, c.draw.groups.A) ? 'green' : 'red'}">${sameSet(v.groups.A, c.draw.groups.A) ? 'Grupos iguais aos do campeonato' : 'Grupos diferentes'}</span>` : ''}
-    <p class="sub" style="margin-top:8px">Grupo A: ${v.groups.A.map(id => esc(T(c, id).name)).join(', ')}<br>Grupo B: ${v.groups.B.map(id => esc(T(c, id).name)).join(', ')}</p>` : ''}`
+    ${c.draw ? ` <span class="pill ${sameDraw(c, v.groups, c.draw.groups) ? 'green' : 'red'}">${sameDraw(c, v.groups, c.draw.groups) ? 'Resultado igual ao do campeonato' : 'Resultado diferente'}</span>` : ''}
+    <p class="sub" style="margin-top:8px">${Object.entries(v.groups).map(([g, ids]) => `${drawTitle(c, g)}: ${ids.map(id => esc(T(c, id).name)).join(', ')}`).join('<br>')}</p>` : ''}`
 }
 function vSorteio() {
   const c = C(), d = ui.draw && ui.draw.cid === c.id ? ui.draw : {}
   const head = `<div class="head"><div><div class="eyebrow">Transparência · ${esc(c.name)}</div><h2>Sorteio auditável</h2>
     <p class="sub" style="max-width:660px">O sistema publica a “impressão digital” (hash SHA-256) de uma semente secreta antes do sorteio. Na hora, o público dita uma entrada (ex.: números falados por pessoas da plateia), que se mistura à semente. Depois a semente é revelada, e qualquer pessoa confere que ninguém escolheu o resultado.</p></div>
     ${c.status === 'inscricoes' && d.hash && !REAL ? '<button class="btn ghost" data-act="redraw">Recomeçar</button>' : ''}</div>`
-  const grp = (g, ids) => `<div class="card"><h3>Grupo ${g}</h3>${ids ? ids.map(id => `<div class="team-chip">${esc(T(c, id).name)}</div>`).join('') : '<p class="sub">Aguardando sorteio.</p>'}</div>`
   const pots = `<div class="card"><h3>Potes <small>cabeças de chave no pote 1</small></h3><div class="grid g2">${[1, 2].map(k => `<div><div class="eyebrow">Pote ${k}</div>${c.teams.filter(t => (t.pot === 1) === (k === 1)).map(t => `<div class="row">${esc(t.name)}</div>`).join('') || '<p class="sub">—</p>'}</div>`).join('')}</div></div>`
   const verify = `<div class="card"><h3>Conferir um sorteio</h3><p class="sub">Digite a semente revelada e a entrada pública. O sistema recalcula o hash e refaz o sorteio.</p>${verifyForm(c)}</div>`
   if (c.status !== 'inscricoes') return head + (c.draw
     ? `<div class="card"><h3>Sorteio realizado <small>${fdt(c.draw.at)}</small></h3>${drawInfo(c.draw)}</div>
-       <div class="grid g2 mt">${grp('A', c.draw.groups.A)}${grp('B', c.draw.groups.B)}</div>`
+       ${drawCards(c, c.draw.groups)}`
     : '<div class="card empty">Este campeonato não tem registro de sorteio.</div>') + `<div class="grid g2 mt">${pots}${verify}</div>`
-  const pend = c.teams.filter(t => teamInsc(c, t)[0] !== 'aprovado'), few = c.teams.length < 4
-  const warn = few ? `<div class="info warn">São necessárias pelo menos 4 equipes para o sorteio (hoje: ${c.teams.length}).</div>`
+  const pend = c.teams.filter(t => teamInsc(c, t)[0] !== 'aprovado'), few = c.teams.length < minTeams(c) || c.teams.length > maxTeams(c)
+  const warn = few ? `<div class="info warn">${FORMATOS[formato(c)].nome}${formato(c) === 'grupos' ? ` com ${regras(c).grupos} grupos` : ''}: são necessárias de ${minTeams(c)} a ${maxTeams(c)} equipes para o sorteio (hoje: ${c.teams.length}). Dá para mudar o formato em Campeonatos → Editar dados.</div>`
     : pend.length ? `<div class="info warn">${pend.length} equipe(s) com pendências de inscrição: ${pend.map(t => esc(t.name)).join(', ')}. O sorteio pode ser feito, mas resolva antes do primeiro jogo.</div>` : ''
   return head + warn + `<div class="grid g3 mt">
     <div class="card"><h3>1 · Publicar o compromisso</h3><p class="sub" style="margin-bottom:8px">Hash divulgado antes do ato, no portal e no grupo das equipes.</p>${d.hash ? `<code class="hash">${d.hash}</code>` : `<button class="btn" data-act="commit" ${few ? 'disabled' : ''}>Gerar e publicar</button>`}</div>
@@ -458,7 +491,7 @@ function vSorteio() {
     <div class="card"><h3>3 · Revelar a semente</h3><p class="sub" style="margin-bottom:8px">Qualquer pessoa confere o hash e repete o sorteio.</p>${d.revealed ? `<code class="hash">${d.seed}</code><span class="pill ${d.ok ? 'green' : 'red'}">${d.ok ? 'Confere com o hash publicado' : 'Não confere!'}</span>` : `<button class="btn" data-act="reveal" ${d.groups ? '' : 'disabled'}>Revelar</button>`}</div>
     <div class="card"><h3>4 · Gerar a tabela</h3><p class="sub" style="margin-bottom:8px">Aplica os grupos e cria todos os jogos, com o mata-mata.</p><button class="btn gold" data-act="applydraw" ${d.revealed && d.ok ? '' : 'disabled'}>Aplicar e gerar tabela</button></div>
   </div>
-  <div class="grid g2 mt">${grp('A', d.groups?.A)}${grp('B', d.groups?.B)}</div>
+  ${drawCards(c, d.groups)}
   <div class="grid g2 mt">${pots}${verify}</div>`
 }
 
@@ -491,7 +524,7 @@ function transparency(c) {
   else if (sc) { const cc = S.champs.find(x => x.id === sc.cid), m = findMatch(cc, sc.mid)
     res = `<div class="info" style="margin-top:10px"><span class="pill ${sc.ok ? 'green' : 'red'}">${sc.ok ? 'Súmula autêntica: o conteúdo confere' : 'Atenção: o conteúdo não confere'}</span>
       <p><b>${esc(label(cc, m))}</b> · ${score(m).join(' × ')} · ${esc(cc.name)}</p><button class="btn sm" data-act="doc" data-c="${cc.id}" data-id="${m.id}">Ver súmula</button></div>` }
-  return `<div class="card"><h3>Transparência</h3>
+  return `<div class="card"><h3>Transparência <small><button class="link" data-act="reg" data-id="${c.id}">ver o regulamento</button></small></h3>
     <h4>Conferir uma súmula</h4><p class="sub">Digite o código de autenticidade impresso na súmula.</p>
     <form class="f" data-form="sumcheck" style="margin-top:6px"><label>Código<input name="code" required placeholder="XXXX-XXXX-XXXX" autocomplete="off"></label><button class="btn">Conferir</button></form>${res}
     ${c.draw ? `<h4 style="margin-top:18px">Sorteio dos grupos</h4>${drawInfo(c.draw)}${verifyForm(c)}` : ''}</div>`
@@ -508,11 +541,57 @@ function vPortal() {
     ${c.teams.map(t => `<div class="row"><b>${esc(t.name)}</b><span class="sub">${esc(t.bairro)}</span></div>`).join('')}
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
   const up = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 4), last = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 5)
-  return chips + hero + sponsorsBar(c) + banner(c) + `<div class="grid g2">${table(c, 'A')}${table(c, 'B')}</div><div class="mt">${bracket(c)}</div>
+  return chips + hero + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Próximos jogos</h3>${up.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
     <div class="card"><h3>Últimos resultados</h3>${last.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo realizado.</p>'}</div></div>
   <div class="grid g2 mt"><div class="card"><h3>Artilharia</h3>${scorers(c).slice(0, 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
     ${transparency(c)}</div>` + lgpd
+}
+
+/* ---------- regulamento (PDF via impressão), montado com o formato e as regras do campeonato ---------- */
+function vReg() {
+  const c = S.champs.find(x => x.id === ui.reg); if (!c) return ''
+  const r = regras(c), f = formato(c), n = c.teams.length, li = xs => `<ol>${xs.filter(Boolean).map(x => `<li>${x}</li>`).join('')}</ol>`
+  const pl = (k, s, p) => `${k} ${k === 1 ? s : p}`
+  const cruz = r.grupos === 4 ? 'quartas de final: 1º A × 2º B, 1º C × 2º D, 1º B × 2º A e 1º D × 2º C; depois semifinais e final' : 'semifinais: 1º do Grupo A × 2º do Grupo B e 1º do Grupo B × 2º do Grupo A; depois a final'
+  const fmt = {
+    grupos: [`As equipes são divididas em ${r.grupos} grupos por <b>sorteio público e auditável</b>. Os cabeças de chave ficam em grupos diferentes.`,
+             'Dentro de cada grupo, todos jogam contra todos, em turno único.', `Os 2 primeiros de cada grupo vão para o mata-mata: ${cruz}.`],
+    pontos: [`Todos jogam contra todos, em ${r.returno ? 'turno e returno (ida e volta)' : 'turno único'}. A ordem dos jogos sai de <b>sorteio público e auditável</b>.`,
+             'É campeã a equipe que somar mais pontos ao fim de todas as rodadas.'],
+    mata:   ['O chaveamento sai de <b>sorteio público e auditável</b>. Os cabeças de chave ficam em lados opostos da chave.',
+             'Quem perde está eliminado. Se o número de equipes não fechar a chave, as primeiras sorteadas avançam direto para a fase seguinte (folga).'],
+  }[f]
+  if (f !== 'pontos') fmt.push('Empate no mata-mata é decidido em cobranças de pênaltis.', r.terceiro ? 'Os perdedores das semifinais disputam o 3º lugar.' : '')
+  return `<div class="docbar noprint"><button class="btn gold" data-act="print">Imprimir / salvar PDF</button><button class="btn ghost" data-act="closedoc">Fechar</button></div>
+  <div class="paper reg">
+    <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><div class="logo">TNT</div><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes</div></div></div>
+      <div style="text-align:right;display:flex;gap:10px;align-items:center"><div><h1>REGULAMENTO</h1><div class="sub">${esc(c.name)}</div></div>${clogo(c.logo, 48)}</div></div>
+    <h4>1. Do campeonato</h4>${li([`O(A) <b>${esc(c.name)}</b> é organizado(a) pela Secretaria Municipal de Esportes de Tonantins/AM${c.responsible ? `, sob a responsabilidade de ${esc(c.responsible)}${c.responsiblePhone ? ` (${esc(c.responsiblePhone)})` : ''}` : ''}.`,
+      `Modalidade: ${esc(c.sport)} · categoria ${esc(c.category)} · faixa etária ${ageRange(c)} (idade conferida na data de início).`,
+      `Início em ${dmy(c.start)}, em ${esc(c.venue)}. Datas e horários de cada jogo ficam no portal público.`])}
+    <h4>2. Das inscrições</h4>${li([c.maxPlayers ? `Cada equipe inscreve até ${c.maxPlayers} atletas.` : '', c.regUntil ? `As inscrições vão até ${dmy(c.regUntil)}.` : '',
+      'Cada atleta é inscrito com foto e documento oficial com foto (RG). A inscrição só vale depois de aprovada pela Secretaria.',
+      'Menor de 18 anos precisa da autorização assinada pelo responsável. Atleta fora da faixa etária não pode ser inscrito.',
+      'O atleta só pode defender uma equipe neste campeonato.'])}
+    <h4>3. Do formato · ${FORMATOS[f].nome}</h4>${li(fmt)}
+    <h4>4. Das partidas</h4>${li([`Cada jogo tem 2 tempos de ${r.tempo} minutos.`,
+      r.faltas ? `A partir da ${r.faltas + 1}ª falta coletiva em cada tempo, a cobrança é tiro livre sem barreira.` : '',
+      `A equipe que não comparecer perde por W.O., com placar de ${r.wo} × 0, registrado pela Secretaria com o motivo.`,
+      'O árbitro registra a partida na súmula digital, assinada por ele e pelos capitães das duas equipes.'])}
+    <h4>5. Da pontuação e do desempate</h4>${li([`Vitória vale ${pl(r.vitoria, 'ponto', 'pontos')}, empate ${pl(r.empate, 'ponto', 'pontos')} e derrota 0.`,
+      f === 'mata' ? '' : 'Em caso de empate em pontos: 1º) mais vitórias; 2º) melhor saldo de gols; 3º) mais gols marcados; 4º) ordem alfabética.'])}
+    <h4>6. Da disciplina</h4>${li([`${r.amarelos} cartões amarelos acumulados suspendem o atleta no jogo seguinte. O segundo amarelo na mesma partida vira vermelho.`,
+      `O cartão vermelho suspende o atleta por ${pl(r.vermelho, 'jogo', 'jogos')}.`, 'O sistema bloqueia o atleta suspenso na súmula.',
+      'Casos graves são julgados pela comissão disciplinar; a suspensão é registrada pela Secretaria com o motivo.'])}
+    <h4>7. Da transparência</h4>${li(['Classificação, jogos, súmulas e o sorteio ficam abertos no portal público, sem login.',
+      'Cada súmula tem um código de autenticidade que qualquer pessoa confere no portal.', 'Correções de resultado só pela Secretaria, com nome, data e motivo registrados no histórico.'])}
+    <h4>8. Disposições finais</h4>${li(['Os casos omissos são resolvidos pela Secretaria Municipal de Esportes.', 'Ao se inscrever, as equipes concordam com este regulamento.',
+      'Os dados pessoais servem só à gestão do campeonato (LGPD). Documentos são apagados ao fim do campeonato.'])}
+    ${sponsorsBar(c)}
+    <div class="sigs" style="grid-template-columns:1fr;max-width:360px;margin:40px auto 0"><div class="sig"><div class="ph"></div>Secretaria Municipal de Esportes de Tonantins</div></div>
+    <p class="sub" style="text-align:center;margin-top:12px">Gerado pelo TNT Esportes em ${new Date().toLocaleDateString('pt-BR')}</p>
+  </div>`
 }
 
 /* ---------- documento da súmula (PDF via impressão) ---------- */
@@ -578,18 +657,27 @@ function buildCards() {
   const c = C(), lastRound = Math.max(0, ...c.matches.filter(m => isDone(m) && m.phase === 'grupos').map(m => m.round))
   const ch = champion(c)
   ui.cards = [
-    canvasCard(c, groupDone(c, 'A') && groupDone(c, 'B') ? 'CLASSIFICAÇÃO FINAL DOS GRUPOS' : `CLASSIFICAÇÃO · APÓS A RODADA ${lastRound}`, (x, F) => {
+    formato(c) === 'mata' ? canvasCard(c, 'MATA-MATA', (x, F) => {
+      let y = 330
+      for (const m of c.matches.filter(m => m.phase !== 'terceiro').sort(byDate).slice(-8)) {
+        x.fillStyle = '#1b4d33'; x.fillRect(48, y, 984, 104)
+        x.textAlign = 'left'; x.fillStyle = '#e1b34a'; x.font = `700 26px ${F.C}`; x.fillText(`${m.title.toUpperCase()} · ${dm(m.date)}`, 76, y + 36)
+        x.fillStyle = '#fff'; fit(x, `${tname(c, m, 'home')} ${isDone(m) ? score(m).join(' × ') : '×'} ${tname(c, m, 'away')}`.toUpperCase(), 76, y + 82, 930, 700, 38, F.C); y += 120
+      }
+    }) : canvasCard(c, allDone(c) || (formato(c) === 'grupos' && groupsOf(c).every(g => groupDone(c, g))) ? 'CLASSIFICAÇÃO FINAL' : `CLASSIFICAÇÃO · APÓS A RODADA ${lastRound}`, (x, F) => {
+      const gs = groupsOf(c), linhas = c.teams.filter(t => t.group).length + gs.length * 1.6
+      const lh = Math.min(72, Math.floor(900 / linhas)), fs = Math.min(36, Math.floor(lh * .55)), q = formato(c) === 'pontos' ? 1 : 2
       let y = 340
-      for (const g of ['A', 'B']) {
-        x.fillStyle = '#9fc2ab'; x.font = `600 26px ${F.B}`; x.textAlign = 'left'; x.fillText('GRUPO ' + g, 60, y)
+      for (const g of gs) {
+        x.fillStyle = '#9fc2ab'; x.font = `600 ${Math.min(26, fs)}px ${F.B}`; x.textAlign = 'left'; x.fillText(formato(c) === 'pontos' ? 'CLASSIFICAÇÃO' : 'GRUPO ' + g, 60, y)
         x.textAlign = 'right'; [['P', 820], ['J', 910], ['SG', 1010]].forEach(([l, px]) => x.fillText(l, px, y))
-        y += 20
-        standings(c, g).forEach((r, i) => { y += 72
-          if (i < 2) { x.fillStyle = 'rgba(225,179,74,.14)'; x.fillRect(48, y - 48, 984, 64) }
-          x.textAlign = 'left'; x.fillStyle = i < 2 ? '#e1b34a' : '#9fc2ab'; x.font = `700 36px ${F.C}`; x.fillText(i + 1, 70, y)
-          x.fillStyle = '#fff'; fit(x, r.t.name, 120, y, 620, 600, 36, F.B)
-          x.textAlign = 'right'; x.font = `700 36px ${F.C}`; x.fillText(r.P, 820, y); x.fillText(r.J, 910, y); x.fillText((r.SG > 0 ? '+' : '') + r.SG, 1010, y) })
-        y += 100
+        y += Math.round(lh * .28)
+        standings(c, g).forEach((r, i) => { y += lh
+          if (i < q) { x.fillStyle = 'rgba(225,179,74,.14)'; x.fillRect(48, y - lh * .66, 984, lh * .9) }
+          x.textAlign = 'left'; x.fillStyle = i < q ? '#e1b34a' : '#9fc2ab'; x.font = `700 ${fs}px ${F.C}`; x.fillText(i + 1, 70, y)
+          x.fillStyle = '#fff'; fit(x, r.t.name, 120, y, 620, 600, fs, F.B)
+          x.textAlign = 'right'; x.font = `700 ${fs}px ${F.C}`; x.fillText(r.P, 820, y); x.fillText(r.J, 910, y); x.fillText((r.SG > 0 ? '+' : '') + r.SG, 1010, y) })
+        y += Math.round(lh * 1.3)
       }
     }),
     canvasCard(c, 'PRÓXIMOS JOGOS', (x, F) => {
@@ -610,13 +698,13 @@ function buildCards() {
     }),
     canvasCard(c, ch ? 'CAMPEÃO' : 'ÚLTIMOS RESULTADOS', (x, F) => {
       if (ch) {
-        const fin = c.matches.find(m => m.phase === 'final'), th = c.matches.find(m => m.phase === 'terceiro')
+        const fin = c.matches.find(m => m.phase === 'final'), [, vice, terc] = podium(c)
         x.textAlign = 'center'; x.fillStyle = '#e1b34a'; x.beginPath(); x.arc(540, 560, 170, 0, 7); x.fill()
         x.fillStyle = '#103d27'; x.font = `700 120px ${F.C}`; x.fillText('1º', 540, 605)
         x.fillStyle = '#fff'; fit(x, T(c, ch).name.toUpperCase(), 540, 860, 960, 700, 88, F.C)
         x.fillStyle = '#cfe3d6'; x.font = `500 34px ${F.B}`
-        x.fillText(`Final: ${label(c, fin)} · ${score(fin).join(' × ')}${fin.pen ? ` (pên. ${fin.pen[0]}×${fin.pen[1]})` : ''}`, 540, 940)
-        x.fillText(`Vice: ${T(c, loser(fin)).name}${winner(th) ? ` · 3º lugar: ${T(c, winner(th)).name}` : ''}`, 540, 995)
+        x.fillText(fin ? `Final: ${label(c, fin)} · ${score(fin).join(' × ')}${fin.pen ? ` (pên. ${fin.pen[0]}×${fin.pen[1]})` : ''}` : `Campeão por pontos corridos · ${standings(c, 'A')[0].P} pontos`, 540, 940)
+        x.fillText(`Vice: ${T(c, vice).name}${terc ? ` · 3º lugar: ${T(c, terc).name}` : ''}`, 540, 995)
         return
       }
       let y = 330
@@ -650,11 +738,11 @@ async function finalize(c, m, quiet) {
   const [h, a] = score(m)
   log(c, m.simulated ? 'Modo apresentação' : REFEREE, `${fix ? 'Correção confirmada' : 'Súmula confirmada'}: ${T(c, m.home).name} ${h} × ${a}${m.pen ? ` (pênaltis ${m.pen[0]}×${m.pen[1]})` : ''} ${T(c, m.away).name}`, null, m)
   resolveKO(c)
-  if (m.phase === 'final') { c.status = 'encerrado'; log(c, SEC, `${T(c, winner(m)).name} é campeão da ${c.name}`) }
+  if (allDone(c)) { c.status = 'encerrado'; log(c, SEC, `${T(c, champion(c)).name} é campeão da ${c.name}`) }
   if (quiet) return
   ui.highlight = [m.home, m.away]
   if (role() === 'secretaria') { ui.tab = 'jogos'; scrollTo(0, 0) }
-  toast(m.phase === 'final' ? `Campeão: ${T(c, winner(m)).name}!` : 'Súmula confirmada. Classificação atualizada.')
+  toast(champion(c) ? `Campeão: ${T(c, champion(c)).name}!` : 'Súmula confirmada. Classificação atualizada.')
 }
 async function sync() {
   let n = 0
@@ -667,7 +755,7 @@ function nextBatch(c) {
   const open = c.matches.filter(m => !isDone(m) && !m.pendingConfirm && m.home && m.away && !m.events.length).sort(byDate)
   if (!open.length) return null
   const f = open[0], key = m => m.phase === 'grupos' ? 'r' + m.round : 'd' + m.date
-  return {batch: open.filter(m => key(m) === key(f)), label: f.phase === 'grupos' ? `a rodada ${f.round}` : f.phase === 'semi' ? 'as semifinais' : 'a final e o 3º lugar'}
+  return {batch: open.filter(m => key(m) === key(f)), label: f.phase === 'grupos' ? `a rodada ${f.round}` : KO_PLURAL[f.phase] ? 'as ' + KO_PLURAL[f.phase].toLowerCase() : c.matches.some(m => m.phase === 'terceiro') ? 'a final e o 3º lugar' : 'a final'}
 }
 function simEvents(c, m) {
   const susp = discipline(c).susp[m.id] || {}, cfg = cfgOf(c), R = n => Math.floor(Math.random() * n), evs = []
@@ -741,17 +829,18 @@ const A = {
   redraw: () => { ui.draw = ui.verify = null },
   applydraw: () => {
     const c = C(), d = ui.draw
-    if (!d?.ok || c.status !== 'inscricoes' || c.teams.length < 4) return
-    c.teams.forEach(t => { t.group = d.groups.A.includes(t.id) ? 'A' : 'B' })
+    if (!d?.ok || c.status !== 'inscricoes' || c.teams.length < minTeams(c) || c.teams.length > maxTeams(c)) return
+    c.teams.forEach(t => { t.group = Object.keys(d.groups).find(g => d.groups[g].includes(t.id)) })
     c.matches = buildFixtures(c, d.groups, c.start)
     c.draw = {seed: d.seed, entrada: d.entrada, final: d.final, hash: d.hash, groups: d.groups, at: new Date().toISOString()}; c.status = 'andamento'
     log(c, SEC, `Sorteio aplicado: grupos definidos e tabela de ${c.matches.length} jogos gerada`)
     ui.draw = null; ui.tab = 'jogos'; scrollTo(0, 0); toast('Tabela gerada!')
   },
   doc: d => { ui.doc = {c: d.c, id: d.id} },
+  reg: d => { ui.doc = null; ui.reg = d.id },
   copylink: d => { navigator.clipboard?.writeText(d.link).then(() => toast('Link copiado. Cole no WhatsApp da equipe.'), () => toast(d.link)); return 'stay' },
   editchamp: d => { ui.editChamp = d.id || null; setTimeout(() => document.getElementById('champform')?.scrollIntoView({behavior: 'smooth'})) },
-  closedoc: () => { ui.doc = null },
+  closedoc: () => { ui.doc = ui.reg = null },
   print: () => { print(); return 'stay' },
   dl: d => { download(+d.i); return 'stay' },
   share: d => { ui.cards[+d.i].toBlob(b => {
@@ -794,7 +883,7 @@ const F = {
     const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max
     if (name.length < 5 || !SPORTS[d.sport] || !/^\d{4}-\d{2}-\d{2}$/.test(d.start)) return toast('Confira nome, modalidade e data de início.')
     if (!(min >= 5 && min <= 80) || (max !== null && !(max >= min && max <= 99))) return toast('Faixa etária inválida.')
-    const c = champBase({id: 'c' + uid().replace(/-/g, '').slice(0, 8), name, sport: d.sport, category: d.category.trim() || 'Livre', minAge: min, maxAge: max, start: d.start, venue: d.venue.trim() || 'A definir'})
+    const c = champBase({id: 'c' + uid().replace(/-/g, '').slice(0, 8), name, sport: d.sport, category: d.category.trim() || 'Livre', minAge: min, maxAge: max, start: d.start, venue: d.venue.trim() || 'A definir', ...lerRegras(d, d.sport)})
     log(c, SEC, 'Campeonato criado; inscrições abertas')
     S.champs.push(c); S.champId = c.id; resetTransient(); ui.tab = 'inscricoes'; toast('Campeonato criado. Cadastre as equipes.')
   },
@@ -804,9 +893,9 @@ const F = {
     if (why.length < 5) return toast('Informe o motivo.')
     if (d.acao === 'wo') {
       if (![m.home, m.away].includes(d.ausente)) return
-      m.wo = d.ausente; m.events = []; m.status = 'encerrado'; m.hash = await sha(sumulaPayload(c, m)).catch(() => null)
+      m.wo = d.ausente; m.woGoals = regras(c).wo; m.events = []; m.status = 'encerrado'; m.hash = await sha(sumulaPayload(c, m)).catch(() => null)
       log(c, SEC, `W.O.: ${T(c, d.ausente).name} não compareceu (${label(c, m)})`, why, m); resolveKO(c)
-      if (m.phase === 'final') c.status = 'encerrado'
+      if (allDone(c)) c.status = 'encerrado'
     } else {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || !/^\d{2}:\d{2}$/.test(d.time)) return toast('Informe nova data e horário.')
       const old = `${dm(m.date)} ${m.time}`; m.date = d.date; m.time = d.time.replace(':', 'h'); m.postponed = true
@@ -826,7 +915,7 @@ const F = {
     const c = C(), m = cur(), why = d.why.trim()
     if (why.length < 5) return toast('Informe o motivo da correção.')
     m.wo = null; m.status = 'correcao'; m.signatures = {}; m.hash = null
-    if (m.phase === 'final') c.status = 'andamento'
+    if (c.status === 'encerrado') c.status = 'andamento'
     log(c, SEC, `Súmula reaberta para correção: ${label(c, m)}`, why, m)
   },
   dodraw: async d => {
@@ -834,13 +923,13 @@ const F = {
     if (!ui.draw?.hash || ui.draw.groups) return
     if (!ui.draw.seed) return toast('A semente secreta fica só no aparelho que publicou o compromisso. Faça o sorteio nele.')
     if (entrada.length < 3) return toast('Digite a entrada pública (pelo menos 3 caracteres).')
-    try { const final = await finalSeed(ui.draw.seed, entrada); Object.assign(ui.draw, {entrada, final, groups: drawGroups(C().teams, final)})
+    try { const final = await finalSeed(ui.draw.seed, entrada); Object.assign(ui.draw, {entrada, final, groups: drawGroups(C().teams, final, drawN(C()))})
       log(C(), SEC, `Sorteio feito em público · entrada pública: ${entrada}`) } catch (e) { toast(e.message) }
   },
   verify: async d => {
     const c = C(), seed = d.seed.trim().toLowerCase(), entrada = d.entrada.trim()
     if (!/^[0-9a-f]{16}$/.test(seed)) return toast('A semente tem 16 caracteres (0 a 9 e a a f).')
-    try { const final = await finalSeed(seed, entrada); ui.verify = {seed, entrada, final, hash: await sha(seed), groups: drawGroups(c.teams, final), cid: c.id} } catch (e) { toast(e.message) }
+    try { const final = await finalSeed(seed, entrada); ui.verify = {seed, entrada, final, hash: await sha(seed), groups: drawGroups(c.teams, final, drawN(c)), cid: c.id} } catch (e) { toast(e.message) }
   },
   sumcheck: async d => {
     const k = d.code.toLowerCase().replace(/[^0-9a-f]/g, '')
@@ -872,8 +961,8 @@ function render() {
   $('#tabs').innerHTML = tabs.map(([k, l]) => `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" ${ui.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')
   app.className = 'wrap'; app.innerHTML = c || ['campeonatos', 'relatorios'].includes(ui.tab) ? VIEWS[ui.tab]()
     : `<div class="card empty mt">Nenhum campeonato cadastrado ainda.${r === 'secretaria' ? '<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="campeonatos">Criar o primeiro campeonato</button></div>' : ''}</div>`
-  doc.hidden = !ui.doc; doc.innerHTML = ui.doc ? vDoc() : ''
-  document.body.classList.toggle('doc-open', !!ui.doc)
+  doc.hidden = !(ui.doc || ui.reg); doc.innerHTML = ui.doc ? vDoc() : ui.reg ? vReg() : ''
+  document.body.classList.toggle('doc-open', !!(ui.doc || ui.reg))
   if (ui.tab === 'sumula') hookPads()
   if (ui.tab === 'divulgacao' && c?.matches.length)
     Promise.all([document.fonts.load('700 40px "Barlow Condensed"'), document.fonts.load('600 30px Barlow')]).catch(() => {}).finally(buildCards)
@@ -897,7 +986,7 @@ document.addEventListener('input', e => {   // campos da tela de assinatura: gua
   if (e.target.dataset.pen !== undefined) { m.pen ??= [null, null]; m.pen[+e.target.dataset.pen] = e.target.value === '' ? null : +e.target.value; save() }
   if (e.target.dataset.notes !== undefined) { m.notes = e.target.value.slice(0, 600); save() }
 })
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.doc) { ui.doc = null; render() } })
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && (ui.doc || ui.reg)) { ui.doc = ui.reg = null; render() } })
 setInterval(() => { if (!ui.clock.running) return; ui.clock.sec++; const el = document.getElementById('clock'); if (el) el.textContent = fmt(ui.clock.sec) }, 1000)
 
 async function ensureHashes() { for (const c of S.champs) for (const m of c.matches) if (isDone(m) && !m.hash) m.hash = await sha(sumulaPayload(c, m)).catch(() => null) }

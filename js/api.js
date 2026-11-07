@@ -17,7 +17,7 @@ async function q(p) { const {data, error} = await p; if (error) throw Object.ass
 async function toState(r) {
   const marca = p => p ? `${SUPABASE_URL}/storage/v1/object/public/marcas/${p}` : null   // logos são públicas
   const camps = r.campeonatos.map(c => champBase({id: c.id, name: c.nome, sport: c.modalidade, category: c.categoria, minAge: c.idade_min,
-    maxAge: c.idade_max, start: c.inicio, venue: c.local, status: c.status, logo: marca(c.logo_path), responsible: c.responsavel,
+    maxAge: c.idade_max, start: c.inicio, venue: c.local, status: c.status, format: c.formato, rules: c.regras || {}, logo: marca(c.logo_path), responsible: c.responsavel,
     responsiblePhone: c.responsavel_telefone, regUntil: c.inscricao_ate, maxPlayers: c.max_atletas,
     sponsors: (c.patrocinadores || []).map(x => ({name: x.nome, logo: marca(x.logo_path), path: x.logo_path}))}))
   const byId = Object.fromEntries(camps.map(c => [c.id, c]))
@@ -35,7 +35,7 @@ async function toState(r) {
     const a = j.assinaturas || {}, m = newMatch({id: j.id, phase: j.fase, round: j.rodada, group: j.grupo, title: j.titulo,
       home: j.mandante_id, away: j.visitante_id, slotH: j.vaga_mandante, slotA: j.vaga_visitante, date: j.data, time: j.hora, status: j.status,
       events: evs[j.id] || [], pen: j.pen_mandante == null ? null : [j.pen_mandante, j.pen_visitante], wo: j.wo_ausente_id, postponed: j.adiado,
-      notes: j.observacoes, hash: j.hash, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
+      notes: j.observacoes, hash: j.hash, woGoals: byId[j.campeonato_id] ? regras(byId[j.campeonato_id]).wo : 3, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
       signatures: Object.fromEntries([['arbitro', a.arbitro], ['home', a.mandante], ['away', a.visitante]].filter(x => x[1]))})
     const d = j.status !== 'encerrado' && json(draftKey(j.id))   // súmula em andamento neste aparelho
     if (d) { const ids = new Set(m.events.map(e => e.id))
@@ -56,7 +56,7 @@ async function toState(r) {
     // compromisso publicado, tabela ainda não gerada: retoma o sorteio de onde parou
     const pd = c.pendingDraw = {cid: c.id, hash: d.hash, seed: d.semente || local.get(seedKey(c.id))}
     if (d.revelado_em) { const final = await finalSeed(d.semente, d.entrada_publica)
-      Object.assign(pd, {entrada: d.entrada_publica, final, groups: drawGroups(c.teams, final), revealed: true, ok: true}) }
+      Object.assign(pd, {entrada: d.entrada_publica, final, groups: drawGroups(c.teams, final, drawN(c)), revealed: true, ok: true}) }
   }
   return camps
 }
@@ -240,6 +240,7 @@ const REAL_A = {
   applydraw: write(async () => {
     const c = C(), d = ui.draw
     if (!d?.ok || c.status !== 'inscricoes') return
+    if (c.teams.length < minTeams(c) || c.teams.length > maxTeams(c)) return toast(`Este formato precisa de ${minTeams(c)} a ${maxTeams(c)} equipes.`)
     const ms = buildFixtures(c, d.groups, c.start), id = Object.fromEntries(ms.map(m => [m.id, uid()]))   // o banco usa uuid
     const vaga = s => s && s.replace(/^([VP]):(.+)$/, (_, k, x) => `${k}:${id[x]}`)
     await rpc('aplicar_sorteio', {c: c.id, g: d.groups, jogos_novos: ms.map(m => ({id: id[m.id], fase: m.phase, rodada: m.round, grupo: m.group, titulo: m.title,
@@ -330,8 +331,8 @@ const REAL_F = {
     if (name.length < 5 || (!d.id && !SPORTS[d.sport]) || !/^\d{4}-\d{2}-\d{2}$/.test(d.start)) return toast('Confira nome, modalidade e data de início.')
     if (!(min >= 5 && min <= 80) || (max !== null && !(max >= min && max <= 99))) return toast('Faixa etária inválida.')
     if (!(maxPlayers >= 5 && maxPlayers <= 40)) return toast('O máximo de atletas por equipe vai de 5 a 40.')
-    const t = v => v?.trim() || null
-    const campos = {nome: name, categoria: t(d.category) || 'Livre', idade_min: min, idade_max: max, inicio: d.start, local: t(d.venue) || 'A definir',
+    const t = v => v?.trim() || null, atual = d.id && S.champs.find(c => c.id === d.id), {format, rules} = lerRegras(d, atual?.sport || d.sport, atual)
+    const campos = {formato: format, regras: rules, nome: name, categoria: t(d.category) || 'Livre', idade_min: min, idade_max: max, inicio: d.start, local: t(d.venue) || 'A definir',
       responsavel: t(d.resp), responsavel_telefone: t(d.respPhone), inscricao_ate: d.regUntil || null, max_atletas: maxPlayers}
     let id = d.id
     if (id) await q(sb.from('campeonatos').update(campos).eq('id', id))

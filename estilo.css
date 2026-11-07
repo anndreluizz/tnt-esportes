@@ -262,3 +262,16 @@ fieldset.step legend > span{width:28px;height:28px;font-size:14px}
 .pat .x{position:absolute;top:8px;right:8px;z-index:1;width:32px;height:32px;border:0;border-radius:50%;background:var(--redbg);color:var(--red);font:700 18px Barlow;cursor:pointer}
 .addpat{min-height:200px;border:2px dashed #b9cbbf;border-radius:14px;background:none;font:600 16px Barlow;color:var(--g7);cursor:pointer}
 .addpat:hover{border-color:var(--g7);background:#edf6f0}
+
+/* formato do campeonato: cartões de escolha; campos que só valem para um formato */
+.formatos{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))}
+.formato{position:relative;display:grid;gap:4px;padding:14px 14px 14px 46px;border:1.5px solid var(--line);border-radius:14px;background:#fff;cursor:pointer;font-weight:500}
+.formato input{position:absolute;left:14px;top:16px;width:22px;height:22px;min-height:0;accent-color:var(--g7)}
+.formato b{font-size:16px}.formato span{font-size:13px;color:var(--muted)}
+.formato:has(input:checked){border-color:var(--g7);background:#edf6f0;box-shadow:0 0 0 3px rgba(23,97,59,.12)}
+form:has(input[name=format][value=pontos]:checked) .so-grupos, form:has(input[name=format][value=mata]:checked) .so-grupos,
+form:has(input[name=format][value=grupos]:checked) .so-pontos, form:has(input[name=format][value=mata]:checked) .so-pontos,
+form:has(input[name=format][value=pontos]:checked) .so-mata-mata{display:none}
+.bracket{grid-template-columns:repeat(var(--cols,2),minmax(0,1fr))}
+@media(max-width:620px){.bracket{grid-template-columns:1fr}}
+.paper.reg ol{margin:4px 0 10px;padding-left:22px}.paper.reg li{margin:3px 0}

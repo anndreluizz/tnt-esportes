@@ -73,5 +73,29 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   const s15 = run('C().draw')
   ok(s15.final === createHash('sha256').update(s15.seed + '4 15 8').digest('hex').slice(0, 16) && run(`JSON.stringify(drawGroups(C().teams, C().draw.final)) === JSON.stringify(C().draw.groups)`), 'sorteio real usa a entrada pública')
   await allViews()
+
+  // outros formatos: monta, sorteia, simula até o campeão
+  const formato = async (id, nTimes, format, rules) => {
+    run(`(()=>{ const c = champBase({id: '${id}', name: 'Teste ${id}', sport: 'Futsal', category: 'Livre', minAge: 15, maxAge: null, start: '2027-03-06', venue: 'Quadra', format: '${format}', rules: ${JSON.stringify(rules)}})
+      for (let i = 0; i < ${nTimes}; i++) { const t = '${id}t' + i; c.teams.push({id: t, name: 'Equipe ' + String.fromCharCode(65 + i), group: null, pot: i < 2 ? 1 : 2, code: 'X', bairro: 'Centro'})
+        for (let k = 0; k < 6; k++) c.players.push({id: t + 'p' + k, team: t, name: 'Atleta ' + i + k, num: k + 1, birth: '1995-01-01', auth: true, approved: true, consent: true, photo: null, bairro: 'Centro'}) }
+      const g = drawGroups(c.teams, 'abcdef0123456789', drawN(c)); c.teams.forEach(t => { t.group = Object.keys(g).find(k => g[k].includes(t.id)) })
+      c.matches = buildFixtures(c, g, c.start); c.status = 'andamento'; c.draw = {groups: g}; S.champs.push(c); S.champId = c.id; resetTransient() })()`)
+    const total = run('C().matches.length')
+    for (let i = 0; i < 40 && !run('champion(C())'); i++) await run('A.simulate()')
+    await allViews(); run(`S.champId = '${id}'; S.session = {role: 'secretaria'}`)
+    return total
+  }
+  ok(await formato('pc', 5, 'pontos', {returno: true, vitoria: 2}) === 20, 'pontos corridos com returno: 5 equipes = 20 jogos')
+  ok(run(`C().matches.every(m => m.phase === 'grupos') && C().status === 'encerrado' && champion(C()) === standings(C(), 'A')[0].t.id`), 'pontos corridos: campeão é o 1º colocado')
+  ok(run(`standings(C(), 'A').every(r => r.P === r.V * 2 + r.E)`), 'vitória valendo 2 pontos')
+  ok(await formato('g4', 8, 'grupos', {grupos: 4}) === 12, '4 grupos: 4 jogos de grupo + quartas, semis, 3º e final')
+  ok(run(`C().matches.filter(m => m.phase === 'quartas').length === 4 && C().matches.find(m => m.phase === 'quartas').slotH === '1A' && !!champion(C()) && C().status === 'encerrado'`), '4 grupos: quartas 1ºA×2ºB até o campeão')
+  ok(await formato('mm', 6, 'mata', {terceiro: false}) === 5, 'mata-mata com 6 equipes: 2 quartas, 2 semis e a final (sem 3º lugar)')
+  ok(run(`(() => { const c = C(), q = c.matches.filter(m => m.phase === 'quartas'), s = c.matches.filter(m => m.phase === 'semi')
+    return q.every(m => m.home && m.away && !m.slotH) && s[0].home === c.draw.groups.A[0] && s[1].home === c.draw.groups.A[1] && !!champion(c) })()`), 'mata-mata: cabeças de chave com folga direto na semifinal')
+  run(`ui.doc = null; ui.reg = 'g4'; render()`); ok(els['#doc'].innerHTML.includes('REGULAMENTO') && els['#doc'].innerHTML.includes('4 grupos') && els['#doc'].innerHTML.includes('quartas de final'), 'regulamento gerado com o formato')
+  run(`ui.reg = 'pc'; render()`); ok(els['#doc'].innerHTML.includes('turno e returno') && els['#doc'].innerHTML.includes('Vitória vale 2 pontos'), 'regulamento com as regras escolhidas')
+  run(`ui.reg = null; render()`)
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()

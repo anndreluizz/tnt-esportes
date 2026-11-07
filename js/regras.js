@@ -10,7 +10,23 @@ const POSICOES = {
   'Futebol society':  ['Goleiro', 'Zagueiro', 'Lateral', 'Meio-campo', 'Atacante'],
   'Futebol de campo': ['Goleiro', 'Zagueiro', 'Lateral', 'Volante', 'Meia', 'Atacante'],
 }
-const PHASES = {grupos: 'Fase de grupos', semi: 'Semifinal', terceiro: 'Disputa de 3º lugar', final: 'Final'}
+const PHASES = {grupos: 'Fase de grupos', oitavas: 'Oitavas de final', quartas: 'Quartas de final', semi: 'Semifinal', terceiro: 'Disputa de 3º lugar', final: 'Final'}
+const KO_ORDER = ['oitavas', 'quartas', 'semi', 'terceiro', 'final']
+
+/* ---------- formato e regras de cada campeonato (o que não for escolhido usa o padrão da modalidade) ---------- */
+const FORMATOS = {
+  grupos: {nome: 'Grupos + mata-mata', desc: 'Grupos de todos contra todos. Os 2 melhores de cada grupo vão para o mata-mata.'},
+  pontos: {nome: 'Pontos corridos', desc: 'Todos contra todos. Campeão é quem somar mais pontos.'},
+  mata:   {nome: 'Mata-mata', desc: 'Eliminatória desde o primeiro jogo: quem perde está fora.'},
+}
+const regrasPadrao = sport => { const s = SPORTS[sport] || SPORTS.Futsal
+  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true} }
+const regras = c => ({...regrasPadrao(c.sport), ...c.rules})
+const formato = c => c.format || 'grupos'
+const groupsOf = c => [...new Set(c.teams.map(t => t.group).filter(Boolean))].sort()
+const minTeams = c => formato(c) === 'grupos' ? regras(c).grupos * 2 : 3
+const maxTeams = c => formato(c) === 'mata' ? 16 : 40
+const allDone = c => c.matches.length > 0 && c.matches.every(isDone)
 const TIMES = ['19h00', '20h00', '21h00', '18h00']
 
 const isDone = m => m.status === 'encerrado'
@@ -20,7 +36,7 @@ const P = (c, id) => c.players.find(p => p.id === id) || {name: '(atleta removid
 const findMatch = (c, id) => c.matches.find(m => m.id === id)
 
 function goals(m) { return [m.home, m.away].map(t => m.events.filter(e => e.type === 'gol' && e.team === t).length) }
-function score(m) { return m.wo ? (m.wo === m.home ? [0, 3] : [3, 0]) : goals(m) }
+function score(m) { const w = m.woGoals ?? 3; return m.wo ? (m.wo === m.home ? [0, w] : [w, 0]) : goals(m) }
 function winner(m) {
   if (!isDone(m)) return null
   const [h, a] = score(m)
@@ -28,7 +44,16 @@ function winner(m) {
   return m.pen ? (m.pen[0] > m.pen[1] ? m.home : m.away) : null
 }
 function loser(m) { const w = winner(m); return w && (w === m.home ? m.away : m.home) }
-const champion = c => { const f = c.matches.find(m => m.phase === 'final'); return f ? winner(f) : null }
+function champion(c) {   // pontos corridos: o 1º quando todos os jogos acabam; senão, quem vence a final
+  if (formato(c) === 'pontos') return allDone(c) ? standings(c, 'A')[0]?.t.id ?? null : null
+  const f = c.matches.find(m => m.phase === 'final'); return f ? winner(f) : null
+}
+// pódio: [campeão, vice, 3º]
+function podium(c) {
+  if (formato(c) === 'pontos') { const s = allDone(c) ? standings(c, 'A') : []; return [0, 1, 2].map(i => s[i]?.t.id ?? null) }
+  const f = c.matches.find(m => m.phase === 'final'), t = c.matches.find(m => m.phase === 'terceiro')
+  return [f && winner(f), f && loser(f), t ? winner(t) : null]
+}
 
 /* ---------- inscrição ---------- */
 function ageAt(birth, ref) {
@@ -62,7 +87,8 @@ function standings(c, g) {
     H.J++; A.J++; H.GP += h; H.GC += a; A.GP += a; A.GC += h
     if (h > a) { H.V++; A.D++ } else if (h < a) { A.V++; H.D++ } else { H.E++; A.E++ }
   }
-  rows.forEach(x => { x.P = x.V * 3 + x.E; x.SG = x.GP - x.GC })
+  const r0 = regras(c)
+  rows.forEach(x => { x.P = x.V * r0.vitoria + x.E * r0.empate; x.SG = x.GP - x.GC })
   // desempate: pontos, vitórias, saldo, gols marcados, ordem alfabética
   return rows.sort((a, b) => b.P - a.P || b.V - a.V || b.SG - a.SG || b.GP - a.GP || a.t.name.localeCompare(b.t.name))
 }
@@ -85,26 +111,27 @@ function slotLabel(c, s) {
 // Preenche os times do mata-mata que ainda não começou. Rodar depois de qualquer mudança de resultado.
 function resolveKO(c) {
   for (const m of c.matches) if (m.phase !== 'grupos' && !isDone(m) && !m.events.length) {
-    m.home = slotTeam(c, m.slotH); m.away = slotTeam(c, m.slotA)
+    if (m.slotH) m.home = slotTeam(c, m.slotH)   // sem vaga = equipe já definida (mata-mata direto ou folga)
+    if (m.slotA) m.away = slotTeam(c, m.slotA)
   }
 }
 
-/* ---------- disciplina: 3 amarelos ou 1 vermelho = suspenso no jogo seguinte; 2 amarelos = pendurado ---------- */
+/* ---------- disciplina: N amarelos ou 1 vermelho = suspenso nos jogos seguintes; um amarelo antes do limite = pendurado ---------- */
 function discipline(c) {
-  const susp = {}, st = {}
+  const susp = {}, st = {}, r0 = regras(c)
   const add = (mid, pid, why) => { (susp[mid] ??= {})[pid] = why }
   for (const p of c.players) {
     const ms = c.matches.filter(m => m.home && (m.home === p.team || m.away === p.team)).sort(byDate)
-    let y = 0, pend = null
+    let y = 0, pend = 0, why = null
     for (const m of ms) {
-      if (pend) { add(m.id, p.id, pend); pend = null; continue }
+      if (pend) { add(m.id, p.id, why); pend--; continue }
       if (!isDone(m)) break
       for (const e of m.events) if (e.player === p.id) {
-        if (e.type === 'vermelho') pend = 'Cartão vermelho'
-        if (e.type === 'amarelo' && ++y >= 3) { y = 0; pend = '3 cartões amarelos' }
+        if (e.type === 'vermelho') { pend = r0.vermelho; why = 'Cartão vermelho' }
+        if (e.type === 'amarelo' && ++y >= r0.amarelos) { y = 0; pend = Math.max(pend, 1); why = `${r0.amarelos} cartões amarelos` }
       }
     }
-    st[p.id] = {y}
+    st[p.id] = {y, pendurado: y === r0.amarelos - 1}
   }
   for (const x of c.punishments) for (const mid of x.matches) add(mid, x.player, 'Decisão da comissão disciplinar')
   return {susp, st}
@@ -133,18 +160,53 @@ function newMatch(o) {
   return {group: null, round: null, home: null, away: null, slotH: null, slotA: null, title: null, status: 'agendado', events: [], half: 1,
     pen: null, wo: null, postponed: null, signatures: {}, notes: '', hash: null, pendingConfirm: false, referee: 'João Paulo', history: [], ...o}
 }
-// Grupo A joga aos sábados, grupo B aos domingos; depois semifinais, 3º lugar e final.
+// ordem das posições numa chave (1º enfrenta o último, e os melhores só se cruzam no fim): 8 → 1,8,4,5,2,7,3,6
+function seedOrder(n) { let a = [1]; while (a.length < n) a = a.flatMap(s => [s, a.length * 2 + 1 - s]); return a }
+const KO_QTD = {2: ['semi', 'Semifinal'], 4: ['quartas', 'Quartas de final'], 8: ['oitavas', 'Oitavas de final']}
+// Grupos ímpares (A, C...) jogam aos sábados e pares (B, D...) aos domingos; mata-mata uma semana depois de cada fase.
 function buildFixtures(c, groups, start) {
-  const ms = []; let n = 0
+  const r0 = regras(c), ms = [], perDay = {}; let n = 0
   const id = () => `${c.id}-m${++n}`
-  const rA = roundRobin(groups.A), rB = roundRobin(groups.B), R = Math.max(rA.length, rB.length)
-  for (let r = 0; r < R; r++) for (const [g, pairs, off] of [['A', rA[r] || [], 0], ['B', rB[r] || [], 1]])
-    pairs.forEach(([h, a], i) => ms.push(newMatch({id: id(), phase: 'grupos', round: r + 1, group: g, home: h, away: a, date: addDays(start, r * 7 + off), time: TIMES[i]})))
-  const ko = addDays(start, R * 7), s1 = id(), s2 = id()
-  ms.push(newMatch({id: s1, phase: 'semi', title: 'Semifinal 1', slotH: '1A', slotA: '2B', date: ko, time: '19h00'}),
-          newMatch({id: s2, phase: 'semi', title: 'Semifinal 2', slotH: '1B', slotA: '2A', date: ko, time: '20h00'}),
-          newMatch({id: id(), phase: 'terceiro', title: 'Disputa de 3º lugar', slotH: 'P:' + s1, slotA: 'P:' + s2, date: addDays(ko, 7), time: '18h30'}),
-          newMatch({id: id(), phase: 'final', title: 'Final', slotH: 'V:' + s1, slotA: 'V:' + s2, date: addDays(ko, 7), time: '20h00'}))
+  const hora = date => { const k = perDay[date] = (perDay[date] ?? -1) + 1; return k < TIMES.length ? TIMES[k] : String(21 - k).padStart(2, '0') + 'h00' }
+  // mata-mata: lados = {team}, {slot} ou null (folga: passa direto para a fase seguinte)
+  const chave = (lados, date) => {
+    let semis = null
+    while (lados.length > 1) {
+      const qtd = lados.length / 2, prox = [], jogos = []
+      if (qtd === 1) {
+        const [a, b] = lados
+        if (semis && r0.terceiro) ms.push(newMatch({id: id(), phase: 'terceiro', title: 'Disputa de 3º lugar', slotH: 'P:' + semis[0], slotA: 'P:' + semis[1], date, time: '18h30'}))
+        ms.push(newMatch({id: id(), phase: 'final', title: 'Final', home: a.team ?? null, away: b.team ?? null, slotH: a.slot ?? null, slotA: b.slot ?? null, date, time: '20h00'}))
+        return
+      }
+      const [fase, tit] = KO_QTD[qtd]
+      for (let i = 0; i < qtd; i++) {
+        const a = lados[2 * i], b = lados[2 * i + 1]
+        if (!a || !b) { prox.push(a || b); continue }
+        const mid = id(); jogos.push(mid)
+        ms.push(newMatch({id: mid, phase: fase, title: `${tit} ${jogos.length}`, home: a.team ?? null, away: b.team ?? null, slotH: a.slot ?? null, slotA: b.slot ?? null, date, time: hora(date)}))
+        prox.push({slot: 'V:' + mid})
+      }
+      semis = fase === 'semi' && jogos.length === 2 ? jogos : null
+      lados = prox; date = addDays(date, 7)
+    }
+  }
+  if (formato(c) === 'mata') {   // ordem do sorteio = cabeças de chave primeiro; quem sobra até a potência de 2 ganha folga
+    const order = groups.A, size = 2 ** Math.ceil(Math.log2(Math.max(2, order.length)))
+    chave(seedOrder(size).map(s => s <= order.length ? {team: order[s - 1]} : null), start)
+    return ms
+  }
+  const gs = Object.keys(groups).sort(), rr = gs.map(g => {
+    const rs = roundRobin(groups[g]); return r0.returno ? [...rs, ...rs.map(p => p.map(([a, b]) => [b, a]))] : rs })
+  const R = Math.max(...rr.map(x => x.length))
+  for (let k = 0; k < R; k++) gs.forEach((g, gi) => (rr[gi][k] || []).forEach(([h, a]) => {
+    const date = addDays(start, k * 7 + gi % 2)
+    ms.push(newMatch({id: id(), phase: 'grupos', round: k + 1, group: g, home: h, away: a, date, time: hora(date)}))
+  }))
+  if (formato(c) === 'pontos') return ms
+  // 2 grupos: semifinal 1ºA×2ºB e 1ºB×2ºA; 4 grupos: quartas 1ºA×2ºB, 1ºC×2ºD, 1ºB×2ºA, 1ºD×2ºC
+  const cruz = gs.length === 4 ? ['1A', '2B', '1C', '2D', '1B', '2A', '1D', '2C'] : ['1A', '2B', '1B', '2A']
+  chave(cruz.map(slot => ({slot})), addDays(start, R * 7))
   return ms
 }
 
@@ -155,14 +217,16 @@ function rng(hex) {
   return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 }
 }
 function shuffle(arr, r) { arr = [...arr]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]] } return arr }
-// Mesma semente + mesmas equipes = mesmo resultado. Cabeças de chave (pote 1) são distribuídos primeiro, alternando A/B.
-function drawGroups(teams, seed) {
+// Mesma semente + mesmas equipes = mesmo resultado. Cabeças de chave (pote 1) são distribuídos primeiro, um em cada grupo.
+// n = número de grupos (1 = todos no grupo A: pontos corridos, ou a ordem da chave no mata-mata)
+function drawGroups(teams, seed, n = 2) {
   const r = rng(seed), sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name))
   const order = [...shuffle(sorted.filter(t => t.pot === 1), r), ...shuffle(sorted.filter(t => t.pot !== 1), r)]
-  const g = {A: [], B: []}
-  order.forEach((t, i) => g[i % 2 ? 'B' : 'A'].push(t.id))
+  const g = Object.fromEntries([...'ABCDEFGH'.slice(0, n)].map(l => [l, []]))
+  order.forEach((t, i) => g['ABCDEFGH'[i % n]].push(t.id))
   return g
 }
+const drawN = c => formato(c) === 'grupos' ? regras(c).grupos : 1
 async function sha(s) {
   if (!crypto.subtle) throw new Error('Abra o arquivo direto no navegador ou por HTTPS.')
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
@@ -198,3 +262,14 @@ if (typeof document !== 'undefined') document.addEventListener('change', e => { 
   const im = box.querySelector('img'); im.src = URL.createObjectURL(f); im.hidden = false
   box.querySelector('svg')?.remove(); box.querySelector('b').textContent = 'Toque para trocar'; box.classList.add('tem')
 })
+
+// formulário do campeonato -> {format, rules}; atual = campeonato sendo editado (formato travado depois do sorteio)
+function lerRegras(d, sport, atual) {
+  const p = regrasPadrao(sport), base = atual ? regras(atual) : p
+  const n = (k, min, max) => { const v = parseInt(d['r_' + k]); return v >= min && v <= max ? v : base[k] }
+  const trava = atual && !d.format   // campos de estrutura vêm desabilitados: mantém os atuais
+  return {format: trava ? formato(atual) : FORMATOS[d.format] ? d.format : 'grupos',
+    rules: {tempo: n('tempo', 5, 60), vitoria: n('vitoria', 1, 5), empate: n('empate', 0, 3), amarelos: n('amarelos', 2, 5), vermelho: n('vermelho', 1, 5),
+      wo: n('wo', 1, 10), faltas: d.r_faltas === '' ? null : n('faltas', 3, 10),
+      grupos: trava ? base.grupos : d.r_grupos === '4' ? 4 : 2, returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro}}
+}

@@ -172,6 +172,56 @@ await q(`select registrar_wo($1, $2, 'equipe desistiu da disputa de 3º')`, [J.t
 await como(ARB)
 await ev(randomUUID(), J.f, 'gol', T.a2.id, A.a2)
 await q(`select confirmar_sumula($1, null, null, '', $2)`, [J.f, assin])
+console.log('Formatos e regras')
+// monta um campeonato, sorteia e gera os jogos como o app faz (aplicar_sorteio)
+const novoCamp = async (formato, regras, nomes) => {
+  await como(SEC)
+  const [{ id }] = await q(`insert into campeonatos (nome, modalidade, idade_min, inicio, formato, regras) values ($1, 'Futsal', 15, '2027-05-01', $2, $3) returning id`, ['Copa ' + formato, formato, regras])
+  const eq = []
+  for (const n of nomes) {
+    const [t] = await q(`insert into equipes (campeonato_id, nome, bairro) values ($1, $2, 'Centro') returning id`, [id, n])
+    const [{ id: a }] = await q(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, autorizacao, aprovado, consentimento) values ($1, $2, 9, '1990-01-01', 'Centro', true, true, true) returning id`, [t.id, 'Atl ' + n])
+    eq.push({ id: t.id, a })
+  }
+  const sem = 'ab12cd34ef56ab78'
+  await q(`select publicar_compromisso($1, $2)`, [id, sha(sem)]); await q(`select revelar_semente($1, $2, '1 2 3')`, [id, sem])
+  return { id, eq }
+}
+const jg = (o) => ({ id: randomUUID(), fase: 'grupos', rodada: 1, grupo: 'A', titulo: null, mandante_id: null, visitante_id: null, vaga_mandante: null, vaga_visitante: null, data: '2027-05-01', hora: '19h00', ...o })
+const apita = async (cid, jid, gols) => {   // gols: equipes que marcam, na ordem
+  await como(SEC); await q(`update jogos set arbitro_id = $1 where id = $2`, [ARB, jid]); await como(ARB)
+  for (const g of gols) await ev(randomUUID(), jid, 'gol', g.id, g.a)
+  return q(`select confirmar_sumula($1, null, null, '', $2)`, [jid, assin])
+}
+// pontos corridos: 3 equipes, vitória vale 2, W.O. 5 × 0, termina sozinho no último jogo
+const PC = await novoCamp('pontos', { vitoria: 2, wo: 5 }, ['PC Um', 'PC Dois', 'PC Tres'])
+const [x, y, z] = PC.eq, jpc = [jg({ mandante_id: x.id, visitante_id: y.id }), jg({ mandante_id: y.id, visitante_id: z.id, rodada: 2 }), jg({ mandante_id: z.id, visitante_id: x.id, rodada: 3 })]
+await q(`select aplicar_sorteio($1, $2, $3)`, [PC.id, { A: [x.id, y.id, z.id] }, jpc])
+await apita(PC.id, jpc[0].id, [x])
+await como(SEC); await q(`select registrar_wo($1, $2, 'equipe não apareceu')`, [jpc[1].id, z.id])
+ok((await q(`select gols_mandante m, gols_visitante v from placar where jogo_id = $1`, [jpc[1].id]))[0].m === 5, 'W.O. com o placar da regra (5 × 0)')
+ok((await q(`select status from campeonatos where id = $1`, [PC.id]))[0].status === 'andamento', 'pontos corridos não termina antes do último jogo')
+await apita(PC.id, jpc[2].id, [z])
+const cpc = await q(`select nome, pontos from classificacao where campeonato_id = $1 order by posicao`, [PC.id])
+ok(cpc.map(r => r.nome + ':' + r.pontos).join() === 'PC Dois:2,PC Tres:2,PC Um:2' || cpc.every(r => r.pontos === 2), 'vitória vale 2 pontos na classificação')
+ok((await q(`select status from campeonatos where id = $1`, [PC.id]))[0].status === 'encerrado', 'pontos corridos termina sozinho no último jogo')
+await como(SEC); await q(`select reabrir_sumula($1, 'gol anulado pela comissão')`, [jpc[2].id])
+ok((await q(`select status from campeonatos where id = $1`, [PC.id]))[0].status === 'andamento', 'reabrir o último jogo reabre o campeonato')
+// mata-mata com 3 equipes: o cabeça de chave tem folga e entra direto na final
+const MM = await novoCamp('mata', { terceiro: false }, ['MM Um', 'MM Dois', 'MM Tres'])
+const [m1, m2, m3] = MM.eq, semiMM = jg({ fase: 'semi', grupo: null, rodada: null, titulo: 'Semifinal 1', mandante_id: m2.id, visitante_id: m3.id })
+const finMM = jg({ fase: 'final', grupo: null, rodada: null, titulo: 'Final', mandante_id: m1.id, vaga_visitante: 'V:' + semiMM.id, data: '2027-05-08', hora: '20h00' })
+await erro(`select aplicar_sorteio($1, $2, $3)`, [MM.id, { Z: [m1.id, m2.id, m3.id] }, [semiMM, finMM]], 'Grupo inválido', 'grupo fora de A–H é recusado')
+await q(`select aplicar_sorteio($1, $2, $3)`, [MM.id, { A: [m1.id, m2.id, m3.id] }, [semiMM, finMM]])
+await apita(MM.id, semiMM.id, [m3])
+const [f1] = await q(`select mandante_id, visitante_id from jogos where id = $1`, [finMM.id])
+ok(f1.mandante_id === m1.id && f1.visitante_id === m3.id, 'mata-mata: folga mantém o cabeça de chave e o vencedor da semiMM entra na final')
+await apita(MM.id, finMM.id, [m1])
+ok((await q(`select status from campeonatos where id = $1`, [MM.id]))[0].status === 'encerrado' && (await q(`select vencedor($1) v`, [finMM.id]))[0].v === m1.id, 'mata-mata termina na final com o campeão')
+// 4 grupos: vaga "1C" é aceita
+await db.exec('reset role')   // função interna (não exposta ao app)
+ok((await q(`select vaga_equipe($1, '1C') v`, [MM.id]))[0].v === null, 'vagas de grupos C e D funcionam (4 grupos)')
+
 console.log('Acesso de árbitros')
 const NOVO = randomUUID()
 await db.exec('reset role'); await db.query(`insert into auth.users values ($1, 'Novo.Arbitro@exemplo.com')`, [NOVO])
