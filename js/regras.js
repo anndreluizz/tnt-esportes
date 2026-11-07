@@ -20,13 +20,19 @@ const FORMATOS = {
   mata:   {nome: 'Mata-mata', desc: 'Eliminatória desde o primeiro jogo: quem perde está fora.'},
 }
 const regrasPadrao = sport => { const s = SPORTS[sport] || SPORTS.Futsal
-  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true} }
+  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true, inscricao_rodada: null} }
 const regras = c => ({...regrasPadrao(c.sport), ...c.rules})
 const formato = c => c.format || 'grupos'
 const groupsOf = c => [...new Set(c.teams.map(t => t.group).filter(Boolean))].sort()
 const minTeams = c => formato(c) === 'grupos' ? regras(c).grupos * 2 : 3
 const maxTeams = c => formato(c) === 'mata' ? 16 : 40
 const allDone = c => c.matches.length > 0 && c.matches.every(isDone)
+// novos atletas pelo link ou pela equipe (a Secretaria sempre pode): prazo e "até o fim da rodada X"
+function inscricaoAberta(c) {
+  const r = regras(c), hoje = new Date().toLocaleDateString('sv', {timeZone: 'America/Manaus'})
+  if (c.status === 'encerrado' || (c.regUntil && c.regUntil < hoje)) return false
+  return !r.inscricao_rodada || c.status === 'inscricoes' || c.matches.some(m => m.phase === 'grupos' && !isDone(m) && m.round <= r.inscricao_rodada)
+}
 const TIMES = ['19h00', '20h00', '21h00', '18h00']
 
 const isDone = m => m.status === 'encerrado'
@@ -271,5 +277,6 @@ function lerRegras(d, sport, atual) {
   return {format: trava ? formato(atual) : FORMATOS[d.format] ? d.format : 'grupos',
     rules: {tempo: n('tempo', 5, 60), vitoria: n('vitoria', 1, 5), empate: n('empate', 0, 3), amarelos: n('amarelos', 2, 5), vermelho: n('vermelho', 1, 5),
       wo: n('wo', 1, 10), faltas: d.r_faltas === '' ? null : n('faltas', 3, 10),
-      grupos: trava ? base.grupos : d.r_grupos === '4' ? 4 : 2, returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro}}
+      grupos: trava ? base.grupos : d.r_grupos === '4' ? 4 : 2, returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro,
+      inscricao_rodada: d.r_inscricao_rodada === '' ? null : n('inscricao_rodada', 1, 60)}}
 }

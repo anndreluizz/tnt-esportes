@@ -243,7 +243,8 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
   ${REAL ? step(4, 'Inscrições', `
     <label>Inscrições até<input name="regUntil" type="date" value="${v('regUntil')}"></label>
     <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
-    <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo, o link para de aceitar inscrições.</p>`)
+    <label class="so-rodadas">Novos atletas até o fim da rodada<input name="r_inscricao_rodada" type="number" min="1" max="60" value="${c ? regras(c).inscricao_rodada ?? '' : ''}" placeholder="sem limite"></label>
+    <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo (ou da rodada limite), o link para de aceitar inscrições. Dá para mudar a qualquer momento; a Secretaria sempre pode inscrever.</p>`)
   + step(5, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>',
       `<div class="pats span2">${sp.map(patRow).join('')}<button type="button" class="addpat" data-addpat>+ Adicionar patrocinador</button></div>`) : ''}
   <div class="btns" style="margin-top:12px"><button class="btn">${c ? 'Salvar alterações' : 'Criar e abrir inscrições'}</button>${c ? '<button type="button" class="btn ghost" data-act="editchamp" data-id="">Cancelar</button>' : ''}</div>
@@ -327,7 +328,7 @@ function teamDetail(c, t, mode) {
   return `<h3>${esc(t.name)} <small>${ps.length}${c.maxPlayers ? ' de ' + c.maxPlayers : ''} atletas · ${esc(t.bairro)}${t.group ? ' · Grupo ' + t.group : ''}</small></h3>
   ${mode === 'sec' ? teamLink(c, t) + `<p class="sub" style="margin-bottom:8px">Código de acesso da equipe: <span class="codebox">${t.code}</span> · o representante usa para entrar no sistema.</p>` : ''}
   <div class="scroll"><table class="st"><thead><tr><th class="l">Atleta</th><th>Nº</th><th>Idade</th><th class="l">Situação</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nenhum atleta inscrito.</td></tr>'}</tbody></table></div>
-  ${athleteForm(c, mode)}`
+  ${mode === 'sec' || inscricaoAberta(c) ? athleteForm(c, mode) : '<p class="note" style="margin-top:18px">As inscrições de novos atletas estão encerradas para este campeonato.</p>'}`
 }
 
 function vInscricoes() {
@@ -571,6 +572,7 @@ function vReg() {
       `Modalidade: ${esc(c.sport)} · categoria ${esc(c.category)} · faixa etária ${ageRange(c)} (idade conferida na data de início).`,
       `Início em ${dmy(c.start)}, em ${esc(c.venue)}. Datas e horários de cada jogo ficam no portal público.`])}
     <h4>2. Das inscrições</h4>${li([c.maxPlayers ? `Cada equipe inscreve até ${c.maxPlayers} atletas.` : '', c.regUntil ? `As inscrições vão até ${dmy(c.regUntil)}.` : '',
+      r.inscricao_rodada && f !== 'mata' ? `Durante o campeonato, novos atletas podem ser inscritos até o fim da ${r.inscricao_rodada}ª rodada, e só jogam depois de aprovados pela Secretaria.` : '',
       'Cada atleta é inscrito com foto e documento oficial com foto (RG). A inscrição só vale depois de aprovada pela Secretaria.',
       'Menor de 18 anos precisa da autorização assinada pelo responsável. Atleta fora da faixa etária não pode ser inscrito.',
       'O atleta só pode defender uma equipe neste campeonato.'])}

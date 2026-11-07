@@ -73,6 +73,9 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   const s15 = run('C().draw')
   ok(s15.final === createHash('sha256').update(s15.seed + '4 15 8').digest('hex').slice(0, 16) && run(`JSON.stringify(drawGroups(C().teams, C().draw.final)) === JSON.stringify(C().draw.groups)`), 'sorteio real usa a entrada pública')
   await allViews()
+  ok(run(`(() => { const c = S.champs.find(x => x.id === 'sub15'), antes = c.rules; c.rules = {inscricao_rodada: 1}
+    const aberta = inscricaoAberta(c), r1 = c.matches.filter(m => m.round === 1); r1.forEach(m => m.status = 'encerrado')
+    const fechada = !inscricaoAberta(c); r1.forEach(m => m.status = 'agendado'); c.rules = antes; return aberta && fechada })()`), 'novos atletas até o fim da rodada 1')
 
   // outros formatos: monta, sorteia, simula até o campeão
   const formato = async (id, nTimes, format, rules) => {
