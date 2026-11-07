@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR" data-mode="real">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TNT Esportes · Oficial</title>
+<meta name="description" content="Gestão de campeonatos da Secretaria Municipal de Esportes de Tonantins">
+<meta name="theme-color" content="#103d27">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap brand">
+    <div class="logo">TNT</div>
+    <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div>
+    <div class="hright" id="hright"></div>
+  </div>
+  <nav class="wrap tabs" id="tabs" aria-label="Seções"></nav>
+</header>
+<main id="app" class="wrap"></main>
+<footer class="wrap foot noprint"><span>Sistema oficial da Secretaria Municipal de Esportes de Tonantins · <a href="index.html">ver o protótipo de demonstração</a></span></footer>
+<div id="doc" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/regras.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/app.js"></script>
+<script src="js/api.js"></script>
+</body>
+</html>

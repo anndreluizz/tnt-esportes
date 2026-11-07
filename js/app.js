@@ -3,10 +3,11 @@
 const $ = s => document.querySelector(s)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const KEY = 'tnt-esportes-prototipo-v2'
+const REAL = document.documentElement?.dataset.mode === 'real'   // oficial.html: dados no Supabase (api.js)
 function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 3 ? s : null } catch { return null } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch { toast('Memória do navegador cheia: as últimas alterações podem não ficar guardadas.') } }
+function save() { if (REAL) return; try { localStorage.setItem(KEY, JSON.stringify(S)) } catch { toast('Memória do navegador cheia: as últimas alterações podem não ficar guardadas.') } }
 
-let S = load() || seed()
+let S = REAL ? {champs: [], champId: null, offline: false, session: null} : load() || seed()
 const ui = {tab: null, matchId: null, team: null, picker: null, manage: null, punish: null, signing: null, doc: null,
             draw: null, verify: null, sumCheck: null, highlight: [], clock: {}, cards: []}
 const C = () => S.champs.find(c => c.id === S.champId) || S.champs[0]
@@ -79,7 +80,7 @@ function phaseNow(c) {
 function matchRow(c, m, mode) {
   const ready = m.home && m.away, d = isDone(m)
   let acts = ''
-  if (mode === 'sec' && !d && ready) acts += `<button class="btn sm" data-act="open" data-id="${m.id}">Abrir súmula</button>`
+  if (mode === 'sec' && !d && ready && !REAL) acts += `<button class="btn sm" data-act="open" data-id="${m.id}">Abrir súmula</button>`
   if (mode === 'sec' && !d && !m.pendingConfirm && !m.events.length) acts += `<button class="btn ghost sm" data-act="manage" data-id="${m.id}">Adiar / W.O.</button>`
   if (d) acts += `<button class="btn ghost sm" data-act="doc" data-c="${c.id}" data-id="${m.id}">Súmula</button>`
   return `<div class="match"><div class="mline"><span class="r">${side(c, m, 'home')}</span>
@@ -126,6 +127,7 @@ const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div 
 
 /* ---------- login ---------- */
 function vLogin() {
+  if (REAL) return loginReal()
   const card = (r, ic, t, d, btn) => `<div class="role"><div class="ic">${ic}</div><h3>${t}</h3><p>${d}</p><button class="btn" data-act="login" data-role="${r}">${btn}</button></div>`
   const teams = S.champs.map(c => `<optgroup label="${esc(c.name)}">${c.teams.map(t => `<option value="${c.id}|${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>`).join('')
   return `<div class="login"><div class="lhero"><div class="wrap"><div class="eyebrow">Secretaria Municipal de Esportes · Tonantins/AM</div>
@@ -169,7 +171,7 @@ function vPainel() {
   <div class="grid side mt">
     <div class="card"><h3>Próximos jogos <small>${up.length} a realizar</small></h3>${up.slice(0, 6).map(m => matchRow(c, m, r)).join('') || '<p class="empty">Todos os jogos foram realizados.</p>'}</div>
     <div class="grid" style="align-content:start">
-      ${nb ? `<div class="card info"><h3>Modo apresentação</h3><p class="sub">Simula ${nb.label} com resultados aleatórios, para mostrar o mata-mata e o campeão sem esperar os jogos reais.</p><button class="btn gold" style="margin-top:8px" data-act="simulate">Simular ${nb.label}</button></div>` : ''}
+      ${nb && !REAL ? `<div class="card info"><h3>Modo apresentação</h3><p class="sub">Simula ${nb.label} com resultados aleatórios, para mostrar o mata-mata e o campeão sem esperar os jogos reais.</p><button class="btn gold" style="margin-top:8px" data-act="simulate">Simular ${nb.label}</button></div>` : ''}
       <div class="card"><h3>Disciplina <small>calculado automaticamente</small></h3>${disc || '<p class="sub">Nenhum atleta pendurado ou suspenso.</p>'}</div>
       ${pendCard}
     </div></div>` + hist
@@ -185,7 +187,7 @@ function vCamps() {
       <button class="btn sm" style="margin-top:10px" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button></div>`
   }).join('')
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
-  <div class="grid g3">${cards}</div>
+  ${cards ? `<div class="grid g3">${cards}</div>` : '<div class="info">Comece criando o primeiro campeonato aqui embaixo. As outras abas (inscrições, sorteio, jogos, relatórios) passam a funcionar depois disso.</div>'}
   <div class="card mt"><h3>Novo campeonato</h3><form class="f" data-form="newchamp">
     <label class="span2">Nome<input name="name" required minlength="5" maxlength="60" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
     <label>Modalidade<select name="sport">${Object.keys(SPORTS).map(s => `<option>${s}</option>`).join('')}</select></label>
@@ -204,7 +206,7 @@ function athleteForm(c, mode) {
     <label>Nº da camisa<input name="num" type="number" min="1" max="99" required></label>
     <label>Nascimento<input name="birth" type="date" required min="1940-01-01" max="${c.start}"></label>
     <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
-    <label>Foto (identificação)<input name="photo" type="file" accept="image/*" capture="user"></label>
+    ${REAL ? '' : '<label>Foto (identificação)<input name="photo" type="file" accept="image/*" capture="user"></label>'}
     <label class="chk span2"><input type="checkbox" name="auth"> Menor de 18: autorização do responsável entregue</label>
     <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Data de nascimento e foto não aparecem no portal público.</label>
     <div class="span2"><button class="btn">${mode === 'team' ? 'Enviar para aprovação' : 'Inscrever'}</button></div></form>
@@ -377,7 +379,7 @@ function vSorteio() {
   const c = C(), d = ui.draw && ui.draw.cid === c.id ? ui.draw : {}
   const head = `<div class="head"><div><div class="eyebrow">Transparência · ${esc(c.name)}</div><h2>Sorteio auditável</h2>
     <p class="sub" style="max-width:660px">O sistema publica a “impressão digital” (hash SHA-256) de uma semente secreta antes do sorteio. Na hora, o público dita uma entrada (ex.: números falados por pessoas da plateia), que se mistura à semente. Depois a semente é revelada, e qualquer pessoa confere que ninguém escolheu o resultado.</p></div>
-    ${c.status === 'inscricoes' && d.hash ? '<button class="btn ghost" data-act="redraw">Recomeçar</button>' : ''}</div>`
+    ${c.status === 'inscricoes' && d.hash && !REAL ? '<button class="btn ghost" data-act="redraw">Recomeçar</button>' : ''}</div>`
   const grp = (g, ids) => `<div class="card"><h3>Grupo ${g}</h3>${ids ? ids.map(id => `<div class="team-chip">${esc(T(c, id).name)}</div>`).join('') : '<p class="sub">Aguardando sorteio.</p>'}</div>`
   const pots = `<div class="card"><h3>Potes <small>cabeças de chave no pote 1</small></h3><div class="grid g2">${[1, 2].map(k => `<div><div class="eyebrow">Pote ${k}</div>${c.teams.filter(t => (t.pot === 1) === (k === 1)).map(t => `<div class="row">${esc(t.name)}</div>`).join('') || '<p class="sub">—</p>'}</div>`).join('')}</div></div>`
   const verify = `<div class="card"><h3>Conferir um sorteio</h3><p class="sub">Digite a semente revelada e a entrada pública. O sistema recalcula o hash e refaz o sorteio.</p>${verifyForm(c)}</div>`
@@ -764,6 +766,7 @@ const F = {
   dodraw: async d => {
     const entrada = d.entrada.trim()
     if (!ui.draw?.hash || ui.draw.groups) return
+    if (!ui.draw.seed) return toast('A semente secreta fica só no aparelho que publicou o compromisso. Faça o sorteio nele.')
     if (entrada.length < 3) return toast('Digite a entrada pública (pelo menos 3 caracteres).')
     try { const final = await finalSeed(ui.draw.seed, entrada); Object.assign(ui.draw, {entrada, final, groups: drawGroups(C().teams, final)})
       log(C(), SEC, `Sorteio feito em público · entrada pública: ${entrada}`) } catch (e) { toast(e.message) }
@@ -793,17 +796,20 @@ function render() {
     $('#hright').innerHTML = ''; $('#tabs').innerHTML = ''; app.className = ''; app.innerHTML = vLogin(); doc.hidden = true
     document.body.classList.remove('doc-open'); return
   }
-  if (!ROLE_TABS[r].some(([k]) => k === ui.tab)) ui.tab = ROLE_TABS[r][0][0]
+  const tabs = ROLE_TABS[r].filter(([k]) => !(REAL && k === 'sumula'))   // súmula no modo oficial: próxima etapa
+  if (!tabs.some(([k]) => k === ui.tab)) ui.tab = tabs[0][0]
   const c = C()
+  if (!c && r === 'secretaria') ui.tab = 'campeonatos'
+  if (REAL && c && !ui.draw && c.pendingDraw) ui.draw = {...c.pendingDraw}
   $('#hright').innerHTML = (r === 'equipe' ? `<span class="who"><span><b>${esc(T(c, S.session.teamId).name)}</b>Equipe</span></span>`
-    : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${ROLES[r].name}</b>${ROLES[r].label}</span></span>`)
+    : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c?.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${esc(S.session.name || ROLES[r].name)}</b>${ROLES[r].label}</span></span>`)
     + '<button class="out" data-act="logout">Trocar perfil</button>'
-  $('#tabs').innerHTML = ROLE_TABS[r].map(([k, l]) => `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" ${ui.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')
-  app.className = 'wrap'; app.innerHTML = VIEWS[ui.tab]()
+  $('#tabs').innerHTML = tabs.map(([k, l]) => `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" ${ui.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')
+  app.className = 'wrap'; app.innerHTML = c || ui.tab === 'campeonatos' ? VIEWS[ui.tab]() : '<div class="card empty mt">Nenhum campeonato publicado ainda.</div>'
   doc.hidden = !ui.doc; doc.innerHTML = ui.doc ? vDoc() : ''
   document.body.classList.toggle('doc-open', !!ui.doc)
   if (ui.tab === 'sumula') hookPads()
-  if (ui.tab === 'divulgacao' && c.matches.length)
+  if (ui.tab === 'divulgacao' && c?.matches.length)
     Promise.all([document.fonts.load('700 40px "Barlow Condensed"'), document.fonts.load('600 30px Barlow')]).catch(() => {}).finally(buildCards)
 }
 
@@ -829,10 +835,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.doc) { 
 setInterval(() => { if (!ui.clock.running) return; ui.clock.sec++; const el = document.getElementById('clock'); if (el) el.textContent = fmt(ui.clock.sec) }, 1000)
 
 async function ensureHashes() { for (const c of S.champs) for (const m of c.matches) if (isDone(m) && !m.hash) m.hash = await sha(sumulaPayload(c, m)).catch(() => null) }
-S.champs.forEach(resolveKO)
-// link direto: index.html#publico/portal, #secretaria/jogos, #arbitro/sumula
-const [hr, ht] = decodeURIComponent(location.hash.slice(1)).split('/')
-if (ROLE_TABS[hr] && hr !== 'equipe') { S.session = {role: hr}; ui.tab = ht }
-render()
-ensureHashes().then(() => { save(); render() })
+if (!REAL) {   // protótipo; o modo oficial começa em api.js
+  S.champs.forEach(resolveKO)
+  // link direto: index.html#publico/portal, #secretaria/jogos, #arbitro/sumula
+  const [hr, ht] = decodeURIComponent(location.hash.slice(1)).split('/')
+  if (ROLE_TABS[hr] && hr !== 'equipe') { S.session = {role: hr}; ui.tab = ht }
+  render()
+  ensureHashes().then(() => { save(); render() })
+}
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {})
