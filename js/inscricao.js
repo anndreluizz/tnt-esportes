@@ -44,7 +44,7 @@ function render() {
       <label class="span2">Nome completo<input name="nome" required minlength="3" maxlength="50" autocomplete="off"></label>
       <label>Apelido<input name="apelido" maxlength="30" autocomplete="off" placeholder="Opcional · como é chamado no jogo"></label>
       <label>Nº da camisa<input name="numero" type="number" min="1" max="99" required inputmode="numeric"></label>
-      <label>Data de nascimento<input name="nascimento" type="date" required min="1940-01-01" max="${i.inicio}"></label>
+      <label>Data de nascimento${campoData('nascimento', '', 'required')}</label>
       <label>Posição<select name="posicao"><option value="">—</option>${(POSICOES[i.modalidade] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
       <label>Telefone / WhatsApp<input name="telefone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
       <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>`)}
@@ -64,13 +64,13 @@ function render() {
 
 async function enviar(e) {
   e.preventDefault()
-  const f = e.target, d = Object.fromEntries(new FormData(f)), i = info, btn = $('#enviar')
+  const f = e.target, d = lerForm(f), i = info, btn = $('#enviar')
   const nome = d.nome.trim().replace(/\s+/g, ' '), numero = +d.numero
   const erro = msg => { toast(msg); return false }
   if (nome.length < 3) return erro('Digite o nome completo do atleta.')
   if (!(numero >= 1 && numero <= 99)) return erro('O número da camisa vai de 1 a 99.')
   if (i.inscritos.some(a => a.numero === numero)) return erro(`O número ${numero} já está com outro atleta da equipe.`)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return erro('Informe a data de nascimento.')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return erro('Data de nascimento inválida. Digite assim: 20/05/2010.')
   const idade = ageAt(d.nascimento, i.inicio)
   if (idade < i.idade_min || (i.idade_max && idade > i.idade_max)) return erro(`Fora da faixa etária do campeonato: o atleta terá ${idade} anos.`)
   if (idade < 18 && (!d.responsavel.trim() || !d.responsavel_telefone.trim())) return erro('Menor de 18 anos: informe o nome e o telefone do responsável.')

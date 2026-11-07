@@ -316,3 +316,19 @@ function lerHoras(txt) {
   const hs = String(txt || '').match(/\d{1,2}\s*[:hH]\s*\d{0,2}/g) || []
   return [...new Set(hs.map(x => { const [h, m] = x.split(/\s*[:hH]\s*/); return +h < 24 && (+m || 0) < 60 ? String(+h).padStart(2, '0') + 'h' + String(+m || 0).padStart(2, '0') : null }).filter(Boolean))].sort()
 }
+
+/* ---------- datas digitadas (dd/mm/aaaa), sem o calendário do celular ---------- */
+const dataBR = iso => /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso.split('-').reverse().join('/') : ''
+function dataISO(br) {   // '20/05/2010' -> '2010-05-20'; data que não existe (31/02) -> ''
+  const m = String(br || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (!m) return ''
+  const iso = `${m[3]}-${m[2]}-${m[1]}`, d = new Date(iso + 'T12:00:00Z')
+  return !isNaN(d) && d.toISOString().slice(0, 10) === iso ? iso : ''
+}
+const campoData = (name, iso = '', extra = '') => `<input name="${name}" data-data inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" value="${dataBR(iso)}" ${extra}>`
+// formulário -> objeto, com as datas já em aaaa-mm-dd
+function lerForm(f) { const d = Object.fromEntries(new FormData(f)); f.querySelectorAll('[data-data]').forEach(i => { d[i.name] = dataISO(i.value) }); return d }
+if (typeof document !== 'undefined') document.addEventListener('input', e => {   // põe as barras sozinho: 20052010 -> 20/05/2010
+  if (!e.target.matches?.('[data-data]')) return
+  const n = e.target.value.replace(/\D/g, '').slice(0, 8)
+  e.target.value = [n.slice(0, 2), n.slice(2, 4), n.slice(4)].filter(Boolean).join('/')
+})

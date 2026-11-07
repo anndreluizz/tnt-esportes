@@ -127,7 +127,7 @@ function manageForm(c, m) {
   const ready = m.home && m.away
   return `<form class="manage f" data-form="manage">
     <label>Ação<select name="acao"><option value="adiar">Alterar data, horário ou local</option>${ready ? '<option value="wo">W.O. (equipe não compareceu)</option>' : ''}</select></label>
-    <label>Data<input type="date" name="date" value="${m.date}"></label>
+    <label>Data${campoData('date', m.date, 'required')}</label>
     <label>Horário<input type="time" name="time" value="${m.time.replace('h', ':')}"></label>
     <label>Local<input name="local" maxlength="60" value="${esc(m.local || '')}" placeholder="${esc(c.venue)}"></label>
     ${ready ? `<label>Equipe ausente (W.O.)<select name="ausente"><option value="${m.home}">${esc(T(c, m.home).name)}</option><option value="${m.away}">${esc(T(c, m.away).name)}</option></select></label>` : ''}
@@ -291,12 +291,12 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
   ${step(2, 'Organização', `
     ${REAL ? `<label>Responsável<input name="resp" maxlength="60" value="${v('responsible')}" placeholder="Nome de quem organiza"></label>
     <label>Telefone / WhatsApp do responsável<input name="respPhone" type="tel" maxlength="20" value="${v('responsiblePhone')}" placeholder="(97) 9 9999-9999"></label>` : ''}
-    <label>Início<input name="start" type="date" required value="${v('start', '2027-03-06')}"></label>
+    <label>Início${campoData('start', c?.start || '', 'required')}</label>
     <label>Local<input name="venue" maxlength="60" value="${v('venue')}" placeholder="Quadra Poliesportiva Municipal"></label>`)}
   ${step(3, 'Formato e regras', regrasCampos(c))}
   ${step(4, 'Dias, horários e locais dos jogos', calendarioCampos(c))}
   ${REAL ? step(5, 'Inscrições', `
-    <label>Inscrições até<input name="regUntil" type="date" value="${v('regUntil')}"></label>
+    <label>Inscrições até${campoData('regUntil', c?.regUntil || '')}</label>
     <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
     <label class="so-rodadas">Novos atletas até o fim da rodada<input name="r_inscricao_rodada" type="number" min="1" max="60" value="${c ? regras(c).inscricao_rodada ?? '' : ''}" placeholder="sem limite"></label>
     <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo (ou da rodada limite), o link para de aceitar inscrições. Dá para mudar a qualquer momento; a Secretaria sempre pode inscrever.</p>`)
@@ -332,7 +332,7 @@ function athleteForm(c, mode) {
     <label>Nome completo<input name="name" required minlength="3" maxlength="50" autocomplete="off"></label>
     <label>Apelido<input name="nick" maxlength="30" autocomplete="off" placeholder="Opcional · como é chamado no jogo"></label>
     <label>Nº da camisa<input name="num" type="number" min="1" max="99" required></label>
-    <label>Nascimento<input name="birth" type="date" required min="1940-01-01" max="${c.start}"></label>
+    <label>Nascimento${campoData('birth', '', 'required')}</label>
     <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
     <label>Telefone / WhatsApp<input name="phone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
     <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
@@ -383,7 +383,7 @@ function teamDetail(c, t, mode) {
       <label class="span2">Nome completo<input name="name" required minlength="3" maxlength="50" value="${esc(p.name)}"></label>
       <label>Apelido<input name="nick" maxlength="30" value="${esc(p.nick || '')}"></label>
       <label>Nº da camisa<input name="num" type="number" min="1" max="99" required value="${p.num}"></label>
-      <label>Nascimento<input name="birth" type="date" required value="${p.birth || ''}"></label>
+      <label>Nascimento${campoData('birth', p.birth, 'required')}</label>
       <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(x => `<option ${x === p.pos ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label>Telefone<input name="phone" type="tel" maxlength="20" value="${esc(p.phone || '')}"></label>
       <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option ${b === p.bairro ? 'selected' : ''}>${b}</option>`).join('')}</select></label>
@@ -1120,7 +1120,7 @@ document.addEventListener('click', async e => {
 })
 document.addEventListener('submit', async e => {
   e.preventDefault(); const f = e.target
-  await F[f.dataset.form](Object.fromEntries(new FormData(f))); save(); render()
+  await F[f.dataset.form](lerForm(f)); save(); render()
 })
 document.addEventListener('change', e => {
   if (e.target.id === 'sel-match') { ui.matchId = e.target.value; ui.picker = ui.signing = null; render() }

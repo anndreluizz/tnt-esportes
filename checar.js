@@ -108,6 +108,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
     for (const m of ms) { const d = porDia[m.date] ??= []; if (d.includes(m.home) || d.includes(m.away)) return false; d.push(m.home, m.away) }
     return ms.every(m => new Date(m.date + 'T12:00:00Z').getUTCDay() === 3 && ['19h00', '20h30'].includes(m.time) && ['Quadra 1', 'Quadra 2'].includes(m.local))
       && ms[0].date === '2027-03-03' && Object.keys(porDia).length === 5 })()`), 'calendário: só quartas, horários e quadras escolhidos, uma rodada por dia')
+  ok(run(`[dataISO('20/05/2010'), dataISO('31/02/2010'), dataISO('2010-05-20'), dataISO('29/02/2024'), dataBR('2010-05-20')].join()`) === '2010-05-20,,,2024-02-29,20/05/2010', 'datas digitadas dd/mm/aaaa (31/02 não existe)')
   ok(run(`JSON.stringify(lerHoras('19h, 20:30, 7h5, 25h00, 19h00'))`) === '["07h05","19h00","20h30"]', 'horários digitados de qualquer jeito viram 19h00, 20h30...')
   // editar atleta, excluir equipe, aviso de WhatsApp, estatísticas
   run(`S.champId = 'cal'; S.session = {role: 'secretaria'}`)
