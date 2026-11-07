@@ -27,7 +27,7 @@ async function toState(r) {
   for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro ?? '', token: t.link_token,
     crest: marca(t.escudo_path), colors: t.cores, coach: t.responsavel, coachPhone: t.responsavel_telefone})
   for (const p of r.atletas) byId[teamCamp[p.equipe_id]]?.players.push({id: p.id, team: p.equipe_id, name: p.nome, num: p.numero, birth: p.nascimento,
-    bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: p.foto_url ?? null, photoPath: p.foto_path,
+    bairro: p.bairro ?? '', address: p.endereco, city: p.municipio, auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: p.foto_url ?? null, photoPath: p.foto_path,
     nick: p.apelido, pos: p.posicao, phone: p.telefone, resp: p.responsavel, respPhone: p.responsavel_telefone, origin: p.origem,
     rg: [p.rg_frente_path, p.rg_verso_path].filter(Boolean)})   // portal: só aprovados, sem nascimento, foto nem documento
   const evs = {}
@@ -366,7 +366,7 @@ const REAL_F = {
   editplayer: write(async d => {
     const c = C(), p = P(c, ui.editPlayer), v = lerAtleta(c, p, d); if (!v) return
     await q(sb.from('atletas').update({nome: v.name, numero: v.num, nascimento: v.birth, apelido: v.nick, posicao: v.pos, telefone: v.phone, bairro: v.bairro,
-      responsavel: v.resp, responsavel_telefone: v.respPhone}).eq('id', p.id))
+      endereco: v.address, municipio: v.city, responsavel: v.resp, responsavel_telefone: v.respPhone}).eq('id', p.id))
     ui.editPlayer = null; toast('Atleta atualizado.')
   }),
   cancelsorteio: write(async d => {
@@ -401,7 +401,7 @@ const REAL_F = {
              rg_verso_path: sec ? await envia('documentos', `${team}/${id}-rg-verso.jpg`, d.rgv, 1400) : null}
     } catch { return toast('Não foi possível ler a imagem. Use uma foto JPG ou PNG.') }
     const t = v => v?.trim() || null
-    await q(sb.from('atletas').insert({id, equipe_id: team, nome: name, numero: num, nascimento: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0],
+    await q(sb.from('atletas').insert({id, equipe_id: team, nome: name, numero: num, nascimento: d.birth, endereco: t(d.endereco), bairro: t(d.bairro) || '', municipio: t(d.municipio),
       apelido: t(d.nick), posicao: d.pos || null, telefone: t(d.phone), responsavel: t(d.resp), responsavel_telefone: t(d.respPhone),
       autorizacao: p.auth, aprovado: sec, consentimento: true, origem: sec ? 'secretaria' : 'equipe', ...arq}))
     const [s, why] = insc(c, p); toast(`${name}: ${sec ? SPILL[s][1].toLowerCase() : 'enviado para aprovação'}${why ? '. ' + why : ''}.`)

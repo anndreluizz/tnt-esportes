@@ -63,16 +63,19 @@ const info = (await q(`select link_inscricao($1) i`, [LINK]))[0].i
 ok(info.equipe === 'Equipe b1' && info.aberta === true && info.inscritos.length === 1, 'link mostra a equipe e quem já foi inscrito')
 ok((await q(`select link_inscricao($1) i`, [randomUUID()]))[0].i === null, 'link inventado não mostra nada')
 const pasta = `${T.b1.id}/${LINK}/`, arq = k => pasta + k + '.jpg'
-const atl = (o = {}) => ({ nome: 'Pelo Link', numero: 12, nascimento: '2000-02-02', consentimento: true, telefone: '97 99999-0000',
+const atl = (o = {}) => ({ nome: 'Pelo Link', numero: 12, nascimento: '2000-02-02', consentimento: true, telefone: '97 99999-0000', endereco: 'Rua da Matriz, 120', bairro: 'Centro', municipio: 'Tonantins',
   foto_path: arq('f'), rg_frente_path: arq('rf'), rg_verso_path: arq('rv'), ...o })
 await erro(`select inscrever_pelo_link($1, $2)`, [randomUUID(), atl()], 'inválido', 'link inventado não inscreve')
 await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ rg_verso_path: null })], 'documento', 'sem o documento não inscreve')
 await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ foto_path: `${T.a1.id}/${LINK}/f.jpg` })], 'Arquivo inválido', 'arquivo de outra pasta é recusado')
 await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ consentimento: false })], 'LGPD', 'sem consentimento não inscreve')
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ endereco: '' })], 'endereço', 'sem endereço não inscreve')
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ municipio: '' })], 'município', 'sem município não inscreve')
 await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ numero: 10 })], 'duplicate', 'número de camisa repetido é recusado')
 const [{ id: viaLink }] = await q(`select inscrever_pelo_link($1, $2) id`, [LINK, atl({ aprovado: true })])
 await como(SEC)
-const [ln] = await q(`select aprovado, origem, telefone, rg_frente_path, situacao_atleta(a) s from atletas a where id = $1`, [viaLink])
+const [ln] = await q(`select aprovado, origem, telefone, rg_frente_path, endereco, municipio, situacao_atleta(a) s from atletas a where id = $1`, [viaLink])
+ok(ln.endereco === 'Rua da Matriz, 120' && ln.municipio === 'Tonantins', 'endereço e município guardados')
 ok(ln.aprovado === false && ln.origem === 'link' && ln.s === 'analise' && ln.rg_frente_path === arq('rf'), 'inscrito pelo link entra em análise')
 await q(`update campeonatos set max_atletas = 5 where id = $1`, [C])
 await como(null)
@@ -90,6 +93,7 @@ await erro(`select nascimento from atletas`, [], 'permission denied', 'público 
 await erro(`select codigo from equipes`, [], 'permission denied', 'público não lê o código das equipes')
 ok((await q(`select * from atletas_publico`)).length === 4, 'portal mostra só atletas aprovados')
 ok(!('nascimento' in (await q(`select * from atletas_publico limit 1`))[0]), 'portal sem data de nascimento')
+ok(!('endereco' in (await q(`select * from atletas_publico limit 1`))[0]), 'portal sem endereço do atleta')
 await erro(`insert into campeonatos (nome, modalidade, idade_min, inicio) values ('Hacker Cup', 'Futsal', 5, '2027-01-01')`, [], 'permission denied', 'público não cria campeonato')
 
 console.log('Sorteio auditável')
@@ -240,7 +244,7 @@ ok((await q(`select count(*)::int n from eventos where jogo_id = $1`, [jc.id]))[
 // regra "novos atletas até o fim da rodada X": rodadas 1 e 2 já terminaram, a 3 está em jogo
 await como(SEC)
 const [{ link_token: LSU }] = await q(`select link_token from equipes where id = $1`, [su1.id])
-const novoLink = n => ({ nome: 'Reforço ' + n, numero: n, nascimento: '1995-02-02', consentimento: true, foto_path: `${su1.id}/${LSU}/f${n}.jpg`, rg_frente_path: `${su1.id}/${LSU}/a${n}.jpg`, rg_verso_path: `${su1.id}/${LSU}/b${n}.jpg` })
+const novoLink = n => ({ nome: 'Reforço ' + n, numero: n, nascimento: '1995-02-02', consentimento: true, endereco: 'Comunidade São José', bairro: 'Zona rural', municipio: 'Santo Antônio do Içá', foto_path: `${su1.id}/${LSU}/f${n}.jpg`, rg_frente_path: `${su1.id}/${LSU}/a${n}.jpg`, rg_verso_path: `${su1.id}/${LSU}/b${n}.jpg` })
 await q(`update campeonatos set regras = regras || '{"inscricao_rodada": 2}' where id = $1`, [SU.id])
 await como(null)
 await erro(`select inscrever_pelo_link($1, $2)`, [LSU, novoLink(30)], 'encerradas', 'depois da rodada limite o link não inscreve')

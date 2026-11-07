@@ -46,7 +46,10 @@ function render() {
       <label>Nº da camisa<input name="numero" type="number" min="1" max="99" required inputmode="numeric"></label>
       <label>Data de nascimento${campoData('nascimento', '', 'required')}</label>
       <label>Posição<select name="posicao"><option value="">—</option>${(POSICOES[i.modalidade] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
-      <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>`)}
+      <label class="span2">Endereço (rua e número, ou comunidade)<input name="endereco" maxlength="100" required value="" placeholder="Ex.: Rua da Matriz, 120"></label>
+    <label>Bairro ou comunidade<input name="bairro" maxlength="60" list="bairros" required value=""></label>
+    <label>Município<input name="municipio" maxlength="40" required value=""></label>
+    <datalist id="bairros">${BAIRROS.map(b => `<option value="${b}">`).join('')}</datalist>`)}
     <div id="resp" hidden>${step(2, 'Responsável <small class="sub">(atleta menor de 18 anos)</small>', `
       <label>Nome do responsável<input name="responsavel" maxlength="60"></label>
       <label>Telefone do responsável<input name="responsavel_telefone" type="tel" maxlength="20"></label>
@@ -73,6 +76,7 @@ async function enviar(e) {
   if (nome.length < 3) return erro('Digite o nome completo do atleta.')
   if (!(numero >= 1 && numero <= 99)) return erro('O número da camisa vai de 1 a 99.')
   if (i.inscritos.some(a => a.numero === numero)) return erro(`O número ${numero} já está com outro atleta da equipe.`)
+  if (d.endereco.trim().length < 3 || d.bairro.trim().length < 2 || d.municipio.trim().length < 2) return erro('Informe o endereço, o bairro ou comunidade e o município.')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return erro('Data de nascimento inválida. Digite assim: 20/05/2010.')
   const idade = ageAt(d.nascimento, i.inicio)
   if (idade < i.idade_min || (i.idade_max && idade > i.idade_max)) return erro(`Fora da faixa etária do campeonato: o atleta terá ${idade} anos.`)
@@ -93,7 +97,7 @@ async function enviar(e) {
                  rg_verso_path: await envia('documentos', '-rg-verso.jpg', d.rgv, 1400)} }
     catch (err) { throw err.message === 'foto' ? new Error('Não foi possível ler a imagem. Tire a foto de novo ou use JPG/PNG.') : err }
     const {error} = await sb.rpc('inscrever_pelo_link', {t: token, a: {id, nome, apelido: d.apelido, numero, nascimento: d.nascimento, posicao: d.posicao,
-      bairro: d.bairro, responsavel: d.responsavel, responsavel_telefone: d.responsavel_telefone, consentimento: true, ...arq}})
+      endereco: d.endereco, bairro: d.bairro, municipio: d.municipio, responsavel: d.responsavel, responsavel_telefone: d.responsavel_telefone, consentimento: true, ...arq}})
     if (error && !/atletas_pkey/.test(error.message))   // pkey = já tinha chegado (toque duplo ou reenvio)
       throw new Error(/numero/.test(error.message) ? `O número ${numero} já está com outro atleta da equipe.` : error.message)
     feito = nome; await carregar(); scrollTo(0, 0)

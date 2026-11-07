@@ -113,8 +113,9 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   // editar atleta, excluir equipe, aviso de WhatsApp, estatísticas
   run(`S.champId = 'cal'; S.session = {role: 'secretaria'}`)
   run(`(() => { const c = C(); c.players.push({id: 'kp', team: 'k0', name: 'Erro Digitado', num: 5, birth: '1990-01-01', auth: true, approved: true, consent: true, bairro: 'Centro'}) })()`)
-  run(`ui.editPlayer = 'kp'; F.editplayer({name: 'Nome Certo', num: '7', birth: '1990-01-01', nick: 'Certinho', pos: 'Ala', phone: '', bairro: 'Centro', resp: '', respPhone: ''})`)
+  run(`ui.editPlayer = 'kp'; F.editplayer({name: 'Nome Certo', num: '7', birth: '1990-01-01', nick: 'Certinho', pos: 'Ala', phone: '', endereco: 'Rua Nova, 5', bairro: 'Vila Nova', municipio: 'Tonantins', resp: '', respPhone: ''})`)
   ok(run(`(() => { const p = P(C(), 'kp'); return p.name === 'Nome Certo' && p.num === 7 && p.nick === 'Certinho' })()`), 'Secretaria corrige nome e número do atleta')
+  ok(run(`(() => { const p = P(C(), 'kp'); return p.address === 'Rua Nova, 5' && p.city === 'Tonantins' })()`), 'endereço e município do atleta')
   run(`(() => { const c = C(); c.matches = []; c.status = 'inscricoes' })()`)
   await run(`F.newteam({name: 'Unidos da Comunidade', colors: 'azul e branco', coach: 'Seu Raimundo', coachPhone: '97 99999-1234', bairro: 'Comunidade São José'})`)
   ok(run(`(() => { const t = C().teams.find(x => x.name === 'Unidos da Comunidade'); return t.colors === 'azul e branco' && t.coach === 'Seu Raimundo' && t.bairro === 'Comunidade São José' })()`), 'equipe com cores, responsável e comunidade (texto livre)')

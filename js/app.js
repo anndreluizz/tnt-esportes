@@ -337,7 +337,10 @@ function athleteForm(c, mode) {
     <label>Nascimento${campoData('birth', '', 'required')}</label>
     <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
     <label>Telefone / WhatsApp<input name="phone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
-    <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
+    <label class="span2">Endereço (rua e número, ou comunidade)<input name="endereco" maxlength="100"  value="" placeholder="Ex.: Rua da Matriz, 120"></label>
+    <label>Bairro ou comunidade<input name="bairro" maxlength="60" list="bairros"  value=""></label>
+    <label>Município<input name="municipio" maxlength="40"  value=""></label>
+    <datalist id="bairros">${BAIRROS.map(b => `<option value="${b}">`).join('')}</datalist>
     <label>Responsável<input name="resp" maxlength="60" placeholder="Se for menor de 18 anos"></label>
     <label>Telefone do responsável<input name="respPhone" type="tel" maxlength="20"></label>
     ${upload('photo', 'Foto do atleta', {capture: 'user', dica: 'Rosto de frente'})}
@@ -372,7 +375,7 @@ function teamDetail(c, t, mode) {
       if (p.rg?.length) acts += ` <button class="btn ghost sm" data-act="docs" data-id="${p.id}">${ui.docs?.id === p.id ? 'Fechar documento' : 'Ver documento'}</button>`
       acts += ` <button class="btn ghost sm" data-act="editplayer" data-id="${p.id}">${ui.editPlayer === p.id ? 'Fechar' : 'Editar'}</button>`
     }
-    const info = [p.pos, p.bairro, p.phone].filter(Boolean).map(esc).join(' · ')
+    const info = [p.pos, mode === 'sec' ? [p.address, p.bairro, p.city].filter(Boolean).join(', ') : p.bairro, p.phone].filter(Boolean).map(esc).join(' · ')
     const row = `<tr><td><div class="ath">${avatar(p)}<div><b>${esc(p.name)}</b>${p.nick ? ` <span class="sub">“${esc(p.nick)}”</span>` : ''}${p.origin === 'link' ? ' <span class="pill blue">via link</span>' : ''}<div class="sub">${info}</div></div></div></td><td>${p.num}</td><td>${ageAt(p.birth, c.start)}</td>
       <td class="l wrap">${spill(s)} ${sw ? '<span class="pill red">Suspenso</span>' : ''} ${why ? `<div class="sub">${why}</div>` : sw ? `<div class="sub">${esc(sw)}</div>` : ''}${p.resp ? `<div class="sub">Responsável: ${esc(p.resp)}${p.respPhone ? ' · ' + esc(p.respPhone) : ''}</div>` : ''}</td><td>${acts}</td></tr>`
     const docs = mode === 'sec' && ui.docs?.id === p.id ? `<tr><td colspan="5"><div class="docs">${ui.docs.urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Documento de ${esc(p.name)}"></a>`).join('')}</div>
@@ -388,7 +391,10 @@ function teamDetail(c, t, mode) {
       <label>Nascimento${campoData('birth', p.birth, 'required')}</label>
       <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(x => `<option ${x === p.pos ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label>Telefone<input name="phone" type="tel" maxlength="20" value="${esc(p.phone || '')}"></label>
-      <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option ${b === p.bairro ? 'selected' : ''}>${b}</option>`).join('')}</select></label>
+      <label class="span2">Endereço (rua e número, ou comunidade)<input name="endereco" maxlength="100"  value="${esc(p.address || '')}" placeholder="Ex.: Rua da Matriz, 120"></label>
+    <label>Bairro ou comunidade<input name="bairro" maxlength="60" list="bairros"  value="${esc(p.bairro || '')}"></label>
+    <label>Município<input name="municipio" maxlength="40"  value="${esc(p.city || '')}"></label>
+    <datalist id="bairros">${BAIRROS.map(b => `<option value="${b}">`).join('')}</datalist>
       <label>Responsável<input name="resp" maxlength="60" value="${esc(p.resp || '')}"></label>
       <label>Telefone do responsável<input name="respPhone" type="tel" maxlength="20" value="${esc(p.respPhone || '')}"></label>
       <div class="btns span2"><button class="btn">Salvar atleta</button><button type="button" class="btn ghost" data-act="editplayer" data-id="">Cancelar</button></div></form></td></tr>` : ''
@@ -585,7 +591,10 @@ function vRelatorios() {
     return `<div class="bars">${list.map(([l, n]) => `<div class="bar"><span>${esc(l)}</span><i style="width:${n / max * 100}%"></i><b>${n}</b></div>`).join('')}</div>` }
   const ages = [['Até 14 anos', r => r.a <= 14], ['15 a 17 anos', r => r.a >= 15 && r.a <= 17], ['18 a 29 anos', r => r.a >= 18 && r.a <= 29], ['30 anos ou mais', r => r.a >= 30]]
     .map(([l, f]) => [l, rows.filter(f).length])
-  const bairros = BAIRROS.map(b => [b, rows.filter(r => r.p.bairro === b).length]).sort((a, b) => b[1] - a[1])
+  // bairro é texto livre: junta igual sem ligar para maiúsculas/acentos e mostra os 8 com mais atletas
+  const chave = b => (b || 'Não informado').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), cont = {}
+  for (const r of rows) { const k = chave(r.p.bairro); (cont[k] ??= [r.p.bairro?.trim() || 'Não informado', 0])[1]++ }
+  const bairros = Object.values(cont).sort((a, b) => b[1] - a[1]).slice(0, 8)
   return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages)}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros)}</div></div>
@@ -990,7 +999,7 @@ function lerAtleta(c, p, d) {
   if (name.length < 3 || !(num >= 1 && num <= 99) || !/^\d{4}-\d{2}-\d{2}$/.test(d.birth)) return toast('Confira nome, número (1 a 99) e data de nascimento.')
   if (c.players.some(x => x !== p && x.team === p.team && x.num === num)) return toast(`O número ${num} já está em uso nesta equipe.`)
   const t = v => v?.trim() || null
-  return {name, num, birth: d.birth, nick: t(d.nick), pos: d.pos || null, phone: t(d.phone), bairro: BAIRROS.includes(d.bairro) ? d.bairro : p.bairro, resp: t(d.resp), respPhone: t(d.respPhone)}
+  return {name, num, birth: d.birth, nick: t(d.nick), pos: d.pos || null, phone: t(d.phone), address: t(d.endereco), bairro: t(d.bairro), city: t(d.municipio), resp: t(d.resp), respPhone: t(d.respPhone)}
 }
 const F = {
   editteam: async d => {
@@ -1012,7 +1021,7 @@ const F = {
     if (!d.consent) return toast('É preciso o consentimento para uso dos dados.')
     if (c.players.some(p => p.team === t && p.num === num)) return toast(`O número ${num} já está em uso nesta equipe.`)
     let photo; try { photo = await resizePhoto(d.photo) } catch { return toast('Não foi possível ler a foto. Use uma imagem JPG ou PNG.') }
-    const p = {id: uid(), team: t, name, num, birth: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0], auth: !!d.auth, approved: mode === 'sec', consent: true, photo,
+    const p = {id: uid(), team: t, name, num, birth: d.birth, address: d.endereco?.trim() || null, bairro: d.bairro?.trim() || null, city: d.municipio?.trim() || null, auth: !!d.auth, approved: mode === 'sec', consent: true, photo,
       nick: d.nick?.trim() || null, pos: d.pos || null, phone: d.phone?.trim() || null, resp: d.resp?.trim() || null, respPhone: d.respPhone?.trim() || null}
     c.players.push(p)
     const [s, why] = insc(c, p)
