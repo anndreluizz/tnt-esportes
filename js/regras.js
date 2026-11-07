@@ -5,6 +5,11 @@ const SPORTS = {
   'Futebol society':  {half: 25, fouls: null},
   'Futebol de campo': {half: 45, fouls: null},
 }
+const POSICOES = {
+  'Futsal':           ['Goleiro', 'Fixo', 'Ala', 'Pivô'],
+  'Futebol society':  ['Goleiro', 'Zagueiro', 'Lateral', 'Meio-campo', 'Atacante'],
+  'Futebol de campo': ['Goleiro', 'Zagueiro', 'Lateral', 'Volante', 'Meia', 'Atacante'],
+}
 const PHASES = {grupos: 'Fase de grupos', semi: 'Semifinal', terceiro: 'Disputa de 3º lugar', final: 'Final'}
 const TIMES = ['19h00', '20h00', '21h00', '18h00']
 
@@ -166,3 +171,16 @@ async function sha(s) {
 // Conteúdo que o código de autenticidade da súmula protege
 const sumulaPayload = (c, m) => JSON.stringify([c.id, m.id, m.home, m.away, score(m), m.pen, m.wo, m.events.map(e => [e.type, e.team, e.player, e.min, e.half]), m.notes])
 const fmtCode = h => h ? h.slice(0, 12).toUpperCase().match(/.{4}/g).join('-') : ''
+
+/* ---------- imagens: reduz no próprio celular antes de enviar (internet fraca) ---------- */
+// square = recorta quadrado (foto de rosto); senão mantém a proporção (documento, logo)
+async function fitImage(file, max, type = 'image/jpeg', square = false) {
+  if (!file || !file.size) return null
+  if (!file.type.startsWith('image/') || file.size > 15e6) throw new Error('foto')
+  const img = await createImageBitmap(file)
+  const k = square ? Math.max(max / img.width, max / img.height) : Math.min(1, max / Math.max(img.width, img.height))
+  const w = square ? max : Math.round(img.width * k), h = square ? max : Math.round(img.height * k), cv = document.createElement('canvas')
+  cv.width = w; cv.height = h
+  cv.getContext('2d').drawImage(img, (w - img.width * k) / 2, (h - img.height * k) / 2, img.width * k, img.height * k)
+  return new Promise(r => cv.toBlob(r, type, .82))
+}

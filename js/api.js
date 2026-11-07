@@ -15,15 +15,20 @@ async function q(p) { const {data, error} = await p; if (error) throw Object.ass
 
 // linhas do banco -> mesmo formato de dados.js (champs/teams/players/matches), para reaproveitar telas e regras.js
 async function toState(r) {
+  const marca = p => p ? `${SUPABASE_URL}/storage/v1/object/public/marcas/${p}` : null   // logos são públicas
   const camps = r.campeonatos.map(c => champBase({id: c.id, name: c.nome, sport: c.modalidade, category: c.categoria, minAge: c.idade_min,
-    maxAge: c.idade_max, start: c.inicio, venue: c.local, status: c.status}))
+    maxAge: c.idade_max, start: c.inicio, venue: c.local, status: c.status, logo: marca(c.logo_path), responsible: c.responsavel,
+    responsiblePhone: c.responsavel_telefone, regUntil: c.inscricao_ate, maxPlayers: c.max_atletas,
+    sponsors: (c.patrocinadores || []).map(x => ({name: x.nome, logo: marca(x.logo_path), path: x.logo_path}))}))
   const byId = Object.fromEntries(camps.map(c => [c.id, c]))
   const teamCamp = Object.fromEntries(r.equipes.map(t => [t.id, t.campeonato_id])), jogoCamp = Object.fromEntries(r.jogos.map(j => [j.id, j.campeonato_id]))
   const nomes = Object.fromEntries((r.perfis || []).map(p => [p.id, p.nome]))
   if (S.session?.uid) nomes[S.session.uid] = S.session.name
-  for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro})
+  for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro, token: t.link_token})
   for (const p of r.atletas) byId[teamCamp[p.equipe_id]]?.players.push({id: p.id, team: p.equipe_id, name: p.nome, num: p.numero, birth: p.nascimento,
-    bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: p.foto_url ?? null})   // portal: só aprovados, sem nascimento nem foto
+    bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: p.foto_url ?? null, photoPath: p.foto_path,
+    nick: p.apelido, pos: p.posicao, phone: p.telefone, resp: p.responsavel, respPhone: p.responsavel_telefone, origin: p.origem,
+    rg: [p.rg_frente_path, p.rg_verso_path].filter(Boolean)})   // portal: só aprovados, sem nascimento, foto nem documento
   const evs = {}
   for (const e of r.eventos) (evs[e.jogo_id] ??= []).push({id: e.id, type: e.tipo, team: e.equipe_id, player: e.atleta_id, min: e.minuto, half: e.tempo, sent: true})
   for (const j of r.jogos) {
@@ -84,6 +89,15 @@ async function loadAll() {
   }
   S.champs = await toState(r)
   if (!S.champs.some(c => c.id === S.champId)) S.champId = S.champs[0]?.id ?? null
+  if (sec) limparDocumentos(r).catch(() => {})   // não trava a tela
+}
+// LGPD: documento (RG) só fica guardado enquanto o campeonato não termina
+async function limparDocumentos(r) {
+  const fim = new Set(r.campeonatos.filter(c => c.status === 'encerrado').map(c => c.id)), camp = Object.fromEntries(r.equipes.map(t => [t.id, t.campeonato_id]))
+  const velhos = r.atletas.filter(a => (a.rg_frente_path || a.rg_verso_path) && fim.has(camp[a.equipe_id]))
+  if (!velhos.length) return
+  const {error} = await sb.storage.from('documentos').remove(velhos.flatMap(a => [a.rg_frente_path, a.rg_verso_path]).filter(Boolean))
+  if (!error) await q(sb.from('atletas').update({rg_frente_path: null, rg_verso_path: null}).in('id', velhos.map(a => a.id)))
 }
 
 async function enter(user) {
@@ -202,7 +216,18 @@ const REAL_A = {
   signupmode: d => { ui.signup = d.tipo || null; ui.signupDone = null },
   auth: write(d => atleta(d.id, {autorizacao: true})),
   approve: write(d => atleta(d.id, {aprovado: true})),
-  reject: write(async d => { await q(sb.from('atletas').delete().eq('id', d.id)); toast('Inscrição recusada.') }),
+  reject: write(async d => {
+    const p = P(C(), d.id); await q(sb.from('atletas').delete().eq('id', d.id))
+    if (p.rg?.length) await sb.storage.from('documentos').remove(p.rg)
+    if (p.photoPath) await sb.storage.from('fotos').remove([p.photoPath])
+    toast('Inscrição recusada. Foto e documento apagados.')
+  }),
+  docs: async d => {   // documento só a Secretaria vê, por link temporário de 10 minutos
+    if (ui.docs?.id === d.id) { ui.docs = null; return }
+    const {data, error} = await sb.storage.from('documentos').createSignedUrls(P(C(), d.id).rg, 600)
+    if (error) return toast(error.message)
+    ui.docs = {id: d.id, urls: data.map(x => x.signedUrl).filter(Boolean)}
+  },
   commit: write(async () => {
     const c = C(), seed = [...crypto.getRandomValues(new Uint8Array(8))].map(x => x.toString(16).padStart(2, '0')).join(''), hash = await sha(seed)
     local.set(seedKey(c.id), seed)   // guarda antes de publicar: se a resposta se perder, a semente não se perde
@@ -274,15 +299,24 @@ const REAL_F = {
     if (name.length < 3 || !(num >= 1 && num <= 99) || !/^\d{4}-\d{2}-\d{2}$/.test(d.birth) || d.birth > c.start) return toast('Confira nome, número (1 a 99) e data de nascimento.')
     if (!d.consent) return toast('É preciso o consentimento para uso dos dados.')
     if (c.players.some(p => p.team === team && p.num === num)) return toast(`O número ${num} já está em uso nesta equipe.`)
-    let photo; try { photo = await resizePhoto(d.photo) } catch { return toast('Não foi possível ler a foto. Use uma imagem JPG ou PNG.') }
+    if (c.maxPlayers && c.players.filter(p => p.team === team).length >= c.maxPlayers) return toast(`A equipe já tem o máximo de ${c.maxPlayers} atletas.`)
     const id = uid(), p = {birth: d.birth, auth: !!d.auth, approved: sec}
-    let foto_path = null
-    if (photo) {   // arquivo privado "fotos/<equipe>/<atleta>.jpg": só Secretaria, a equipe e o árbitro do jogo veem
-      const path = `${team}/${id}.jpg`, {error} = await sb.storage.from('fotos').upload(path, await (await fetch(photo)).blob(), {contentType: 'image/jpeg'})
-      if (error) toast('A foto não foi enviada: ' + error.message); else foto_path = path
+    const envia = async (bucket, path, file, max, square) => {
+      const b = await fitImage(file, max, 'image/jpeg', square); if (!b) return null
+      const {error} = await sb.storage.from(bucket).upload(path, b, {contentType: 'image/jpeg'})
+      if (error) { toast('Imagem não enviada: ' + error.message); return null }
+      return path
     }
+    let arq
+    try {   // foto: Secretaria, a equipe e o árbitro do jogo veem; documento: só a Secretaria
+      arq = {foto_path: await envia('fotos', `${team}/${id}.jpg`, d.photo, 400, true),
+             rg_frente_path: sec ? await envia('documentos', `${team}/${id}-rg-frente.jpg`, d.rgf, 1400) : null,
+             rg_verso_path: sec ? await envia('documentos', `${team}/${id}-rg-verso.jpg`, d.rgv, 1400) : null}
+    } catch { return toast('Não foi possível ler a imagem. Use uma foto JPG ou PNG.') }
+    const t = v => v?.trim() || null
     await q(sb.from('atletas').insert({id, equipe_id: team, nome: name, numero: num, nascimento: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0],
-      autorizacao: p.auth, aprovado: sec, consentimento: true, foto_path}))
+      apelido: t(d.nick), posicao: d.pos || null, telefone: t(d.phone), responsavel: t(d.resp), responsavel_telefone: t(d.respPhone),
+      autorizacao: p.auth, aprovado: sec, consentimento: true, origem: sec ? 'secretaria' : 'equipe', ...arq}))
     const [s, why] = insc(c, p); toast(`${name}: ${sec ? SPILL[s][1].toLowerCase() : 'enviado para aprovação'}${why ? '. ' + why : ''}.`)
   }),
   newteam: write(async d => {
@@ -292,12 +326,30 @@ const REAL_F = {
     ui.team = t.id; toast('Equipe cadastrada.')
   }),
   newchamp: write(async d => {
-    const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max
-    if (name.length < 5 || !SPORTS[d.sport] || !/^\d{4}-\d{2}-\d{2}$/.test(d.start)) return toast('Confira nome, modalidade e data de início.')
+    const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max, maxPlayers = +d.maxPlayers || 20
+    if (name.length < 5 || (!d.id && !SPORTS[d.sport]) || !/^\d{4}-\d{2}-\d{2}$/.test(d.start)) return toast('Confira nome, modalidade e data de início.')
     if (!(min >= 5 && min <= 80) || (max !== null && !(max >= min && max <= 99))) return toast('Faixa etária inválida.')
-    const [c] = await q(sb.from('campeonatos').insert({nome: name, modalidade: d.sport, categoria: d.category.trim() || 'Livre', idade_min: min, idade_max: max,
-      inicio: d.start, local: d.venue.trim() || 'A definir'}).select('id'))
-    S.champId = c.id; resetTransient(); ui.tab = 'inscricoes'; toast('Campeonato criado. Cadastre as equipes.')
+    if (!(maxPlayers >= 5 && maxPlayers <= 40)) return toast('O máximo de atletas por equipe vai de 5 a 40.')
+    const t = v => v?.trim() || null
+    const campos = {nome: name, categoria: t(d.category) || 'Livre', idade_min: min, idade_max: max, inicio: d.start, local: t(d.venue) || 'A definir',
+      responsavel: t(d.resp), responsavel_telefone: t(d.respPhone), inscricao_ate: d.regUntil || null, max_atletas: maxPlayers}
+    let id = d.id
+    if (id) await q(sb.from('campeonatos').update(campos).eq('id', id))
+    else id = (await q(sb.from('campeonatos').insert({...campos, modalidade: d.sport}).select('id')))[0].id
+    // logos: arquivo público "marcas/<campeonato>/..."; se uma imagem falhar, o resto continua salvo
+    const marca = async (file, nome) => {
+      let b; try { b = await fitImage(file, 400, 'image/png') } catch { toast('Não foi possível ler a imagem de ' + nome); return null }
+      if (!b) return null
+      const path = `${id}/${nome}-${Date.now()}.png`, {error} = await sb.storage.from('marcas').upload(path, b, {contentType: 'image/png'})
+      if (error) { toast('Imagem não enviada: ' + error.message); return null }
+      return path
+    }
+    const antes = S.champs.find(c => c.id === id)?.sponsors || [], extra = {patrocinadores: []}
+    const logo = await marca(d.logo, 'logo'); if (logo) extra.logo_path = logo
+    for (let i = 0; i < 4; i++) { const n = t(d['sp' + i]); if (n) extra.patrocinadores.push({nome: n, logo_path: (await marca(d['spl' + i], 'patrocinio' + (i + 1))) || antes[i]?.path || null}) }
+    await q(sb.from('campeonatos').update(extra).eq('id', id))
+    if (d.id) { ui.editChamp = null; toast('Dados do campeonato atualizados.') }
+    else { S.champId = id; resetTransient(); ui.tab = 'inscricoes'; toast('Campeonato criado. Cadastre as equipes e mande o link de inscrição.') }
   }),
   manage: write(async d => {
     const m = findMatch(C(), ui.manage), why = d.why.trim()

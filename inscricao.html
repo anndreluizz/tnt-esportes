@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inscrição de atletas · TNT Esportes</title>
+<meta name="description" content="Inscrição de atletas da equipe no campeonato, com foto e documento">
+<meta name="theme-color" content="#103d27">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .insc{max-width:680px;margin:18px auto 40px}
+  .insc .hero{margin-bottom:12px}
+  .insc fieldset.step{background:#fff}
+  .numeros{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .numeros span{background:var(--g1);border-radius:8px;padding:3px 8px;font-size:13px}
+  .thumb{display:block;margin-top:6px;max-height:110px;max-width:100%;border-radius:8px;border:1px solid var(--line)}
+  .ok{font-size:44px;line-height:1;color:var(--g7)}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap brand"><div class="logo">TNT</div>
+  <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div></div></header>
+<main id="app" class="wrap insc"><div class="card empty">Carregando…</div></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/regras.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/inscricao.js"></script>
+</body>
+</html>

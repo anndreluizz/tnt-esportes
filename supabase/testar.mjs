@@ -12,7 +12,7 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create role anon nologin; create role authenticated nologin;
   grant usage on schema public, auth to anon, authenticated; grant execute on function auth.uid() to anon, authenticated;`)
-for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.endsWith('_storage.sql')))
+for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.includes('_storage')))
   await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8'))
 
 let falhas = 0, total = 0
@@ -52,6 +52,37 @@ await erro(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, co
 await erro(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, consentimento) values ($1, 'Sem LGPD', 9, '1999-01-01', 'Centro', false)`, [T.a1.id], 'check', 'sem consentimento não entra')
 ok((await q(`update atletas set aprovado = true where id = $1 returning id`, [nov.id])).length === 0, 'equipe não altera inscrição depois de enviada')
 ok((await q(`select * from atletas`)).every(a => a.equipe_id === T.a1.id), 'equipe só vê os próprios atletas')
+
+console.log('Inscrição por link')
+await como(SEC)
+const [{ link_token: LINK }] = await q(`select link_token from equipes where id = $1`, [T.b1.id])
+await como(null)
+await erro(`select codigo from equipes`, [], 'permission denied', 'público não lê o link nem o código das equipes')
+ok(!('link_token' in (await q(`select * from equipes_publico limit 1`))[0]), 'link não aparece no portal')
+const info = (await q(`select link_inscricao($1) i`, [LINK]))[0].i
+ok(info.equipe === 'Equipe b1' && info.aberta === true && info.inscritos.length === 1, 'link mostra a equipe e quem já foi inscrito')
+ok((await q(`select link_inscricao($1) i`, [randomUUID()]))[0].i === null, 'link inventado não mostra nada')
+const pasta = `${T.b1.id}/${LINK}/`, arq = k => pasta + k + '.jpg'
+const atl = (o = {}) => ({ nome: 'Pelo Link', numero: 12, nascimento: '2000-02-02', consentimento: true, telefone: '97 99999-0000',
+  foto_path: arq('f'), rg_frente_path: arq('rf'), rg_verso_path: arq('rv'), ...o })
+await erro(`select inscrever_pelo_link($1, $2)`, [randomUUID(), atl()], 'inválido', 'link inventado não inscreve')
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ rg_verso_path: null })], 'documento', 'sem o documento não inscreve')
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ foto_path: `${T.a1.id}/${LINK}/f.jpg` })], 'Arquivo inválido', 'arquivo de outra pasta é recusado')
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ consentimento: false })], 'LGPD', 'sem consentimento não inscreve')
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ numero: 10 })], 'duplicate', 'número de camisa repetido é recusado')
+const [{ id: viaLink }] = await q(`select inscrever_pelo_link($1, $2) id`, [LINK, atl({ aprovado: true })])
+await como(SEC)
+const [ln] = await q(`select aprovado, origem, telefone, rg_frente_path, situacao_atleta(a) s from atletas a where id = $1`, [viaLink])
+ok(ln.aprovado === false && ln.origem === 'link' && ln.s === 'analise' && ln.rg_frente_path === arq('rf'), 'inscrito pelo link entra em análise')
+await q(`update campeonatos set max_atletas = 5 where id = $1`, [C])
+await como(null)
+for (const n of [13, 14, 15]) await q(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ numero: n, nome: 'Atleta ' + n })])
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ numero: 16 })], 'máximo', 'respeita o máximo de atletas da equipe')
+await como(SEC); await q(`update campeonatos set inscricao_ate = '2020-01-01', max_atletas = 20 where id = $1`, [C])
+await como(null)
+await erro(`select inscrever_pelo_link($1, $2)`, [LINK, atl({ numero: 17 })], 'encerradas', 'depois do prazo o link não inscreve')
+ok((await q(`select link_inscricao($1) i`, [LINK]))[0].i.aberta === false, 'página do link mostra inscrições encerradas')
+await como(SEC); await q(`update campeonatos set inscricao_ate = null where id = $1`, [C]); await q(`delete from atletas where equipe_id = $1 and origem = 'link'`, [T.b1.id])
 
 console.log('LGPD e acesso público')
 await como(null)

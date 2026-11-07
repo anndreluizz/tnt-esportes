@@ -178,41 +178,87 @@ function vPainel() {
     </div></div>` + hist
 }
 
+const clogo = (url, size = 44) => url ? `<img class="clogo" src="${esc(url)}" alt="" style="width:${size}px;height:${size}px">` : ''
+function sponsorsBar(c) {
+  if (!c.sponsors?.length) return ''
+  return `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${c.sponsors.map(s => s.logo ? `<img src="${esc(s.logo)}" alt="${esc(s.name)}" title="${esc(s.name)}">` : `<b>${esc(s.name)}</b>`).join('')}</div>`
+}
+function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e prazo só no modo oficial
+  const v = (k, d = '') => esc(c?.[k] ?? d), sp = c?.sponsors || []
+  const step = (n, t, body) => `<fieldset class="step"><legend><span>${n}</span>${t}</legend><div class="f">${body}</div></fieldset>`
+  return `<div class="card mt" id="champform"><h3>${c ? `Editar: ${esc(c.name)}` : 'Novo campeonato'}</h3>
+  <form data-form="newchamp">${c ? `<input type="hidden" name="id" value="${c.id}">` : ''}
+  ${step(1, 'Identidade', `
+    <label class="span2">Nome<input name="name" required minlength="5" maxlength="60" value="${v('name')}" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
+    <label>Modalidade<select name="sport" ${c ? 'disabled' : ''}>${Object.keys(SPORTS).map(s => `<option ${c?.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+    <label>Categoria<input name="category" maxlength="20" value="${v('category')}" placeholder="Livre, Sub-17, Feminino, Veteranos..."></label>
+    <label>Idade mínima<input name="min" type="number" min="5" max="80" value="${v('minAge', 15)}" required></label>
+    <label>Idade máxima<input name="max" type="number" min="5" max="99" value="${v('maxAge')}" placeholder="sem limite"></label>
+    ${REAL ? `<label class="span2">Logo do campeonato${c?.logo ? ` <span class="sub">(já tem; envie outra só para trocar)</span>` : ''}<input name="logo" type="file" accept="image/*"></label>` : ''}`)}
+  ${step(2, 'Organização', `
+    ${REAL ? `<label>Responsável<input name="resp" maxlength="60" value="${v('responsible')}" placeholder="Nome de quem organiza"></label>
+    <label>Telefone / WhatsApp do responsável<input name="respPhone" type="tel" maxlength="20" value="${v('responsiblePhone')}" placeholder="(97) 9 9999-9999"></label>` : ''}
+    <label>Início<input name="start" type="date" required value="${v('start', '2027-03-06')}"></label>
+    <label>Local<input name="venue" maxlength="60" value="${v('venue')}" placeholder="Quadra Poliesportiva Municipal"></label>`)}
+  ${REAL ? step(3, 'Inscrições', `
+    <label>Inscrições até<input name="regUntil" type="date" value="${v('regUntil')}"></label>
+    <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
+    <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo, o link para de aceitar inscrições.</p>`)
+  + step(4, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>', [0, 1, 2, 3].map(i => `
+    <label>Patrocinador ${i + 1}<input name="sp${i}" maxlength="40" value="${esc(sp[i]?.name || '')}" placeholder="Nome"></label>
+    <label>Logo ${sp[i]?.logo ? '<span class="sub">(já tem)</span>' : ''}<input name="spl${i}" type="file" accept="image/*"></label>`).join('')) : ''}
+  <div class="btns" style="margin-top:12px"><button class="btn">${c ? 'Salvar alterações' : 'Criar e abrir inscrições'}</button>${c ? '<button type="button" class="btn ghost" data-act="editchamp" data-id="">Cancelar</button>' : ''}</div>
+  </form></div>`
+}
 function vCamps() {
   const cards = S.champs.map(c => {
     const done = c.matches.filter(isDone).length, ch = champion(c)
     return `<div class="card"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
-      <h3 style="margin-top:8px;font-size:22px">${esc(c.name)}</h3>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px">${clogo(c.logo)}<h3 style="font-size:22px">${esc(c.name)}</h3></div>
       <p class="sub">${ageRange(c)} · início ${dmy(c.start)} · ${esc(c.venue)}</p>
+      ${c.responsible ? `<p class="sub">Responsável: ${esc(c.responsible)}${c.responsiblePhone ? ' · ' + esc(c.responsiblePhone) : ''}</p>` : ''}
       <p class="sub">${c.teams.length} equipes · ${c.players.length} atletas · ${c.matches.length ? `${done}/${c.matches.length} jogos` : 'tabela após o sorteio'}${ch ? ` · campeão: <b>${esc(T(c, ch).name)}</b>` : ''}</p>
-      <button class="btn sm" style="margin-top:10px" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button></div>`
+      ${c.regUntil ? `<p class="sub">Inscrições até ${dmy(c.regUntil)}</p>` : ''}${sponsorsBar(c)}
+      <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button>
+        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}</div></div>`
   }).join('')
+  const editing = S.champs.find(c => c.id === ui.editChamp)
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
-  ${REAL ? arbitrosCard() : ''}
   ${cards ? `<div class="grid g3">${cards}</div>` : '<div class="info">Comece criando o primeiro campeonato aqui embaixo. As outras abas (inscrições, sorteio, jogos, relatórios) passam a funcionar depois disso.</div>'}
-  <div class="card mt"><h3>Novo campeonato</h3><form class="f" data-form="newchamp">
-    <label class="span2">Nome<input name="name" required minlength="5" maxlength="60" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
-    <label>Modalidade<select name="sport">${Object.keys(SPORTS).map(s => `<option>${s}</option>`).join('')}</select></label>
-    <label>Categoria<input name="category" maxlength="20" placeholder="Livre, Sub-17, Feminino, Veteranos..."></label>
-    <label>Idade mínima<input name="min" type="number" min="5" max="80" value="15" required></label>
-    <label>Idade máxima<input name="max" type="number" min="5" max="99" placeholder="sem limite"></label>
-    <label>Início<input name="start" type="date" required value="2027-03-06"></label>
-    <label>Local<input name="venue" maxlength="60" placeholder="Quadra Poliesportiva Municipal"></label>
-    <button class="btn">Criar e abrir inscrições</button></form></div>`
+  ${champForm(editing)}
+  ${REAL ? `<div class="mt">${arbitrosCard()}</div>` : ''}`
 }
 
 function athleteForm(c, mode) {
-  return `<h3 style="margin-top:22px">${mode === 'team' ? 'Inscrever atleta' : 'Inscrever atleta pela Secretaria'}</h3>
+  const sec = mode !== 'team'
+  return `<h3 style="margin-top:22px">${sec ? 'Inscrever atleta pela Secretaria' : 'Inscrever atleta'}</h3>
   <form class="f" data-form="athlete">
     <label>Nome completo<input name="name" required minlength="3" maxlength="50" autocomplete="off"></label>
+    <label>Apelido <span class="sub">(opcional)</span><input name="nick" maxlength="30" autocomplete="off" placeholder="Como é chamado no jogo"></label>
     <label>Nº da camisa<input name="num" type="number" min="1" max="99" required></label>
     <label>Nascimento<input name="birth" type="date" required min="1940-01-01" max="${c.start}"></label>
+    <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
+    <label>Telefone / WhatsApp <span class="sub">(opcional)</span><input name="phone" type="tel" maxlength="20" placeholder="(97) 9 9999-9999"></label>
     <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
-    <label>Foto (identificação)<input name="photo" type="file" accept="image/*" capture="user"></label>
+    <label>Foto do atleta<input name="photo" type="file" accept="image/*" capture="user"></label>
+    <label>Responsável <span class="sub">(se menor de 18)</span><input name="resp" maxlength="60"></label>
+    <label>Telefone do responsável<input name="respPhone" type="tel" maxlength="20"></label>
+    ${REAL && sec ? `<label>Documento (RG) – frente<input name="rgf" type="file" accept="image/*"></label><label>Documento (RG) – verso<input name="rgv" type="file" accept="image/*"></label>` : ''}
     <label class="chk span2"><input type="checkbox" name="auth"> Menor de 18: autorização do responsável entregue</label>
-    <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Data de nascimento e foto não aparecem no portal público.</label>
-    <div class="span2"><button class="btn">${mode === 'team' ? 'Enviar para aprovação' : 'Inscrever'}</button></div></form>
-  <p class="note">Faixa etária: ${ageRange(c)}. A idade é conferida na hora: fora da faixa, a inscrição é bloqueada; menor de 18 sem autorização fica pendente.${mode === 'team' ? ' A Secretaria aprova depois de conferir os documentos.' : ''}</p>`
+    <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Data de nascimento, documento e foto não aparecem no portal público.</label>
+    <div class="span2"><button class="btn">${sec ? 'Inscrever' : 'Enviar para aprovação'}</button></div></form>
+  <p class="note">Faixa etária: ${ageRange(c)}. A idade é conferida na hora: fora da faixa, a inscrição é bloqueada; menor de 18 sem autorização fica pendente.${sec ? '' : ' A Secretaria aprova depois de conferir os documentos.'}</p>`
+}
+
+function teamLink(c, t) {   // modo oficial: link de inscrição da equipe, para mandar no WhatsApp
+  if (!REAL || !t.token) return ''
+  const link = new URL('inscricao.html?t=' + t.token, location.href).href
+  const msg = `Inscrição da equipe ${t.name} na ${c.name}.\nCadastre cada atleta com foto e documento (RG) por este link:\n${link}`
+  return `<div class="info" style="margin-bottom:12px"><b>Link de inscrição da equipe</b>
+    <p class="sub">Mande para o responsável da equipe. Cada atleta é inscrito com foto e documento e entra em análise para você aprovar.${c.regUntil ? ` Vale até ${dmy(c.regUntil)}.` : ''}</p>
+    <div class="btns" style="margin-top:8px"><button class="btn sm" data-act="copylink" data-link="${esc(link)}">Copiar link</button>
+      <a class="btn sm gold" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Enviar no WhatsApp</a>
+      <a class="btn sm ghost" target="_blank" rel="noopener" href="${esc(link)}">Abrir</a></div></div>`
 }
 
 function teamDetail(c, t, mode) {
@@ -225,17 +271,21 @@ function teamDetail(c, t, mode) {
       if (s === 'analise') acts = `<button class="btn sm" data-act="approve" data-id="${p.id}">Aprovar</button> <button class="btn ghost sm" data-act="reject" data-id="${p.id}">Recusar</button>`
       if (s === 'pendente') acts = `<button class="btn sm" data-act="auth" data-id="${p.id}">Registrar autorização</button>`
       if (s === 'aprovado' && nx) acts = `<button class="btn ghost sm" data-act="punish" data-id="${p.id}">Suspender</button>`
+      if (p.rg?.length) acts += ` <button class="btn ghost sm" data-act="docs" data-id="${p.id}">${ui.docs?.id === p.id ? 'Fechar documento' : 'Ver documento'}</button>`
     }
-    const row = `<tr><td><div class="ath">${avatar(p)}<div><b>${esc(p.name)}</b><div class="sub">${esc(p.bairro)}</div></div></div></td><td>${p.num}</td><td>${ageAt(p.birth, c.start)}</td>
-      <td class="l wrap">${spill(s)} ${sw ? '<span class="pill red">Suspenso</span>' : ''} ${why ? `<div class="sub">${why}</div>` : sw ? `<div class="sub">${esc(sw)}</div>` : ''}</td><td>${acts}</td></tr>`
+    const info = [p.pos, p.bairro, p.phone].filter(Boolean).map(esc).join(' · ')
+    const row = `<tr><td><div class="ath">${avatar(p)}<div><b>${esc(p.name)}</b>${p.nick ? ` <span class="sub">“${esc(p.nick)}”</span>` : ''}${p.origin === 'link' ? ' <span class="pill blue">via link</span>' : ''}<div class="sub">${info}</div></div></div></td><td>${p.num}</td><td>${ageAt(p.birth, c.start)}</td>
+      <td class="l wrap">${spill(s)} ${sw ? '<span class="pill red">Suspenso</span>' : ''} ${why ? `<div class="sub">${why}</div>` : sw ? `<div class="sub">${esc(sw)}</div>` : ''}${p.resp ? `<div class="sub">Responsável: ${esc(p.resp)}${p.respPhone ? ' · ' + esc(p.respPhone) : ''}</div>` : ''}</td><td>${acts}</td></tr>`
+    const docs = mode === 'sec' && ui.docs?.id === p.id ? `<tr><td colspan="5"><div class="docs">${ui.docs.urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Documento de ${esc(p.name)}"></a>`).join('')}</div>
+      <p class="note">Documento visível só para a Secretaria. É apagado automaticamente quando o campeonato termina (LGPD).</p></td></tr>` : ''
     const form = mode === 'sec' && ui.punish === p.id ? `<tr><td colspan="5"><form class="f manage" data-form="punish">
       <label>Jogos de suspensão<select name="games"><option>1</option><option>2</option><option>3</option></select></label>
       <label class="span2">Decisão / motivo<input name="why" required minlength="5" placeholder="Ex.: agressão ao adversário, decisão da comissão em 05/11"></label>
       <div class="btns span2"><button class="btn danger">Aplicar suspensão</button><button type="button" class="btn ghost" data-act="punish" data-id="">Cancelar</button></div></form></td></tr>` : ''
-    return row + form
+    return row + docs + form
   }).join('')
-  return `<h3>${esc(t.name)} <small>${ps.length} atletas · ${esc(t.bairro)}${t.group ? ' · Grupo ' + t.group : ''}</small></h3>
-  ${mode === 'sec' ? `<p class="sub" style="margin-bottom:8px">Código de acesso da equipe: <span class="codebox">${t.code}</span> · o representante usa para inscrever os atletas.</p>` : ''}
+  return `<h3>${esc(t.name)} <small>${ps.length}${c.maxPlayers ? ' de ' + c.maxPlayers : ''} atletas · ${esc(t.bairro)}${t.group ? ' · Grupo ' + t.group : ''}</small></h3>
+  ${mode === 'sec' ? teamLink(c, t) + `<p class="sub" style="margin-bottom:8px">Código de acesso da equipe: <span class="codebox">${t.code}</span> · o representante usa para entrar no sistema.</p>` : ''}
   <div class="scroll"><table class="st"><thead><tr><th class="l">Atleta</th><th>Nº</th><th>Idade</th><th class="l">Situação</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nenhum atleta inscrito.</td></tr>'}</tbody></table></div>
   ${athleteForm(c, mode)}`
 }
@@ -440,15 +490,15 @@ function vPortal() {
   const c = C()
   const chips = role() === 'equipe' ? '' : `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`
   const nx = c.matches.filter(m => !isDone(m) && m.home && m.away).sort(byDate)[0]
-  const hero = `<div class="hero"><div><div class="eyebrow">Portal público · sem login</div><h2>${esc(c.name)}</h2>
-    <div style="color:#cfe3d6;font-size:14px;margin-top:4px">${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</div></div>
+  const hero = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<div><div class="eyebrow">Portal público · sem login</div><h2>${esc(c.name)}</h2>
+    <div style="color:#cfe3d6;font-size:14px;margin-top:4px">${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</div></div></div>
     ${nx ? `<div class="next"><div class="eyebrow">Próximo jogo · ${dm(nx.date)} · ${nx.time}</div><b class="cond" style="font-size:20px">${esc(label(c, nx))}</b></div>` : ''}</div>`
   const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD).</p>'
-  if (!c.matches.length) return chips + hero + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
+  if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
     ${c.teams.map(t => `<div class="row"><b>${esc(t.name)}</b><span class="sub">${esc(t.bairro)}</span></div>`).join('')}
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
   const up = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 4), last = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 5)
-  return chips + hero + banner(c) + `<div class="grid g2">${table(c, 'A')}${table(c, 'B')}</div><div class="mt">${bracket(c)}</div>
+  return chips + hero + sponsorsBar(c) + banner(c) + `<div class="grid g2">${table(c, 'A')}${table(c, 'B')}</div><div class="mt">${bracket(c)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Próximos jogos</h3>${up.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
     <div class="card"><h3>Últimos resultados</h3>${last.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo realizado.</p>'}</div></div>
   <div class="grid g2 mt"><div class="card"><h3>Artilharia</h3>${scorers(c).slice(0, 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
@@ -473,7 +523,7 @@ function vDoc() {
   return `<div class="docbar noprint"><button class="btn gold" data-act="print">Imprimir / salvar PDF</button><button class="btn ghost" data-act="closedoc">Fechar</button></div>
   <div class="paper">
     <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><div class="logo">TNT</div><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes · documento gerado pelo sistema</div></div></div>
-      <div style="text-align:right"><h1>SÚMULA DE JOGO</h1><div class="sub">${esc(c.name)}</div></div></div>
+      <div style="text-align:right;display:flex;gap:10px;align-items:center"><div><h1>SÚMULA DE JOGO</h1><div class="sub">${esc(c.name)}</div></div>${clogo(c.logo, 48)}</div></div>
     <div class="dgrid"><div><span>Modalidade</span>${esc(c.sport)} · ${esc(c.category)}</div><div><span>Fase</span>${esc(mtitle(m))}</div><div><span>Data e horário</span>${dmy(m.date)} · ${m.time}</div>
       <div><span>Local</span>${esc(c.venue)}</div><div><span>Árbitro</span>${esc(m.referee)}</div><div><span>Situação</span>${isDone(m) ? 'Confirmada' : 'Em aberto'}</div></div>
     <div class="dscore"><span class="r">${nm(m.home)}</span><span class="big">${score(m).join(' × ')}</span><span>${nm(m.away)}</span></div>
@@ -485,6 +535,7 @@ function vDoc() {
     <h4>Observações do árbitro</h4><p>${esc(m.notes) || 'Sem observações.'}</p>
     ${m.history.length ? `<h4>Histórico da partida</h4>${m.history.map(x => `<p class="sub">${fdt(x.at)} · ${esc(x.who)}: ${esc(x.what)}${x.why ? ` · motivo: ${esc(x.why)}` : ''}</p>`).join('')}` : ''}
     <h4>Assinaturas</h4>${sigs}
+    ${sponsorsBar(c)}
     <div class="auth"><div><div class="sub">Código de autenticidade</div><b>${fmtCode(m.hash) || '—'}</b></div><div class="sub" style="max-width:380px">Confira este código no Portal público, em “Conferir uma súmula”. Se qualquer dado da súmula for alterado, o código deixa de bater.</div></div>
   </div>`
 }
@@ -688,6 +739,8 @@ const A = {
     ui.draw = null; ui.tab = 'jogos'; scrollTo(0, 0); toast('Tabela gerada!')
   },
   doc: d => { ui.doc = {c: d.c, id: d.id} },
+  copylink: d => { navigator.clipboard?.writeText(d.link).then(() => toast('Link copiado. Cole no WhatsApp da equipe.'), () => toast(d.link)); return 'stay' },
+  editchamp: d => { ui.editChamp = d.id || null; setTimeout(() => document.getElementById('champform')?.scrollIntoView({behavior: 'smooth'})) },
   closedoc: () => { ui.doc = null },
   print: () => { print(); return 'stay' },
   dl: d => { download(+d.i); return 'stay' },
@@ -712,7 +765,8 @@ const F = {
     if (!d.consent) return toast('É preciso o consentimento para uso dos dados.')
     if (c.players.some(p => p.team === t && p.num === num)) return toast(`O número ${num} já está em uso nesta equipe.`)
     let photo; try { photo = await resizePhoto(d.photo) } catch { return toast('Não foi possível ler a foto. Use uma imagem JPG ou PNG.') }
-    const p = {id: uid(), team: t, name, num, birth: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0], auth: !!d.auth, approved: mode === 'sec', consent: true, photo}
+    const p = {id: uid(), team: t, name, num, birth: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0], auth: !!d.auth, approved: mode === 'sec', consent: true, photo,
+      nick: d.nick?.trim() || null, pos: d.pos || null, phone: d.phone?.trim() || null, resp: d.resp?.trim() || null, respPhone: d.respPhone?.trim() || null}
     c.players.push(p)
     const [s, why] = insc(c, p)
     log(c, mode === 'team' ? `Equipe ${T(c, t).name}` : SEC, `${mode === 'team' ? 'Atleta enviado para aprovação' : 'Atleta inscrito'}: ${name} (${T(c, t).name})`)
