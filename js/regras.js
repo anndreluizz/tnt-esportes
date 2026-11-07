@@ -31,6 +31,7 @@ function ageAt(birth, ref) {
   return ry - y - (rm < mo || (rm === mo && rd < d) ? 1 : 0)
 }
 function insc(c, p) {
+  if (!p.birth) return ['aprovado', '']   // modo oficial sem login: o banco só manda atletas aprovados, sem nascimento
   const a = ageAt(p.birth, c.start)
   if (a < c.minAge) return ['bloqueado', `Abaixo da faixa etária (${a} anos)`]
   if (c.maxAge && a > c.maxAge) return ['bloqueado', `Acima da faixa etária (${a} anos)`]

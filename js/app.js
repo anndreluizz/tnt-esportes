@@ -5,7 +5,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const KEY = 'tnt-esportes-prototipo-v2'
 const REAL = document.documentElement?.dataset.mode === 'real'   // oficial.html: dados no Supabase (api.js)
 function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 3 ? s : null } catch { return null } }
-function save() { if (REAL) return; try { localStorage.setItem(KEY, JSON.stringify(S)) } catch { toast('Memória do navegador cheia: as últimas alterações podem não ficar guardadas.') } }
+function save() { if (REAL) return saveDrafts(); try { localStorage.setItem(KEY, JSON.stringify(S)) } catch { toast('Memória do navegador cheia: as últimas alterações podem não ficar guardadas.') } }
 
 let S = REAL ? {champs: [], champId: null, offline: false, session: null} : load() || seed()
 const ui = {tab: null, matchId: null, team: null, picker: null, manage: null, punish: null, signing: null, doc: null,
@@ -80,12 +80,12 @@ function phaseNow(c) {
 function matchRow(c, m, mode) {
   const ready = m.home && m.away, d = isDone(m)
   let acts = ''
-  if (mode === 'sec' && !d && ready && !REAL) acts += `<button class="btn sm" data-act="open" data-id="${m.id}">Abrir súmula</button>`
+  if (mode === 'sec' && !d && ready) acts += `<button class="btn sm" data-act="open" data-id="${m.id}">Abrir súmula</button>`
   if (mode === 'sec' && !d && !m.pendingConfirm && !m.events.length) acts += `<button class="btn ghost sm" data-act="manage" data-id="${m.id}">Adiar / W.O.</button>`
   if (d) acts += `<button class="btn ghost sm" data-act="doc" data-c="${c.id}" data-id="${m.id}">Súmula</button>`
   return `<div class="match"><div class="mline"><span class="r">${side(c, m, 'home')}</span>
     <span class="sc ${d ? '' : 'time'}">${d ? scoreTxt(m) : m.time}</span><span>${side(c, m, 'away')}</span></div>
-    <div class="meta">${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(c.venue)} ${mpill(m)} ${acts}</div>
+    <div class="meta">${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(c.venue)} ${mpill(m)} ${acts}${REAL && mode === 'sec' && !d ? refSelect(m) : ''}</div>
     ${mode === 'sec' && ui.manage === m.id ? manageForm(c, m) : ''}</div>`
 }
 function manageForm(c, m) {
@@ -187,6 +187,7 @@ function vCamps() {
       <button class="btn sm" style="margin-top:10px" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button></div>`
   }).join('')
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
+  ${REAL ? arbitrosCard() : ''}
   ${cards ? `<div class="grid g3">${cards}</div>` : '<div class="info">Comece criando o primeiro campeonato aqui embaixo. As outras abas (inscrições, sorteio, jogos, relatórios) passam a funcionar depois disso.</div>'}
   <div class="card mt"><h3>Novo campeonato</h3><form class="f" data-form="newchamp">
     <label class="span2">Nome<input name="name" required minlength="5" maxlength="60" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
@@ -270,10 +271,10 @@ function vJogos() {
 
 /* ---------- súmula (celular do árbitro) ---------- */
 function vSumula() {
-  const c = C(), list = c.matches.filter(m => m.home && m.away).sort(byDate)
+  const c = C(), list = c.matches.filter(m => m.home && m.away && !(REAL && role() === 'arbitro' && m.refereeId !== S.session.uid)).sort(byDate)
   let m = findMatch(c, ui.matchId)
   if (!m || !list.includes(m)) { m = list.find(x => !isDone(x)) || list[0]; ui.matchId = m?.id }
-  const head = `<div class="head"><div><div class="eyebrow">${role() === 'arbitro' ? 'Árbitro João Paulo · celular' : 'Modo árbitro · celular'}</div><h2>Súmula digital</h2></div>
+  const head = `<div class="head"><div><div class="eyebrow">${role() === 'arbitro' ? `Árbitro ${esc(S.session.name || 'João Paulo')} · celular` : 'Modo árbitro · celular'}</div><h2>Súmula digital</h2></div>
     ${m ? `<label style="display:flex;align-items:center;gap:8px;min-width:0;max-width:100%">Partida <select id="sel-match">${list.map(x => `<option value="${x.id}" ${x.id === m.id ? 'selected' : ''}>${esc(mtitle(x))} · ${esc(label(c, x))}${isDone(x) ? ' (encerrada)' : ''}</option>`).join('')}</select></label>` : ''}</div>`
   if (!m) return head + '<div class="card empty">Nenhuma partida com equipes definidas neste campeonato.</div>'
   const cfg = cfgOf(c)
@@ -310,7 +311,7 @@ function vSumula() {
   else bottom = `<button class="btn block" data-act="sign">Encerrar jogo e assinar</button>
     <p class="sub" style="text-align:center;margin-top:6px">${pending ? `${pending} evento(s) guardado(s) no aparelho. Serão enviados quando a internet voltar.` : 'Os eventos são enviados na hora.'}</p>`
   return head + `<div class="sumula"><div class="phone">
-    <div class="ptop"><span>Árbitro: ${esc(m.referee)}</span><button class="net ${S.offline ? 'off' : ''}" data-act="net" title="Toque para simular queda de sinal"><i></i>${S.offline ? 'Sem internet' : 'Online'}</button></div>
+    <div class="ptop"><span>Árbitro: ${esc(m.referee)}</span><button class="net ${S.offline ? 'off' : ''}" data-act="net" title="${REAL ? 'Toque para tentar enviar agora' : 'Toque para simular queda de sinal'}"><i></i>${S.offline ? 'Sem internet' : 'Online'}</button></div>
     <div class="board"><div class="cap">${esc(c.name)} · ${esc(mtitle(m))}</div>
       <div class="bline"><span class="tn r">${esc(T(c, m.home).name)}</span><span class="big">${h} × ${a}</span><span class="tn" style="text-align:left">${esc(T(c, m.away).name)}</span></div>
       ${m.pen ? `<div class="cap">Pênaltis ${m.pen[0]} × ${m.pen[1]}</div>` : ''}
@@ -324,7 +325,7 @@ function vSumula() {
       ${locked ? '<span></span>' : `<button class="link" data-act="undo" data-id="${e.id}">desfazer</button>`}</div>`).join('')}</div>
     ${bottom}
   </div>
-  <div><p class="sub">Experimente: registre gols e cartões, toque em “Online” para simular a quadra sem sinal, depois encerre o jogo e assine na tela.</p>
+  <div>${REAL ? '' : '<p class="sub">Experimente: registre gols e cartões, toque em “Online” para simular a quadra sem sinal, depois encerre o jogo e assine na tela.</p>'}
     <ol class="points">
       <li><b>Um celular por partida</b>Só o árbitro escalado registra a súmula, evitando dois resultados diferentes para o mesmo jogo.</li>
       <li><b>Funciona sem internet</b>Tudo fica guardado no aparelho e é enviado quando o sinal volta. Cada evento tem um código único: nada é duplicado.</li>
@@ -339,7 +340,7 @@ function hookPads() {
   document.querySelectorAll('canvas.pad').forEach(cv => {
     const x = cv.getContext('2d'), k = cv.dataset.k
     x.lineWidth = 3; x.lineCap = x.lineJoin = 'round'; x.strokeStyle = '#14261b'
-    if (m.signatures[k]) { const im = new Image(); im.onload = () => x.drawImage(im, 0, 0); im.src = m.signatures[k] }
+    if (m.signatures[k]?.startsWith('data:')) { const im = new Image(); im.onload = () => x.drawImage(im, 0, 0); im.src = m.signatures[k] }
     let on = false
     const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height] }
     cv.onpointerdown = e => { on = true; cv.setPointerCapture(e.pointerId); x.beginPath(); x.moveTo(...pos(e)) }
@@ -463,7 +464,7 @@ function vDoc() {
     ${list.map(e => `<tr><td>${e.min}'</td><td>${e.half}º</td>${showType ? `<td>${TYPES[e.type]}</td>` : ''}<td>${nm(e.team)}</td><td>${e.player ? `${esc(P(c, e.player).name)} (nº ${P(c, e.player).num})` : '—'}</td></tr>`).join('')}</table>` : '<p class="sub">Nenhum.</p>'
   const evs = t => m.events.filter(e => e.type === t)
   const fouls = (t, h) => m.events.filter(e => e.type === 'falta' && e.team === t && e.half === h).length
-  const sig = (k, l) => `<div class="sig">${m.signatures[k] && !pub ? `<img src="${m.signatures[k]}" alt="Assinatura">` : `<div class="ph">${m.signatures[k] ? 'assinado no aparelho' : '—'}</div>`}${esc(l)}</div>`
+  const sig = (k, l) => `<div class="sig">${m.signatures[k]?.startsWith('data:') && !pub ? `<img src="${m.signatures[k]}" alt="Assinatura">` : `<div class="ph">${m.signatures[k] ? 'assinado no aparelho' : '—'}</div>`}${esc(l)}</div>`
   const sigs = m.sample ? '<p class="sub">Partida dos dados de exemplo: sem assinaturas.</p>'
     : m.simulated ? '<p class="sub">Resultado simulado no modo apresentação: sem assinaturas.</p>'
     : m.wo ? '<p class="sub">W.O. registrado pela Secretaria.</p>'
@@ -573,7 +574,7 @@ function download(i) { const a = document.createElement('a'); a.href = ui.cards[
 /* ---------- ações ---------- */
 function addEv(team, type, player) {
   const c = C(), m = cur(), cfg = cfgOf(c)
-  const push = t => m.events.push({id: uid(), type: t, team, player, min: Math.floor(ui.clock.sec / 60) + 1, half: m.half, sent: !S.offline})
+  const push = t => m.events.push({id: uid(), type: t, team, player, min: Math.floor(ui.clock.sec / 60) + 1, half: m.half, sent: !S.offline && !REAL})   // oficial: api.js envia
   push(type)
   if (type === 'amarelo' && m.events.filter(e => e.type === 'amarelo' && e.player === player).length === 2) { push('vermelho'); toast('Segundo amarelo: atleta expulso.') }
   if (type === 'falta' && cfg.fouls && m.events.filter(e => e.type === 'falta' && e.team === team && e.half === m.half).length === cfg.fouls)
@@ -796,7 +797,7 @@ function render() {
     $('#hright').innerHTML = ''; $('#tabs').innerHTML = ''; app.className = ''; app.innerHTML = vLogin(); doc.hidden = true
     document.body.classList.remove('doc-open'); return
   }
-  const tabs = ROLE_TABS[r].filter(([k]) => !(REAL && k === 'sumula'))   // súmula no modo oficial: próxima etapa
+  const tabs = ROLE_TABS[r]
   if (!tabs.some(([k]) => k === ui.tab)) ui.tab = tabs[0][0]
   const c = C()
   if (!c && r === 'secretaria') ui.tab = 'campeonatos'

@@ -8,7 +8,7 @@ import { createHash, randomUUID } from 'node:crypto'
 const db = new PGlite({ extensions: { pgcrypto } })
 // o que o Supabase já traz pronto: schema auth, auth.uid() e os papéis anon/authenticated
 await db.exec(`
-  create schema auth; create table auth.users (id uuid primary key);
+  create schema auth; create table auth.users (id uuid primary key, email text);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create role anon nologin; create role authenticated nologin;
   grant usage on schema public, auth to anon, authenticated; grant execute on function auth.uid() to anon, authenticated;`)
@@ -141,6 +141,19 @@ await q(`select registrar_wo($1, $2, 'equipe desistiu da disputa de 3º')`, [J.t
 await como(ARB)
 await ev(randomUUID(), J.f, 'gol', T.a2.id, A.a2)
 await q(`select confirmar_sumula($1, null, null, '', $2)`, [J.f, assin])
+console.log('Acesso de árbitros')
+const NOVO = randomUUID()
+await db.exec('reset role'); await db.query(`insert into auth.users values ($1, 'Novo.Arbitro@exemplo.com')`, [NOVO])
+await como(ARB)
+await erro(`select liberar_arbitro('novo.arbitro@exemplo.com', 'Pedro')`, [], 'Secretaria', 'árbitro não libera outro árbitro')
+await como(null)
+await erro(`select liberar_arbitro('novo.arbitro@exemplo.com', 'Pedro')`, [], 'permission denied', 'público não libera árbitro')
+await como(SEC)
+await erro(`select liberar_arbitro('ninguem@exemplo.com', 'Pedro')`, [], 'Nenhuma conta', 'e-mail sem conta é avisado')
+await q(`select liberar_arbitro(' NOVO.arbitro@exemplo.com ', 'Pedro Lima')`)
+ok((await q(`select papel, nome from perfis where id = $1`, [NOVO]))[0]?.papel === 'arbitro', 'Secretaria libera árbitro pelo e-mail')
+await erro(`select liberar_arbitro('novo.arbitro@exemplo.com', 'Pedro')`, [], 'já tem acesso', 'não libera duas vezes')
+
 await como(null)
 ok((await q(`select status from campeonatos where id = $1`, [C]))[0].status === 'encerrado', 'final confirmada encerra o campeonato')
 ok((await q(`select vencedor($1) v`, [J.f]))[0].v === T.a2.id, 'campeão definido')

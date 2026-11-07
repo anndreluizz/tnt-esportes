@@ -1,13 +1,17 @@
 // Modo oficial (oficial.html): as mesmas telas do protótipo, com os dados no Supabase.
-// Público lê sem login; a Secretaria entra com e-mail e senha. Toda mudança vai ao banco
+// Público lê sem login; Secretaria e árbitros entram com e-mail e senha. Toda mudança vai ao banco
 // (tabelas protegidas por RLS ou funções que conferem permissão) e depois a tela recarrega do banco.
+// Súmula: o que ainda não chegou ao banco fica guardado no aparelho e é enviado quando o sinal volta.
 let sb
 const seedKey = cid => 'tnt-semente-' + cid   // semente secreta do sorteio: só no aparelho que publicou o compromisso
+const draftKey = id => 'tnt-sumula-' + id      // eventos ainda não enviados, assinaturas, observações
 const local = {get: k => { try { return localStorage.getItem(k) } catch { return null } },
                set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch {} }}
+const json = k => { try { return JSON.parse(local.get(k)) } catch { return null } }
 
 const ERR = {'42501': 'Sem permissão para isso.', '23505': 'Já existe um registro igual (nome ou número repetido).', '23514': 'Algum dado está fora do permitido.'}
-async function q(p) { const {data, error} = await p; if (error) throw new Error(ERR[error.code] || error.message); return data }
+// erro sem código = não chegou ao banco (sem internet)
+async function q(p) { const {data, error} = await p; if (error) throw Object.assign(new Error(ERR[error.code] || error.message), {code: error.code}); return data }
 
 // linhas do banco -> mesmo formato de dados.js (champs/teams/players/matches), para reaproveitar telas e regras.js
 async function toState(r) {
@@ -15,15 +19,25 @@ async function toState(r) {
     maxAge: c.idade_max, start: c.inicio, venue: c.local, status: c.status}))
   const byId = Object.fromEntries(camps.map(c => [c.id, c]))
   const teamCamp = Object.fromEntries(r.equipes.map(t => [t.id, t.campeonato_id])), jogoCamp = Object.fromEntries(r.jogos.map(j => [j.id, j.campeonato_id]))
+  const nomes = Object.fromEntries((r.perfis || []).map(p => [p.id, p.nome]))
+  if (S.session?.uid) nomes[S.session.uid] = S.session.name
   for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro})
   for (const p of r.atletas) byId[teamCamp[p.equipe_id]]?.players.push({id: p.id, team: p.equipe_id, name: p.nome, num: p.numero, birth: p.nascimento,
     bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: null})   // portal: só aprovados, sem nascimento
   const evs = {}
   for (const e of r.eventos) (evs[e.jogo_id] ??= []).push({id: e.id, type: e.tipo, team: e.equipe_id, player: e.atleta_id, min: e.minuto, half: e.tempo, sent: true})
-  for (const j of r.jogos) byId[j.campeonato_id]?.matches.push(newMatch({id: j.id, phase: j.fase, round: j.rodada, group: j.grupo, title: j.titulo,
-    home: j.mandante_id, away: j.visitante_id, slotH: j.vaga_mandante, slotA: j.vaga_visitante, date: j.data, time: j.hora, status: j.status,
-    events: (evs[j.id] || []).sort((a, b) => a.half - b.half || a.min - b.min), pen: j.pen_mandante == null ? null : [j.pen_mandante, j.pen_visitante],
-    wo: j.wo_ausente_id, postponed: j.adiado, notes: j.observacoes, hash: j.hash, referee: 'Árbitro escalado'}))
+  for (const j of r.jogos) {
+    const a = j.assinaturas || {}, m = newMatch({id: j.id, phase: j.fase, round: j.rodada, group: j.grupo, title: j.titulo,
+      home: j.mandante_id, away: j.visitante_id, slotH: j.vaga_mandante, slotA: j.vaga_visitante, date: j.data, time: j.hora, status: j.status,
+      events: evs[j.id] || [], pen: j.pen_mandante == null ? null : [j.pen_mandante, j.pen_visitante], wo: j.wo_ausente_id, postponed: j.adiado,
+      notes: j.observacoes, hash: j.hash, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
+      signatures: Object.fromEntries([['arbitro', a.arbitro], ['home', a.mandante], ['away', a.visitante]].filter(x => x[1]))})
+    const d = j.status !== 'encerrado' && json(draftKey(j.id))   // súmula em andamento neste aparelho
+    if (d) { const ids = new Set(m.events.map(e => e.id))
+      m.events.push(...d.events.filter(e => !ids.has(e.id))); Object.assign(m, {signatures: d.signatures, notes: d.notes, pen: d.pen, half: d.half, pendingConfirm: d.pendingConfirm}) }
+    m.events.sort((x, y) => x.half - y.half || x.min - y.min)
+    byId[j.campeonato_id]?.matches.push(m)
+  }
   for (const h of r.historico) {   // vem do mais novo para o mais antigo
     const c = byId[h.campeonato_id ?? jogoCamp[h.jogo_id]]; if (!c) continue
     const e = {at: h.em, who: h.quem, what: h.o_que, ...(h.motivo ? {why: h.motivo} : {})}
@@ -43,42 +57,133 @@ async function toState(r) {
 }
 
 async function loadAll() {
-  const sec = role() === 'secretaria', all = t => q(sb.from(t).select('*'))
-  // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
-  const [campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes] = await Promise.all([
-    q(sb.from('campeonatos').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
-    all(sec ? 'atletas' : 'atletas_publico'), all('jogos'), all('eventos'), all('sorteios_publico'),
-    q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)), sec ? all('suspensoes') : []])
-  S.champs = await toState({campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes})
+  const sec = role() === 'secretaria', arb = role() === 'arbitro', all = t => q(sb.from(t).select('*'))
+  let r
+  try {
+    // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
+    const [campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis] = await Promise.all([
+      q(sb.from('campeonatos').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
+      all(sec ? 'atletas' : 'atletas_publico'), all('jogos'), all('eventos'), all('sorteios_publico'),
+      q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)),
+      sec || arb ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : []])
+    r = {campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis}
+    if (arb) local.set('tnt-oficial-dados', JSON.stringify(r))   // árbitro abre a súmula mesmo sem sinal na quadra (só dados públicos)
+    S.arbitros = perfis.filter(p => p.papel === 'arbitro')
+  } catch (e) {
+    if (!(arb && !e.code && (r = json('tnt-oficial-dados')))) throw e
+    S.offline = true
+  }
+  S.champs = await toState(r)
   if (!S.champs.some(c => c.id === S.champId)) S.champId = S.champs[0]?.id ?? null
 }
 
 async function enter(user) {
-  const p = (await q(sb.from('perfis').select('nome, papel').eq('id', user.id)))[0]
-  if (p?.papel === 'secretaria') { S.session = {role: 'secretaria', name: p.nome}; return true }
+  let p
+  try { p = (await q(sb.from('perfis').select('nome, papel').eq('id', user.id)))[0] }
+  catch (e) { const c = json('tnt-oficial-perfil'); if (e.code || c?.uid !== user.id) throw e; p = c }   // sem sinal: último perfil deste aparelho
+  if (p?.papel === 'secretaria' || p?.papel === 'arbitro') {
+    S.session = {role: p.papel, name: p.nome, uid: user.id}
+    local.set('tnt-oficial-perfil', JSON.stringify({uid: user.id, nome: p.nome, papel: p.papel})); return true
+  }
   await sb.auth.signOut()
-  toast(p ? 'O acesso de árbitros e equipes chega na próxima etapa. Por enquanto, veja o portal público.' : 'Esta conta ainda não tem perfil no sistema. Fale com a Secretaria.')
+  toast(p ? 'O acesso das equipes chega na próxima etapa. Por enquanto, veja o portal público.'
+          : `Conta ainda sem acesso. Peça à Secretaria para liberar o e-mail ${user.email}.`)
   return false
 }
 
 function loginReal() {
+  const form = ui.signup
+    ? `<form class="f" data-form="signup"><label class="span2">E-mail<input name="email" type="email" required autocomplete="username"></label>
+        <label class="span2">Crie uma senha (mínimo 8 caracteres)<input name="senha" type="password" required minlength="8" autocomplete="new-password"></label>
+        <div class="span2 btns"><button class="btn">Criar conta</button><button type="button" class="btn ghost" data-act="signupmode">Voltar</button></div></form>`
+    : `<form class="f" data-form="signin"><label class="span2">E-mail<input name="email" type="email" required autocomplete="username"></label>
+        <label class="span2">Senha<input name="senha" type="password" required autocomplete="current-password"></label>
+        <div class="span2 btns"><button class="btn">Entrar</button><button type="button" class="link" data-act="signupmode">Árbitro, primeira vez? Criar conta</button></div></form>`
   return `<div class="login"><div class="lhero"><div class="wrap"><div class="eyebrow">Secretaria Municipal de Esportes · Tonantins/AM</div>
     <h1>TNT ESPORTES</h1><p>Organizando o esporte. Conectando pessoas.</p></div></div>
     <div class="wrap"><div class="roles">
-      <div class="role"><div class="ic">${IC.sec}</div><h3>Secretaria</h3><p>Entre com o e-mail e a senha da Secretaria.</p>
-        <form class="f" data-form="signin"><label class="span2">E-mail<input name="email" type="email" required autocomplete="username"></label>
-          <label class="span2">Senha<input name="senha" type="password" required autocomplete="current-password"></label><div class="span2"><button class="btn">Entrar</button></div></form></div>
+      <div class="role"><div class="ic">${IC.sec}</div><h3>${ui.signup ? 'Criar conta de árbitro' : 'Secretaria e árbitros'}</h3>
+        <p>${ui.signup ? 'Depois de criar a conta, peça à Secretaria para liberar o seu acesso pelo e-mail.' : 'Entre com o seu e-mail e senha.'}</p>
+        ${ui.signupDone ? `<div class="info">Conta criada para <b>${esc(ui.signupDone)}</b>. Se chegar um e-mail de confirmação, abra o link. Depois peça à Secretaria para liberar o seu acesso.</div>` : ''}${form}</div>
       <div class="role"><div class="ic">${IC.pub}</div><h3>População</h3><p>Tabela, jogos, artilharia e súmulas abertos para todos, sem login.</p><button class="btn" data-act="login" data-role="publico">Ver o portal</button></div>
-    </div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais. Árbitros e equipes terão acesso na próxima etapa.</p></div></div>`
+    </div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais. O acesso das equipes chega na próxima etapa.</p></div></div>`
 }
 
+// Secretaria: escalar árbitro no jogo e liberar a conta de árbitros novos
+function refSelect(m) {
+  return ` <label class="sub" style="display:inline-flex;gap:6px;align-items:center">Árbitro <select data-ref="${m.id}"><option value="">A definir</option>
+    ${(S.arbitros || []).map(a => `<option value="${a.id}" ${a.id === m.refereeId ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>`
+}
+function arbitrosCard() {
+  return `<div class="card" style="margin-bottom:14px"><h3>Árbitros <small>${(S.arbitros || []).length} com acesso</small></h3>
+    <p class="sub">${(S.arbitros || []).map(a => esc(a.nome)).join(', ') || 'Nenhum árbitro liberado ainda.'}</p>
+    <p class="sub" style="margin-top:6px">O árbitro cria a conta na tela de entrada (“Árbitro, primeira vez?”). Depois você libera aqui com o e-mail dele e escala nos jogos, na aba Jogos e tabela.</p>
+    <form class="f" data-form="liberar" style="margin-top:8px"><label>E-mail do árbitro<input name="email" type="email" required></label>
+      <label>Nome<input name="nome" required minlength="2" maxlength="60"></label><button class="btn">Liberar acesso</button></form></div>`
+}
+
+/* ---------- súmula: guarda no aparelho e envia quando der ---------- */
+function saveDrafts() {
+  for (const c of S.champs) for (const m of c.matches) {
+    if (isDone(m)) { local.set(draftKey(m.id), null); continue }
+    const d = {events: m.events.filter(e => !e.sent), signatures: m.signatures, notes: m.notes, pen: m.pen, half: m.half, pendingConfirm: m.pendingConfirm}
+    const vazio = !d.events.length && !Object.keys(d.signatures).length && !d.notes && !d.pen && d.half === 1 && !d.pendingConfirm
+    local.set(draftKey(m.id), vazio ? null : JSON.stringify(d))
+  }
+}
+async function sendConfirm(m) {
+  const assin = {}
+  for (const [k, nome] of [['arbitro', 'arbitro'], ['home', 'mandante'], ['away', 'visitante']]) {
+    let s = m.signatures[k]
+    if (s.startsWith('data:')) {   // ainda não foi para o arquivo privado "assinaturas"
+      const path = `${m.id}/${nome}-${Date.now()}.png`
+      const {error} = await sb.storage.from('assinaturas').upload(path, await (await fetch(s)).blob(), {contentType: 'image/png'})
+      if (error) throw error   // sem sinal: tenta de novo depois, com a súmula guardada
+      s = m.signatures[k] = path; saveDrafts()
+    }
+    assin[nome] = s
+  }
+  try { await rpc('confirmar_sumula', {j: m.id, pen_m: m.pen?.[0] ?? null, pen_v: m.pen?.[1] ?? null, obs: m.notes, assin}) }
+  catch (e) { if (!e.code) throw e; m.pendingConfirm = false; toast('Súmula recusada: ' + e.message); return }
+  m.pendingConfirm = false; local.set(draftKey(m.id), null)
+  toast(m.phase === 'final' ? 'Final confirmada. Campeonato encerrado!' : 'Súmula confirmada. Classificação atualizada.')
+}
+let syncing = false
+async function syncReal(quiet) {   // devolve true se tudo foi enviado
+  if (syncing || !sb) return false
+  syncing = true; let sent = 0, changed = false
+  try {
+    for (const c of S.champs) for (const m of c.matches) {
+      for (const e of m.events.filter(x => !x.sent)) {
+        try { await q(sb.from('eventos').insert({id: e.id, jogo_id: m.id, tipo: e.type, equipe_id: e.team, atleta_id: e.player, minuto: e.min, tempo: e.half})) }
+        catch (err) {
+          if (!err.code) throw err                     // sem sinal: para e tenta depois
+          if (err.code !== '23505') {                   // 23505 = já tinha chegado antes (reenvio não duplica)
+            m.events = m.events.filter(x => x !== e); changed = true; toast('Evento recusado: ' + err.message); continue }
+        }
+        e.sent = true; sent++
+      }
+      if (m.pendingConfirm) { await sendConfirm(m); changed = true }
+    }
+    S.offline = false
+  } catch (e) { S.offline = true; if (!quiet && navigator.onLine) toast('Não foi possível enviar agora: ' + e.message) }
+  finally { syncing = false; saveDrafts() }
+  if (sent && quiet) toast(`Sinal voltou: ${sent} evento(s) enviados sem duplicar.`)
+  if (changed) await loadAll().catch(() => {})
+  return !S.offline
+}
+const pending = () => S.champs.some(c => c.matches.some(m => m.pendingConfirm || m.events.some(e => !e.sent)))
+
 // mudança no banco: mostra o erro em português e sempre recarrega, para a tela ficar igual ao banco
-const write = fn => async d => { try { await fn(d) } catch (e) { toast(e.message) } try { await loadAll() } catch (e) { toast('Sem conexão com o banco: ' + e.message) } }
+const write = fn => async d => { try { await fn(d) } catch (e) { toast(e.code || navigator.onLine ? e.message : 'Sem internet. Tente de novo quando o sinal voltar.') }
+  try { await loadAll() } catch (e) { toast('Sem conexão com o banco: ' + e.message) } }
 const rpc = (f, args) => q(sb.rpc(f, args))
 const atleta = (id, campos) => q(sb.from('atletas').update(campos).eq('id', id))
 
+const DEMO = {ev: A.ev, pick: A.pick}
 const REAL_A = {
   logout: async () => { await sb.auth.signOut(); S.session = null; resetTransient(); ui.doc = null; render(); await loadAll() },
+  signupmode: () => { ui.signup = !ui.signup; ui.signupDone = null },
   auth: write(d => atleta(d.id, {autorizacao: true})),
   approve: write(d => atleta(d.id, {aprovado: true})),
   reject: write(async d => { await q(sb.from('atletas').delete().eq('id', d.id)); toast('Inscrição recusada.') }),
@@ -100,15 +205,46 @@ const REAL_A = {
       mandante_id: m.home, visitante_id: m.away, vaga_mandante: vaga(m.slotH), vaga_visitante: vaga(m.slotA), data: m.date, hora: m.time}))})
     local.set(seedKey(c.id), null); ui.draw = null; ui.tab = 'jogos'; scrollTo(0, 0); toast('Tabela gerada!')
   }),
+  // súmula: o evento fica no aparelho na hora e é enviado logo em seguida (ou quando o sinal voltar)
+  ev: async d => { DEMO.ev(d); if (d.type === 'falta') { saveDrafts(); await syncReal() } },
+  pick: async d => { DEMO.pick(d); saveDrafts(); await syncReal() },
+  undo: async d => {
+    const m = cur(), e = m?.events.find(x => x.id === d.id); if (!e) return
+    if (!e.sent) { m.events = m.events.filter(x => x !== e); return }
+    try { await q(sb.from('eventos').delete().eq('id', e.id)); await loadAll() }
+    catch (err) { toast(err.code ? err.message : 'Sem internet: este evento já foi enviado e só pode ser desfeito quando o sinal voltar.') }
+  },
+  confirm: async () => {
+    const m = cur()
+    if (m.phase !== 'grupos' && goals(m)[0] === goals(m)[1]) {
+      const p = m.pen; if (!p || !Number.isInteger(p[0]) || !Number.isInteger(p[1]) || p[0] === p[1]) return toast('Informe o placar dos pênaltis (não pode empatar).')
+    } else m.pen = null
+    if (['arbitro', 'home', 'away'].some(k => !m.signatures[k])) return toast('Faltam assinaturas.')
+    ui.signing = null; m.pendingConfirm = true; saveDrafts()
+    if (!(await syncReal(true)) && !navigator.onLine) toast('Sem internet: súmula guardada no aparelho. Será enviada sozinha quando o sinal voltar.')
+  },
+  net: async () => { toast((await syncReal()) ? (pending() ? 'Enviando…' : 'Tudo enviado.') : 'Ainda sem internet. Os dados continuam guardados no aparelho.') },
 }
 
 const REAL_F = {
   signin: async d => {
     const {data, error} = await sb.auth.signInWithPassword({email: d.email.trim(), password: d.senha})
-    if (error) return toast(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message)
-    if (await enter(data.user)) { resetTransient(); ui.tab = 'painel'; scrollTo(0, 0) }
+    if (error) return toast(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message === 'Email not confirmed' ? 'Confirme o e-mail pelo link que chegou na sua caixa de entrada.' : error.message)
+    if (await enter(data.user)) { resetTransient(); ui.tab = role() === 'secretaria' ? 'painel' : 'sumula'; scrollTo(0, 0) }
     await loadAll()
   },
+  signup: async d => {
+    if (d.senha.length < 8) return toast('A senha precisa de pelo menos 8 caracteres.')
+    const email = d.email.trim(), {data, error} = await sb.auth.signUp({email, password: d.senha, options: {emailRedirectTo: location.href.split('#')[0]}})
+    if (error) return toast(error.message === 'User already registered' ? 'Já existe uma conta com esse e-mail. Use “Entrar”.' : error.message)
+    if (data.session) await sb.auth.signOut()
+    ui.signup = false; ui.signupDone = email
+  },
+  liberar: write(async d => { await rpc('liberar_arbitro', {email_arbitro: d.email, nome_arbitro: d.nome.trim()}); toast('Acesso liberado. Escale o árbitro nos jogos.') }),
+  reopen: write(async d => {
+    const why = d.why.trim(); if (why.length < 5) return toast('Informe o motivo da correção.')
+    await rpc('reabrir_sumula', {j: cur().id, motivo: why}); local.set(draftKey(cur().id), null)
+  }),
   athlete: write(async d => {
     const c = C(), name = d.name.trim().replace(/\s+/g, ' '), num = +d.num
     if (name.length < 3 || !(num >= 1 && num <= 99) || !/^\d{4}-\d{2}-\d{2}$/.test(d.birth) || d.birth > c.start) return toast('Confira nome, número (1 a 99) e data de nascimento.')
@@ -161,6 +297,7 @@ const REAL_F = {
 async function startReal() {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
   Object.assign(A, REAL_A); Object.assign(F, REAL_F)
+  S.offline = !navigator.onLine
   try {
     const {data: {session}} = await sb.auth.getSession()
     if (session) await enter(session.user)
@@ -168,5 +305,13 @@ async function startReal() {
     await loadAll()
   } catch (e) { toast('Sem conexão com o banco: ' + e.message) }
   render()
+  if (pending()) syncReal(true).then(render)
+  // escalar árbitro direto no jogo (Secretaria)
+  document.addEventListener('change', async e => {
+    const id = e.target.dataset?.ref; if (id === undefined) return
+    await write(async () => { await q(sb.from('jogos').update({arbitro_id: e.target.value || null}).eq('id', id)); toast('Árbitro escalado.') })(); render()
+  })
+  addEventListener('online', () => syncReal(true).then(render))
+  setInterval(() => { if (pending() && !syncing) syncReal(true).then(ok => { if (ok) render() }) }, 30000)
 }
 if (REAL) startReal()
