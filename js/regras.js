@@ -335,7 +335,7 @@ if (typeof document !== 'undefined') document.addEventListener('input', e => {  
   if (!e.target.matches?.('[data-data]')) return
   const n = e.target.value.replace(/\D/g, '').slice(0, 8)
   e.target.value = [n.slice(0, 2), n.slice(2, 4), n.slice(4)].filter(Boolean).join('/')
-})
+}, true)   // antes dos outros: quem lê o campo já recebe com as barras
 // mata-mata que sai dos grupos: no máximo 16 classificados (oitavas) e pelo menos 2
 function ajustaGrupos(rules) {
   if (rules.grupos * rules.classificam > 16) rules.classificam = Math.max(1, Math.floor(16 / rules.grupos))
