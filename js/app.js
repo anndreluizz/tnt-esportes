@@ -183,6 +183,17 @@ function sponsorsBar(c) {
   if (!c.sponsors?.length) return ''
   return `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${c.sponsors.map(s => s.logo ? `<img src="${esc(s.logo)}" alt="${esc(s.name)}" title="${esc(s.name)}">` : `<b>${esc(s.name)}</b>`).join('')}</div>`
 }
+let patN = 100
+function patRow(s, i = patN++) {   // um patrocinador; adicionar e remover mexem só na tela, salva tudo junto no fim
+  return `<div class="pat"><button type="button" class="x" data-rmpat title="Remover patrocinador" aria-label="Remover patrocinador">×</button>
+    <label>Nome<input name="sp${i}" maxlength="40" required value="${esc(s?.name || '')}" placeholder="Nome do patrocinador"></label>
+    ${s?.path ? `<input type="hidden" name="spp${i}" value="${esc(s.path)}">` : ''}${upload('spl' + i, 'Logo', {atual: s?.logo})}</div>`
+}
+document.addEventListener('click', e => {
+  if (e.target.closest?.('[data-rmpat]')) return e.target.closest('.pat').remove()
+  const add = e.target.closest?.('[data-addpat]')
+  if (add) { add.insertAdjacentHTML('beforebegin', patRow()); add.previousElementSibling.querySelector('input').focus() }
+})
 function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e prazo só no modo oficial
   const v = (k, d = '') => esc(c?.[k] ?? d), sp = c?.sponsors || []
   const step = (n, t, body) => `<fieldset class="step"><legend><span>${n}</span>${t}</legend><div class="f">${body}</div></fieldset>`
@@ -194,7 +205,7 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
     <label>Categoria<input name="category" maxlength="20" value="${v('category')}" placeholder="Livre, Sub-17, Feminino, Veteranos..."></label>
     <label>Idade mínima<input name="min" type="number" min="5" max="80" value="${v('minAge', 15)}" required></label>
     <label>Idade máxima<input name="max" type="number" min="5" max="99" value="${v('maxAge')}" placeholder="sem limite"></label>
-    ${REAL ? `<label class="span2">Logo do campeonato${c?.logo ? ` <span class="sub">(já tem; envie outra só para trocar)</span>` : ''}<input name="logo" type="file" accept="image/*"></label>` : ''}`)}
+    ${REAL ? upload('logo', 'Logo do campeonato', {atual: c?.logo, dica: 'PNG ou JPG · aparece no portal, na súmula e no link'}) : ''}`)}
   ${step(2, 'Organização', `
     ${REAL ? `<label>Responsável<input name="resp" maxlength="60" value="${v('responsible')}" placeholder="Nome de quem organiza"></label>
     <label>Telefone / WhatsApp do responsável<input name="respPhone" type="tel" maxlength="20" value="${v('responsiblePhone')}" placeholder="(97) 9 9999-9999"></label>` : ''}
@@ -204,9 +215,8 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
     <label>Inscrições até<input name="regUntil" type="date" value="${v('regUntil')}"></label>
     <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
     <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo, o link para de aceitar inscrições.</p>`)
-  + step(4, 'Patrocinadores <small class="sub">(opcional · até 12 · aparecem no portal, na súmula e no link)</small>', [...Array(Math.min(12, Math.max(4, sp.length + 2))).keys()].map(i => `
-    <label>Patrocinador ${i + 1}<input name="sp${i}" maxlength="40" value="${esc(sp[i]?.name || '')}" placeholder="Nome"></label>
-    <label>Logo ${sp[i]?.logo ? '<span class="sub">(já tem)</span>' : ''}<input name="spl${i}" type="file" accept="image/*"></label>`).join('')) : ''}
+  + step(4, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>',
+      `<div class="pats span2">${sp.map(patRow).join('')}<button type="button" class="addpat" data-addpat>+ Adicionar patrocinador</button></div>`) : ''}
   <div class="btns" style="margin-top:12px"><button class="btn">${c ? 'Salvar alterações' : 'Criar e abrir inscrições'}</button>${c ? '<button type="button" class="btn ghost" data-act="editchamp" data-id="">Cancelar</button>' : ''}</div>
   </form></div>`
 }
@@ -240,10 +250,10 @@ function athleteForm(c, mode) {
     <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
     <label>Telefone / WhatsApp<input name="phone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
     <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
-    <label>Foto do atleta<input name="photo" type="file" accept="image/*" capture="user"></label>
     <label>Responsável<input name="resp" maxlength="60" placeholder="Se for menor de 18 anos"></label>
     <label>Telefone do responsável<input name="respPhone" type="tel" maxlength="20"></label>
-    ${REAL && sec ? `<label>Documento (RG) – frente<input name="rgf" type="file" accept="image/*"></label><label>Documento (RG) – verso<input name="rgv" type="file" accept="image/*"></label>` : ''}
+    ${upload('photo', 'Foto do atleta', {capture: 'user', dica: 'Rosto de frente'})}
+    ${REAL && sec ? upload('rgf', 'Documento (RG) – frente') + upload('rgv', 'Documento (RG) – verso') : ''}
     <label class="chk span2"><input type="checkbox" name="auth"> Menor de 18: autorização do responsável entregue</label>
     <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Data de nascimento, documento e foto não aparecem no portal público.</label>
     <div class="span2"><button class="btn">${sec ? 'Inscrever' : 'Enviar para aprovação'}</button></div></form>

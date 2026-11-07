@@ -38,7 +38,6 @@ function render() {
   }
   if (i.inscritos.length >= i.max_atletas) { app.innerHTML = head + `<div class="card empty">A equipe já tem o máximo de ${i.max_atletas} atletas.</div>` + lista; return }
   const step = (n, t, body) => `<fieldset class="step"><legend><span>${n}</span>${t}</legend><div class="f">${body}</div></fieldset>`
-  const arquivo = (nome, rotulo, extra = '') => `<label>${rotulo}<input name="${nome}" type="file" accept="image/*" required ${extra}><img class="thumb" data-prev="${nome}" hidden alt=""></label>`
   app.innerHTML = head + `<form id="form" novalidate>
     ${step(1, 'Dados do atleta', `
       <label class="span2">Nome completo<input name="nome" required minlength="3" maxlength="50" autocomplete="off"></label>
@@ -53,18 +52,13 @@ function render() {
       <label>Telefone do responsável<input name="responsavel_telefone" type="tel" maxlength="20"></label>
       <p class="note span2">Menor de 18 anos também precisa levar a autorização assinada pelo responsável à Secretaria.</p>`)}
     ${step(3, 'Foto e documento', `
-      ${arquivo('foto', 'Foto do rosto do atleta', 'capture="user"')}
-      <span></span>
-      ${arquivo('rgf', 'Documento (RG) – frente', 'capture="environment"')}
-      ${arquivo('rgv', 'Documento (RG) – verso', 'capture="environment"')}
+      ${upload('foto', 'Foto do rosto do atleta', {capture: 'user', required: true, dica: 'De frente, sem boné nem óculos escuros'})}
+      ${upload('rgf', 'Documento (RG) – frente', {capture: 'environment', required: true})}
+      ${upload('rgv', 'Documento (RG) – verso', {capture: 'environment', required: true})}
       <p class="note span2">O documento serve só para a Secretaria conferir a idade. Ninguém mais vê, e ele é apagado quando o campeonato termina.</p>`)}
     <label class="chk" style="margin-top:12px"><input type="checkbox" name="consentimento"> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Nascimento, foto e documento não aparecem no portal público.</label>
     <button class="btn block" style="margin-top:14px" id="enviar">Enviar inscrição</button></form>` + lista
   $('#form').onsubmit = enviar
-  $('#form').onchange = e => {   // mostra a foto escolhida
-    const im = e.target.type === 'file' && document.querySelector(`[data-prev="${e.target.name}"]`)
-    if (im && e.target.files[0]) { im.src = URL.createObjectURL(e.target.files[0]); im.hidden = false }
-  }
 }
 
 async function enviar(e) {

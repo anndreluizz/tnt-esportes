@@ -235,3 +235,30 @@ fieldset.step legend > span{background:var(--g7);color:#fff;border-radius:50%;wi
 .sponsors img{height:34px;max-width:110px;object-fit:contain}
 .docs{display:flex;gap:10px;flex-wrap:wrap}
 .docs img{max-width:min(320px,100%);max-height:220px;border-radius:8px;border:1px solid var(--line)}
+
+/* formulários: maiores, fáceis de tocar no celular (16px evita o zoom do iPhone) */
+form.f,div.f{display:grid;gap:14px 16px;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));align-items:start}
+form label{font-size:13.5px;font-weight:600;color:#2f3d34;gap:6px}
+form input,form select,form textarea{font-size:16px;padding:11px 14px;min-height:48px;border:1.5px solid #cdd8d0;border-radius:12px;transition:border-color .15s,box-shadow .15s}
+form input:focus,form select:focus,form textarea:focus{outline:none;border-color:var(--g7);box-shadow:0 0 0 4px rgba(23,97,59,.14)}
+form input::placeholder{color:#9aa8a0}
+form label.chk{font-size:14px;align-items:center;padding:12px 14px;background:#f6f9f6;border:1.5px solid var(--line);border-radius:12px;cursor:pointer}
+form label.chk input{width:22px;height:22px;min-height:0;accent-color:var(--g7);flex:none}
+form .btn:not(.sm){min-height:48px;padding:12px 22px;font-size:15px;border-radius:12px}
+fieldset.step{background:#fbfdfb;padding:16px 18px 18px;border-radius:16px;margin-top:16px}
+fieldset.step legend{font-size:17px}
+fieldset.step legend > span{width:28px;height:28px;font-size:14px}
+/* envio de imagem: caixa grande com prévia */
+.upload{position:relative;display:grid;place-items:center;gap:4px;min-height:132px;padding:14px;border:2px dashed #b9cbbf;border-radius:14px;background:#f6faf7;text-align:center;color:var(--g7);cursor:pointer;transition:.15s}
+.upload:hover,.upload:focus-within{border-color:var(--g7);background:#edf6f0}
+.upload.tem{border-style:solid;background:#fff}
+.upload input{position:absolute;inset:0;opacity:0;cursor:pointer;min-height:0;padding:0}
+.upload img{max-height:120px;max-width:100%;border-radius:10px;object-fit:contain}
+.upload b{font-size:14px}
+.upload .sub{font-weight:500;font-size:12.5px}
+/* patrocinadores: quantos precisar */
+.pats{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr))}
+.pat{position:relative;display:grid;gap:10px;padding:14px;border:1.5px solid var(--line);border-radius:14px;background:#fff}
+.pat .x{position:absolute;top:8px;right:8px;z-index:1;width:32px;height:32px;border:0;border-radius:50%;background:var(--redbg);color:var(--red);font:700 18px Barlow;cursor:pointer}
+.addpat{min-height:200px;border:2px dashed #b9cbbf;border-radius:14px;background:none;font:600 16px Barlow;color:var(--g7);cursor:pointer}
+.addpat:hover{border-color:var(--g7);background:#edf6f0}

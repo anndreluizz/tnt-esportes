@@ -184,3 +184,17 @@ async function fitImage(file, max, type = 'image/jpeg', square = false) {
   cv.getContext('2d').drawImage(img, (w - img.width * k) / 2, (h - img.height * k) / 2, img.width * k, img.height * k)
   return new Promise(r => cv.toBlob(r, type, .82))
 }
+
+/* ---------- formulário: envio de imagem com prévia (usado no app e na página do link) ---------- */
+const CAMERA = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
+function upload(name, title, o = {}) {   // o: {atual: url da imagem já salva, capture, required, dica}
+  const at = o.atual && String(o.atual).replace(/"/g, '&quot;')
+  return `<label>${title}<span class="upload${at ? ' tem' : ''}"><input name="${name}" type="file" accept="image/*"${o.capture ? ` capture="${o.capture}"` : ''}${o.required ? ' required' : ''}>
+    <img ${at ? `src="${at}"` : 'hidden'} alt="">${at ? '' : CAMERA}<b>${at ? 'Toque para trocar' : 'Toque para enviar'}</b>${o.dica ? `<span class="sub">${o.dica}</span>` : ''}</span></label>`
+}
+if (typeof document !== 'undefined') document.addEventListener('change', e => {   // mostra a imagem escolhida na hora
+  const box = e.target.type === 'file' && e.target.closest?.('.upload'), f = box && e.target.files[0]
+  if (!f) return
+  const im = box.querySelector('img'); im.src = URL.createObjectURL(f); im.hidden = false
+  box.querySelector('svg')?.remove(); box.querySelector('b').textContent = 'Toque para trocar'; box.classList.add('tem')
+})
