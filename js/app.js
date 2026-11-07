@@ -801,13 +801,13 @@ function render() {
   const tabs = ROLE_TABS[r]
   if (!tabs.some(([k]) => k === ui.tab)) ui.tab = tabs[0][0]
   const c = C()
-  if (!c && r === 'secretaria') ui.tab = 'campeonatos'
   if (REAL && c && !ui.draw && c.pendingDraw) ui.draw = {...c.pendingDraw}
   $('#hright').innerHTML = (r === 'equipe' ? `<span class="who"><span><b>${esc(T(c, S.session.teamId).name)}</b>Equipe</span></span>`
     : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c?.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${esc(S.session.name || ROLES[r].name)}</b>${ROLES[r].label}</span></span>`)
     + '<button class="out" data-act="logout">Trocar perfil</button>'
   $('#tabs').innerHTML = tabs.map(([k, l]) => `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" ${ui.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')
-  app.className = 'wrap'; app.innerHTML = c || ui.tab === 'campeonatos' ? VIEWS[ui.tab]() : '<div class="card empty mt">Nenhum campeonato publicado ainda.</div>'
+  app.className = 'wrap'; app.innerHTML = c || ['campeonatos', 'relatorios'].includes(ui.tab) ? VIEWS[ui.tab]()
+    : `<div class="card empty mt">Nenhum campeonato cadastrado ainda.${r === 'secretaria' ? '<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="campeonatos">Criar o primeiro campeonato</button></div>' : ''}</div>`
   doc.hidden = !ui.doc; doc.innerHTML = ui.doc ? vDoc() : ''
   document.body.classList.toggle('doc-open', !!ui.doc)
   if (ui.tab === 'sumula') hookPads()
