@@ -26,7 +26,7 @@ function render() {
   const img = i.escudo || i.logo   // escudo da equipe; sem escudo, a logo do campeonato
   const head = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${img ? `<img class="clogo" src="${esc(marca(img))}" alt="" style="width:64px;height:64px">` : ''}
     <div><div class="eyebrow">Inscrição de atletas · ${esc(i.campeonato)}</div><h2>${esc(i.equipe)}</h2>
-    <div style="color:#cfe3d6;font-size:14px;margin-top:4px">${esc(i.modalidade)} · ${esc(i.categoria)} · ${faixa}${i.inscricao_ate ? ` · inscrições até ${dmy(i.inscricao_ate)}` : ''}</div></div></div></div>${pats}`
+    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${esc(i.modalidade)} · ${esc(i.categoria)} · ${faixa}${i.inscricao_ate ? ` · inscrições até ${dmy(i.inscricao_ate)}` : ''}</div></div></div></div>${pats}`
   const lista = `<div class="card"><h3>Atletas já inscritos <small>${i.inscritos.length} de ${i.max_atletas}</small></h3>
     ${i.inscritos.length ? `<div class="numeros">${i.inscritos.map(a => `<span><b>${a.numero}</b> ${esc(a.nome)}</span>`).join('')}</div>` : '<p class="sub">Nenhum ainda. Comece pelo primeiro atleta aqui embaixo.</p>'}</div>`
   if (!i.aberta) { app.innerHTML = head + `<div class="card empty">As inscrições deste campeonato estão encerradas.</div>` + lista; return }

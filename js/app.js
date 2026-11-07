@@ -510,7 +510,7 @@ function hookPads() {
   const m = cur(); if (!m) return
   document.querySelectorAll('canvas.pad').forEach(cv => {
     const x = cv.getContext('2d'), k = cv.dataset.k
-    x.lineWidth = 3; x.lineCap = x.lineJoin = 'round'; x.strokeStyle = '#14261b'
+    x.lineWidth = 3; x.lineCap = x.lineJoin = 'round'; x.strokeStyle = '#142036'
     if (m.signatures[k]?.startsWith('data:')) { const im = new Image(); im.onload = () => x.drawImage(im, 0, 0); im.src = m.signatures[k] }
     let on = false
     const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height] }
@@ -640,7 +640,7 @@ function vPortal() {
   const chips = role() === 'equipe' ? '' : `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`
   const nx = c.matches.filter(m => !isDone(m) && m.home && m.away).sort(byDate)[0]
   const hero = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<div><div class="eyebrow">Portal público · sem login</div><h2>${esc(c.name)}</h2>
-    <div style="color:#cfe3d6;font-size:14px;margin-top:4px">${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</div></div></div>
+    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</div></div></div>
     ${nx ? `<div class="next"><div class="eyebrow">Próximo jogo · ${dm(nx.date)} · ${nx.time}</div><b class="cond" style="font-size:20px">${esc(label(c, nx))}</b></div>` : ''}</div>`
   const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD). <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>'
   if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
@@ -750,25 +750,25 @@ function vDiv() {
 function canvasCard(c, title, body) {
   const cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1350
   const x = cv.getContext('2d'), F = {C: '"Barlow Condensed", sans-serif', B: 'Barlow, sans-serif'}
-  x.fillStyle = '#103d27'; x.fillRect(0, 0, 1080, 1350)
-  x.fillStyle = '#17613b'; x.fillRect(0, 0, 1080, 190); x.fillRect(0, 1270, 1080, 80)
-  x.fillStyle = '#e1b34a'; x.beginPath(); x.arc(110, 95, 52, 0, 7); x.fill()
-  x.fillStyle = '#103d27'; x.font = `700 40px ${F.C}`; x.textAlign = 'center'; x.fillText('TNT', 110, 110)
+  x.fillStyle = '#0d2f73'; x.fillRect(0, 0, 1080, 1350)
+  x.fillStyle = '#1d55b8'; x.fillRect(0, 0, 1080, 190); x.fillRect(0, 1270, 1080, 80)
+  x.fillStyle = '#2db35d'; x.beginPath(); x.arc(110, 95, 52, 0, 7); x.fill()
+  x.fillStyle = '#0d2f73'; x.font = `700 40px ${F.C}`; x.textAlign = 'center'; x.fillText('TNT', 110, 110)
   x.textAlign = 'left'; x.fillStyle = '#fff'; x.font = `700 64px ${F.C}`; x.fillText('TNT ESPORTES', 190, 88)
-  x.fillStyle = '#cfe3d6'; x.font = `400 30px ${F.B}`; x.fillText(c.name, 190, 134)
-  x.fillStyle = '#e1b34a'; x.font = `700 54px ${F.C}`; x.fillText(title, 60, 275)
+  x.fillStyle = '#d6e2f7'; x.font = `400 30px ${F.B}`; x.fillText(c.name, 190, 134)
+  x.fillStyle = '#2db35d'; x.font = `700 54px ${F.C}`; x.fillText(title, 60, 275)
   const mk = ui.marcas?.id === c.id ? ui.marcas : null, box = (im, X, Y, W, H) => { const k = Math.min(W / im.width, H / im.height); x.drawImage(im, X + (W - im.width * k) / 2, Y + (H - im.height * k) / 2, im.width * k, im.height * k) }
   if (mk?.logo) box(mk.logo, 920, 35, 120, 120)
   body(x, F)
   if (mk?.sponsors.length) {   // faixa de patrocínio acima do rodapé
     x.fillStyle = '#fff'; x.fillRect(0, 1180, 1080, 90)
-    x.fillStyle = '#5d6d63'; x.font = `600 18px ${F.B}`; x.textAlign = 'left'; x.fillText('PATROCÍNIO', 40, 1232)
+    x.fillStyle = '#5b6680'; x.font = `600 18px ${F.B}`; x.textAlign = 'left'; x.fillText('PATROCÍNIO', 40, 1232)
     const w = Math.min(190, 900 / mk.sponsors.length)
     mk.sponsors.forEach((s, i) => { const X = 170 + i * w
       if (s.img) box(s.img, X, 1190, w - 16, 70)
-      else { x.fillStyle = '#14261b'; fit(x, s.name, X, 1236, w - 16, 700, 26, F.C) } })
+      else { x.fillStyle = '#142036'; fit(x, s.name, X, 1236, w - 16, 700, 26, F.C) } })
   }
-  x.textAlign = 'left'; x.fillStyle = '#cfe3d6'; x.font = `400 26px ${F.B}`
+  x.textAlign = 'left'; x.fillStyle = '#d6e2f7'; x.font = `400 26px ${F.B}`
   x.fillText(`Atualizado em ${new Date().toLocaleDateString('pt-BR')} · Secretaria Municipal de Esportes de Tonantins`, 60, 1318)
   return cv
 }
@@ -787,8 +787,8 @@ async function buildCards() {
     formato(c) === 'mata' ? canvasCard(c, 'MATA-MATA', (x, F) => {
       let y = 330
       for (const m of c.matches.filter(m => m.phase !== 'terceiro').sort(byDate).slice(-8 + pat)) {
-        x.fillStyle = '#1b4d33'; x.fillRect(48, y, 984, 104)
-        x.textAlign = 'left'; x.fillStyle = '#e1b34a'; x.font = `700 26px ${F.C}`; x.fillText(`${m.title.toUpperCase()} · ${dm(m.date)}`, 76, y + 36)
+        x.fillStyle = '#16408f'; x.fillRect(48, y, 984, 104)
+        x.textAlign = 'left'; x.fillStyle = '#2db35d'; x.font = `700 26px ${F.C}`; x.fillText(`${m.title.toUpperCase()} · ${dm(m.date)}`, 76, y + 36)
         x.fillStyle = '#fff'; fit(x, `${tname(c, m, 'home')} ${isDone(m) ? score(m).join(' × ') : '×'} ${tname(c, m, 'away')}`.toUpperCase(), 76, y + 82, 930, 700, 38, F.C); y += 120
       }
     }) : canvasCard(c, allDone(c) || (formato(c) === 'grupos' && groupsOf(c).every(g => groupDone(c, g))) ? 'CLASSIFICAÇÃO FINAL' : `CLASSIFICAÇÃO · APÓS A RODADA ${lastRound}`, (x, F) => {
@@ -796,12 +796,12 @@ async function buildCards() {
       const lh = Math.min(72, Math.floor((900 - pat * 90) / linhas)), fs = Math.min(36, Math.floor(lh * .55)), q = formato(c) === 'pontos' ? 1 : 2
       let y = 340
       for (const g of gs) {
-        x.fillStyle = '#9fc2ab'; x.font = `600 ${Math.min(26, fs)}px ${F.B}`; x.textAlign = 'left'; x.fillText(formato(c) === 'pontos' ? 'CLASSIFICAÇÃO' : 'GRUPO ' + g, 60, y)
+        x.fillStyle = '#a9bfe6'; x.font = `600 ${Math.min(26, fs)}px ${F.B}`; x.textAlign = 'left'; x.fillText(formato(c) === 'pontos' ? 'CLASSIFICAÇÃO' : 'GRUPO ' + g, 60, y)
         x.textAlign = 'right'; [['P', 820], ['J', 910], ['SG', 1010]].forEach(([l, px]) => x.fillText(l, px, y))
         y += Math.round(lh * .28)
         standings(c, g).forEach((r, i) => { y += lh
-          if (i < q) { x.fillStyle = 'rgba(225,179,74,.14)'; x.fillRect(48, y - lh * .66, 984, lh * .9) }
-          x.textAlign = 'left'; x.fillStyle = i < q ? '#e1b34a' : '#9fc2ab'; x.font = `700 ${fs}px ${F.C}`; x.fillText(i + 1, 70, y)
+          if (i < q) { x.fillStyle = 'rgba(45,179,93,.14)'; x.fillRect(48, y - lh * .66, 984, lh * .9) }
+          x.textAlign = 'left'; x.fillStyle = i < q ? '#2db35d' : '#a9bfe6'; x.font = `700 ${fs}px ${F.C}`; x.fillText(i + 1, 70, y)
           x.fillStyle = '#fff'; fit(x, r.t.name, 120, y, 620, 600, fs, F.B)
           x.textAlign = 'right'; x.font = `700 ${fs}px ${F.C}`; x.fillText(r.P, 820, y); x.fillText(r.J, 910, y); x.fillText((r.SG > 0 ? '+' : '') + r.SG, 1010, y) })
         y += Math.round(lh * 1.3)
@@ -810,26 +810,26 @@ async function buildCards() {
     canvasCard(c, 'PRÓXIMOS JOGOS', (x, F) => {
       const ms = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 6 - pat); let y = 320
       if (!ms.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Todos os jogos foram realizados.', 60, 400) }
-      ms.forEach(m => { x.fillStyle = '#1b4d33'; x.fillRect(48, y, 984, 132)
-        x.fillStyle = '#e1b34a'; x.font = `700 28px ${F.C}`; x.fillText(`${dm(m.date)} · ${m.time.toUpperCase()} · ${mtitle(m).toUpperCase()}`, 76, y + 42)
+      ms.forEach(m => { x.fillStyle = '#16408f'; x.fillRect(48, y, 984, 132)
+        x.fillStyle = '#2db35d'; x.font = `700 28px ${F.C}`; x.fillText(`${dm(m.date)} · ${m.time.toUpperCase()} · ${mtitle(m).toUpperCase()}`, 76, y + 42)
         x.fillStyle = '#fff'; fit(x, label(c, m).toUpperCase(), 76, y + 90, 930, 700, 44, F.C)
-        x.fillStyle = '#9fc2ab'; x.font = `400 24px ${F.B}`; x.fillText(m.local || c.venue, 76, y + 120); y += 152 })
+        x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(m.local || c.venue, 76, y + 120); y += 152 })
     }),
     canvasCard(c, 'ARTILHARIA', (x, F) => {
       let y = 380
       scorers(c).slice(0, 8 - pat).forEach((s, i) => {
-        x.textAlign = 'left'; x.fillStyle = i ? '#9fc2ab' : '#e1b34a'; x.font = `700 40px ${F.C}`; x.fillText(i + 1, 70, y)
+        x.textAlign = 'left'; x.fillStyle = i ? '#a9bfe6' : '#2db35d'; x.font = `700 40px ${F.C}`; x.fillText(i + 1, 70, y)
         x.fillStyle = '#fff'; x.font = `600 38px ${F.B}`; x.fillText(s.p.name, 130, y)
-        x.fillStyle = '#9fc2ab'; x.font = `400 24px ${F.B}`; x.fillText(T(c, s.p.team).name, 130, y + 34)
-        x.textAlign = 'right'; x.fillStyle = i ? '#fff' : '#e1b34a'; x.font = `700 44px ${F.C}`; x.fillText(`${s.n} gol${s.n > 1 ? 's' : ''}`, 1010, y + 10); y += 110 })
+        x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(T(c, s.p.team).name, 130, y + 34)
+        x.textAlign = 'right'; x.fillStyle = i ? '#fff' : '#2db35d'; x.font = `700 44px ${F.C}`; x.fillText(`${s.n} gol${s.n > 1 ? 's' : ''}`, 1010, y + 10); y += 110 })
     }),
     canvasCard(c, ch ? 'CAMPEÃO' : 'ÚLTIMOS RESULTADOS', (x, F) => {
       if (ch) {
         const fin = c.matches.find(m => m.phase === 'final'), [, vice, terc] = podium(c)
-        x.textAlign = 'center'; x.fillStyle = '#e1b34a'; x.beginPath(); x.arc(540, 560, 170, 0, 7); x.fill()
-        x.fillStyle = '#103d27'; x.font = `700 120px ${F.C}`; x.fillText('1º', 540, 605)
+        x.textAlign = 'center'; x.fillStyle = '#2db35d'; x.beginPath(); x.arc(540, 560, 170, 0, 7); x.fill()
+        x.fillStyle = '#0d2f73'; x.font = `700 120px ${F.C}`; x.fillText('1º', 540, 605)
         x.fillStyle = '#fff'; fit(x, T(c, ch).name.toUpperCase(), 540, 860, 960, 700, 88, F.C)
-        x.fillStyle = '#cfe3d6'; x.font = `500 34px ${F.B}`
+        x.fillStyle = '#d6e2f7'; x.font = `500 34px ${F.B}`
         x.fillText(fin ? `Final: ${label(c, fin)} · ${score(fin).join(' × ')}${fin.pen ? ` (pên. ${fin.pen[0]}×${fin.pen[1]})` : ''}` : `Campeão por pontos corridos · ${standings(c, 'A')[0].P} pontos`, 540, 940)
         x.fillText(`Vice: ${T(c, vice).name}${terc ? ` · 3º lugar: ${T(c, terc).name}` : ''}`, 540, 995)
         return
@@ -837,11 +837,11 @@ async function buildCards() {
       let y = 330
       c.matches.filter(isDone).sort(byDate).reverse().slice(0, 7 - pat).forEach(m => {
         const [h, a] = score(m)
-        x.fillStyle = '#1b4d33'; x.fillRect(48, y, 984, 112)
-        x.fillStyle = '#9fc2ab'; x.font = `600 22px ${F.B}`; x.textAlign = 'left'; x.fillText(`${dm(m.date)} · ${mtitle(m).toUpperCase()}`, 76, y + 34)
+        x.fillStyle = '#16408f'; x.fillRect(48, y, 984, 112)
+        x.fillStyle = '#a9bfe6'; x.font = `600 22px ${F.B}`; x.textAlign = 'left'; x.fillText(`${dm(m.date)} · ${mtitle(m).toUpperCase()}`, 76, y + 34)
         x.fillStyle = '#fff'; x.font = `700 38px ${F.C}`; x.textAlign = 'right'; x.fillText(T(c, m.home).name.toUpperCase(), 450, y + 84)
         x.textAlign = 'left'; x.fillText(T(c, m.away).name.toUpperCase(), 630, y + 84)
-        x.textAlign = 'center'; x.fillStyle = '#e1b34a'; x.font = `700 48px ${F.C}`; x.fillText(`${h} × ${a}`, 540, y + 86); y += 128 })
+        x.textAlign = 'center'; x.fillStyle = '#2db35d'; x.font = `700 48px ${F.C}`; x.fillText(`${h} × ${a}`, 540, y + 86); y += 128 })
     }),
   ]
   ui.cards.forEach((cv, i) => { const el = document.getElementById('cv' + i); if (el) el.replaceChildren(cv) })
