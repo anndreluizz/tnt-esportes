@@ -82,7 +82,7 @@ async function loadAll() {
     }
     r = {campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis}
     if (arb) local.set('tnt-oficial-dados', JSON.stringify(r))   // árbitro abre a súmula mesmo sem sinal na quadra (só dados públicos)
-    S.arbitros = perfis.filter(p => p.papel === 'arbitro')
+    S.arbitros = perfis.filter(p => p.papel === 'arbitro'); S.secretarias = perfis.filter(p => p.papel === 'secretaria')
   } catch (e) {
     if (!(arb && !e.code && (r = json('tnt-oficial-dados')))) throw e
     S.offline = true
@@ -144,12 +144,21 @@ function refSelect(m) {
   return ` <label class="sub" style="display:inline-flex;gap:6px;align-items:center">Árbitro <select data-ref="${m.id}"><option value="">A definir</option>
     ${(S.arbitros || []).map(a => `<option value="${a.id}" ${a.id === m.refereeId ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>`
 }
-function arbitrosCard() {
-  return `<div class="card" style="margin-bottom:14px"><h3>Árbitros <small>${(S.arbitros || []).length} com acesso</small></h3>
-    <p class="sub">${(S.arbitros || []).map(a => esc(a.nome)).join(', ') || 'Nenhum árbitro liberado ainda.'}</p>
-    <p class="sub" style="margin-top:6px">O árbitro cria a conta na tela de entrada (“Árbitro, primeira vez?”). Depois você libera aqui com o e-mail dele e escala nos jogos, na aba Jogos e tabela.</p>
-    <form class="f" data-form="liberar" style="margin-top:8px"><label>E-mail do árbitro<input name="email" type="email" required></label>
-      <label>Nome<input name="nome" required minlength="2" maxlength="60"></label><button class="btn">Liberar acesso</button></form></div>`
+function arbitrosCard() {   // acessos (árbitros e Secretaria) + minha conta
+  const nomes = l => l.map(a => esc(a.nome)).join(', ')
+  return `<div class="grid g2"><div class="card"><h3>Acessos ao sistema</h3>
+    <p class="sub"><b>Secretaria:</b> ${nomes(S.secretarias || []) || '—'}</p>
+    <p class="sub"><b>Árbitros:</b> ${nomes(S.arbitros || []) || 'nenhum ainda'}</p>
+    <p class="note">A pessoa cria a conta na tela de entrada (“Criar conta de árbitro”). Depois você libera aqui pelo e-mail. Árbitros são escalados nos jogos, na aba Jogos e tabela. Tenha sempre pelo menos 2 contas da Secretaria.</p>
+    <form class="f" data-form="liberar" style="margin-top:8px"><label>E-mail<input name="email" type="email" required></label>
+      <label>Nome<input name="nome" required minlength="2" maxlength="60"></label>
+      <label>Acesso<select name="papel"><option value="arbitro">Árbitro</option><option value="secretaria">Secretaria (administrador)</option></select></label>
+      <div><button class="btn">Liberar acesso</button></div></form></div>
+  <div class="card"><h3>Minha conta <small>${esc(S.session?.name || '')}</small></h3>
+    <p class="sub">Use uma senha forte: pelo menos 10 caracteres, misturando letras e números. Não use datas nem a mesma senha de outros sites.</p>
+    <form class="f" data-form="senha" style="margin-top:8px"><label>Nova senha<input name="senha" type="password" required minlength="10" autocomplete="new-password"></label>
+      <label>Repita a nova senha<input name="senha2" type="password" required minlength="10" autocomplete="new-password"></label>
+      <div><button class="btn">Trocar senha</button></div></form></div></div>`
 }
 
 /* ---------- súmula: guarda no aparelho e envia quando der ---------- */
@@ -247,6 +256,16 @@ const REAL_A = {
       mandante_id: m.home, visitante_id: m.away, vaga_mandante: vaga(m.slotH), vaga_visitante: vaga(m.slotA), data: m.date, hora: m.time}))})
     local.set(seedKey(c.id), null); ui.draw = null; ui.tab = 'jogos'; scrollTo(0, 0); toast('Tabela gerada!')
   }),
+  backup: async () => {   // tudo o que está no banco, num arquivo (fotos e documentos ficam fora)
+    try {
+      const tabelas = ['campeonatos', 'equipes', 'atletas', 'jogos', 'eventos', 'suspensoes', 'sorteios', 'historico', 'perfis'], dados = {}
+      for (const t of tabelas) dados[t] = await q(sb.from(t === 'sorteios' ? 'sorteios_publico' : t).select('*').limit(100000))
+      const blob = new Blob([JSON.stringify({sistema: 'TNT Esportes', gerado_em: new Date().toISOString(), ...dados}, null, 1)], {type: 'application/json'})
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tnt-esportes-copia-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+      toast(`Cópia baixada: ${tabelas.map(t => dados[t].length).reduce((x, y) => x + y)} registros. Guarde em lugar seguro (tem dados pessoais).`)
+    } catch (e) { toast('Não foi possível gerar a cópia: ' + e.message) }
+    return 'stay'
+  },
   // súmula: o evento fica no aparelho na hora e é enviado logo em seguida (ou quando o sinal voltar)
   ev: async d => { DEMO.ev(d); if (d.type === 'falta') { saveDrafts(); await syncReal() } },
   pick: async d => { DEMO.pick(d); saveDrafts(); await syncReal() },
@@ -290,7 +309,17 @@ const REAL_F = {
     try { await rpc('vincular_equipe', {cod: d.codigo, nome: d.nome.trim()}) } catch (e) { return toast(e.message) }
     const {data: {user}} = await sb.auth.getUser(); await entrou(user); toast('Pronto! Agora inscreva os atletas da equipe.')
   },
-  liberar: write(async d => { await rpc('liberar_arbitro', {email_arbitro: d.email, nome_arbitro: d.nome.trim()}); toast('Acesso liberado. Escale o árbitro nos jogos.') }),
+  liberar: write(async d => {
+    const papel = d.papel === 'secretaria' ? 'secretaria' : 'arbitro'
+    await rpc('liberar_acesso', {email_conta: d.email, nome_conta: d.nome.trim(), papel_conta: papel})
+    toast(papel === 'secretaria' ? 'Acesso de Secretaria liberado.' : 'Acesso liberado. Escale o árbitro nos jogos.')
+  }),
+  senha: async d => {
+    if (d.senha.length < 10 || !/[a-zA-Z]/.test(d.senha) || !/\d/.test(d.senha)) return toast('A senha precisa de pelo menos 10 caracteres, com letras e números.')
+    if (d.senha !== d.senha2) return toast('As duas senhas não são iguais.')
+    const {error} = await sb.auth.updateUser({password: d.senha})
+    toast(error ? (/different/i.test(error.message) ? 'A nova senha precisa ser diferente da atual.' : error.message) : 'Senha trocada. Use a nova senha na próxima vez que entrar.')
+  },
   reopen: write(async d => {
     const why = d.why.trim(); if (why.length < 5) return toast('Informe o motivo da correção.')
     await rpc('reabrir_sumula', {j: cur().id, motivo: why}); local.set(draftKey(cur().id), null)

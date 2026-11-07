@@ -285,7 +285,7 @@ function athleteForm(c, mode) {
     ${upload('photo', 'Foto do atleta', {capture: 'user', dica: 'Rosto de frente'})}
     ${REAL && sec ? upload('rgf', 'Documento (RG) – frente') + upload('rgv', 'Documento (RG) – verso') : ''}
     <label class="chk span2"><input type="checkbox" name="auth"> Menor de 18: autorização do responsável entregue</label>
-    <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Data de nascimento, documento e foto não aparecem no portal público.</label>
+    <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Se o atleta for menor de 18 anos, o responsável legal autorizou. Data de nascimento, documento e foto não aparecem no portal público. <a href="privacidade.html" target="_blank" rel="noopener">Como usamos os dados</a></label>
     <div class="span2"><button class="btn">${sec ? 'Inscrever' : 'Enviar para aprovação'}</button></div></form>
   <p class="note">Faixa etária: ${ageRange(c)}. A idade é conferida na hora: fora da faixa, a inscrição é bloqueada; menor de 18 sem autorização fica pendente.${sec ? '' : ' A Secretaria aprova depois de conferir os documentos.'}</p>`
 }
@@ -506,7 +506,7 @@ function vRelatorios() {
   const ages = [['Até 14 anos', r => r.a <= 14], ['15 a 17 anos', r => r.a >= 15 && r.a <= 17], ['18 a 29 anos', r => r.a >= 18 && r.a <= 29], ['30 anos ou mais', r => r.a >= 30]]
     .map(([l, f]) => [l, rows.filter(f).length])
   const bairros = BAIRROS.map(b => [b, rows.filter(r => r.p.bairro === b).length]).sort((a, b) => b[1] - a[1])
-  return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><button class="btn ghost noprint" data-act="print">Imprimir / salvar PDF</button></div>
+  return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages)}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros)}</div></div>
   <div class="card mt"><h3>Por campeonato</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Campeonato</th><th class="l">Modalidade</th><th>Categoria</th><th>Situação</th><th>Equipes</th><th>Atletas</th><th>Jogos</th><th>Gols</th></tr></thead><tbody>
@@ -536,7 +536,7 @@ function vPortal() {
   const hero = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<div><div class="eyebrow">Portal público · sem login</div><h2>${esc(c.name)}</h2>
     <div style="color:#cfe3d6;font-size:14px;margin-top:4px">${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</div></div></div>
     ${nx ? `<div class="next"><div class="eyebrow">Próximo jogo · ${dm(nx.date)} · ${nx.time}</div><b class="cond" style="font-size:20px">${esc(label(c, nx))}</b></div>` : ''}</div>`
-  const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD).</p>'
+  const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD). <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>'
   if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
     ${c.teams.map(t => `<div class="row"><b>${esc(t.name)}</b><span class="sub">${esc(t.bairro)}</span></div>`).join('')}
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
