@@ -419,6 +419,7 @@ const REAL_F = {
     await enviaEscudo(c, t.id, v.escudo); ui.team = t.id; toast('Equipe cadastrada.')
   }),
   newchamp: write(async d => {
+    const falta = faltaCampeonato(d, true); if (falta.length) return toast('Preencha: ' + falta.join(', ') + '.')
     const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max, maxPlayers = +d.maxPlayers || 20
     if (name.length < 5 || (!d.id && !SPORTS[d.sport]) || !/^\d{4}-\d{2}-\d{2}$/.test(d.start)) return toast('Confira nome, modalidade e data de início.')
     if (!(min >= 5 && min <= 80) || (max !== null && !(max >= min && max <= 99))) return toast('Faixa etária inválida.')

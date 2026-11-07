@@ -99,6 +99,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   ok(await formato('mm', 6, 'mata', {terceiro: false}) === 5, 'mata-mata com 6 equipes: 2 quartas, 2 semis e a final (sem 3º lugar)')
   ok(run(`(() => { const c = C(), q = c.matches.filter(m => m.phase === 'quartas'), s = c.matches.filter(m => m.phase === 'semi')
     return q.every(m => m.home && m.away && !m.slotH) && s[0].home === c.draw.groups.A[0] && s[1].home === c.draw.groups.A[1] && !!champion(c) })()`), 'mata-mata: cabeças de chave com folga direto na semifinal')
+  ok(run(`faltaCampeonato({name: 'Copa X', category: '', min: '15', start: '2027-01-01', venue: 'Quadra'}, true).join()`) === 'Categoria,Responsável,WhatsApp do responsável,Inscrições até,Máximo de atletas', 'campeonato oficial não é criado sem os campos obrigatórios')
   // calendário escolhido: quartas-feiras, 2 horários × 2 quadras; cada rodada num dia, ninguém joga 2× no mesmo dia
   run(`(() => { const c = champBase({id: 'cal', name: 'Teste cal', sport: 'Futsal', category: 'Livre', minAge: 15, maxAge: null, start: '2027-03-01', venue: 'Quadra',
     ...lerRegras({r_cal: '1', r_dia3: 'on', r_horarios: '19h, 20:30', r_locais: 'Quadra 1\\nQuadra 2'}, 'Futsal'), format: 'pontos'})

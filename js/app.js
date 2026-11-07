@@ -291,24 +291,25 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
   const v = (k, d = '') => esc(c?.[k] ?? d), sp = c?.sponsors || []
   const step = (n, t, body) => `<fieldset class="step"><legend><span>${n}</span>${t}</legend><div class="f">${body}</div></fieldset>`
   return `<div class="card mt" id="champform"><h3>${c ? `Editar: ${esc(c.name)}` : 'Novo campeonato'}</h3>
+  <p class="note">Campos com <span class="obr">*</span> são obrigatórios.</p>
   <form data-form="newchamp">${c ? `<input type="hidden" name="id" value="${c.id}">` : ''}
   ${step(1, 'Identidade', `
-    <label class="span2">Nome<input name="name" required minlength="5" maxlength="60" value="${v('name')}" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
-    <label>Modalidade<select name="sport" ${c ? 'disabled' : ''}>${Object.keys(SPORTS).map(s => `<option ${c?.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
-    <label>Categoria<input name="category" maxlength="20" value="${v('category')}" placeholder="Livre, Sub-17, Feminino, Veteranos..."></label>
-    <label>Idade mínima<input name="min" type="number" min="5" max="80" value="${v('minAge', 15)}" required></label>
+    <label class="span2">Nome<span class="obr">*</span><input name="name" required minlength="5" maxlength="60" value="${v('name')}" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
+    <label>Modalidade<span class="obr">*</span><select name="sport" ${c ? 'disabled' : ''}>${Object.keys(SPORTS).map(s => `<option ${c?.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+    <label>Categoria<span class="obr">*</span><input name="category" required minlength="3" maxlength="20" value="${v('category')}" placeholder="Livre, Sub-17, Feminino, Veteranos..."></label>
+    <label>Idade mínima<span class="obr">*</span><input name="min" type="number" min="5" max="80" value="${v('minAge', 15)}" required></label>
     <label>Idade máxima<input name="max" type="number" min="5" max="99" value="${v('maxAge')}" placeholder="sem limite"></label>
     ${REAL ? upload('logo', 'Logo do campeonato', {atual: c?.logo, dica: 'PNG ou JPG · aparece no portal, na súmula e no link'}) : ''}`)}
   ${step(2, 'Organização', `
-    ${REAL ? `<label>Responsável<input name="resp" maxlength="60" value="${v('responsible')}" placeholder="Nome de quem organiza"></label>
-    <label>Telefone / WhatsApp do responsável<input name="respPhone" type="tel" maxlength="20" value="${v('responsiblePhone')}" placeholder="(97) 9 9999-9999"></label>` : ''}
-    <label>Início${campoData('start', c?.start || '', 'required')}</label>
-    <label>Local<input name="venue" maxlength="60" value="${v('venue')}" placeholder="Quadra Poliesportiva Municipal"></label>`)}
+    ${REAL ? `<label>Responsável<span class="obr">*</span><input name="resp" required minlength="3" maxlength="60" value="${v('responsible')}" placeholder="Nome de quem organiza"></label>
+    <label>WhatsApp do responsável<span class="obr">*</span><input name="respPhone" type="tel" required minlength="8" maxlength="20" value="${v('responsiblePhone')}" placeholder="(97) 9 9999-9999"></label>` : ''}
+    <label>Início<span class="obr">*</span>${campoData('start', c?.start || '', 'required')}</label>
+    <label>Local principal<span class="obr">*</span><input name="venue" required minlength="3" maxlength="60" value="${v('venue')}" placeholder="Quadra Poliesportiva Municipal"></label>`)}
   ${step(3, 'Formato e regras', regrasCampos(c))}
   ${step(4, 'Dias, horários e locais dos jogos', calendarioCampos(c))}
   ${REAL ? step(5, 'Inscrições', `
-    <label>Inscrições até${campoData('regUntil', c?.regUntil || '')}</label>
-    <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
+    <label>Inscrições até<span class="obr">*</span>${campoData('regUntil', c?.regUntil || '', 'required')}</label>
+    <label>Máximo de atletas por equipe<span class="obr">*</span><input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
     <label class="so-rodadas">Novos atletas até o fim da rodada<input name="r_inscricao_rodada" type="number" min="1" max="60" value="${c ? regras(c).inscricao_rodada ?? '' : ''}" placeholder="sem limite"></label>
     <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo (ou da rodada limite), o link para de aceitar inscrições. Dá para mudar a qualquer momento; a Secretaria sempre pode inscrever.</p>`)
   + step(6, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>',
@@ -1095,6 +1096,7 @@ const F = {
     ui.team = id; log(c, SEC, `Equipe cadastrada: ${v.name}`); toast('Equipe cadastrada.')
   },
   newchamp: d => {
+    const falta = faltaCampeonato(d, false); if (falta.length) return toast('Preencha: ' + falta.join(', ') + '.')
     const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max
     if (name.length < 5 || !SPORTS[d.sport] || !/^\d{4}-\d{2}-\d{2}$/.test(d.start)) return toast('Confira nome, modalidade e data de início.')
     if (!(min >= 5 && min <= 80) || (max !== null && !(max >= min && max <= 99))) return toast('Faixa etária inválida.')

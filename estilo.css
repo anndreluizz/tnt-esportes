@@ -298,3 +298,5 @@ form:has(input[name=format][value=mata]:checked) .so-rodadas{display:none}
 .linha .x{flex:none;width:40px;height:40px;border:0;border-radius:50%;background:var(--redbg);color:var(--red);font:700 20px Barlow;cursor:pointer}
 .addrow{min-height:48px;padding:0 18px;border:2px dashed #b9c6de;border-radius:12px;background:none;font:600 15px Barlow;color:var(--g7);cursor:pointer}
 .addrow:hover{border-color:var(--g7);background:#eaf1fc}
+.obr{color:var(--red);margin-left:3px;font-weight:700}
+form input:user-invalid,form select:user-invalid,form textarea:user-invalid{border-color:var(--red);box-shadow:0 0 0 3px rgba(179,38,30,.12)}

@@ -298,6 +298,13 @@ if (typeof document !== 'undefined') document.addEventListener('change', e => { 
 })
 
 // formulário do campeonato -> {format, rules}; atual = campeonato sendo editado (formato travado depois do sorteio)
+// campos mínimos para criar ou editar um campeonato; devolve o que falta (o oficial pede também responsável e prazo)
+function faltaCampeonato(d, oficial) {
+  const vazio = k => !String(d[k] ?? '').trim()
+  return [['name', 'Nome'], ['category', 'Categoria'], ['min', 'Idade mínima'], ['start', 'Início'], ['venue', 'Local principal'],
+    ...(oficial ? [['resp', 'Responsável'], ['respPhone', 'WhatsApp do responsável'], ['regUntil', 'Inscrições até'], ['maxPlayers', 'Máximo de atletas']] : [])]
+    .filter(([k]) => vazio(k)).map(([, l]) => l)
+}
 function lerRegras(d, sport, atual) {
   const p = regrasPadrao(sport), base = atual ? regras(atual) : p
   const n = (k, min, max) => { const v = parseInt(d['r_' + k]); return v >= min && v <= max ? v : base[k] }
@@ -330,7 +337,7 @@ function dataISO(br) {   // '20/05/2010' -> '2010-05-20'; data que não existe (
   const iso = `${m[3]}-${m[2]}-${m[1]}`, d = new Date(iso + 'T12:00:00Z')
   return !isNaN(d) && d.toISOString().slice(0, 10) === iso ? iso : ''
 }
-const campoData = (name, iso = '', extra = '') => `<input name="${name}" data-data inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off" value="${dataBR(iso)}" ${extra}>`
+const campoData = (name, iso = '', extra = '') => `<input name="${name}" data-data inputmode="numeric" maxlength="10" pattern="\\d{2}/\\d{2}/\\d{4}" title="Digite assim: 20/05/2010" placeholder="dd/mm/aaaa" autocomplete="off" value="${dataBR(iso)}" ${extra}>`
 // formulário -> objeto, com as datas já em aaaa-mm-dd
 function lerForm(f) { const d = Object.fromEntries(new FormData(f)); f.querySelectorAll('[data-data]').forEach(i => { d[i.name] = dataISO(i.value) }); return d }
 if (typeof document !== 'undefined') document.addEventListener('input', e => {   // põe as barras sozinho: 20052010 -> 20/05/2010
