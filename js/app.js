@@ -67,7 +67,8 @@ function mpill(m) {
 }
 function avatar(p, size = 34) {
   const st = `width:${size}px;height:${size}px`
-  if (p.photo && p.photo.startsWith('data:image/')) return `<img class="av" style="${st}" src="${p.photo}" alt="">`
+  // oficial: a foto vem como link temporário (https) do arquivo privado
+  if (p.photo && /^(data:image\/|https:\/\/)/.test(p.photo)) return `<img class="av" style="${st}" src="${p.photo}" alt="">`
   const hue = [...p.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 360
   return `<span class="av" style="${st};background:hsl(${hue} 32% 36%)">${esc(p.name.split(' ').map(w => w[0]).slice(0, 2).join(''))}</span>`
 }
@@ -207,7 +208,7 @@ function athleteForm(c, mode) {
     <label>Nº da camisa<input name="num" type="number" min="1" max="99" required></label>
     <label>Nascimento<input name="birth" type="date" required min="1940-01-01" max="${c.start}"></label>
     <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
-    ${REAL ? '' : '<label>Foto (identificação)<input name="photo" type="file" accept="image/*" capture="user"></label>'}
+    <label>Foto (identificação)<input name="photo" type="file" accept="image/*" capture="user"></label>
     <label class="chk span2"><input type="checkbox" name="auth"> Menor de 18: autorização do responsável entregue</label>
     <label class="chk span2"><input type="checkbox" name="consent" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Data de nascimento e foto não aparecem no portal público.</label>
     <div class="span2"><button class="btn">${mode === 'team' ? 'Enviar para aprovação' : 'Inscrever'}</button></div></form>

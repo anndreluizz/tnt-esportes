@@ -23,7 +23,7 @@ async function toState(r) {
   if (S.session?.uid) nomes[S.session.uid] = S.session.name
   for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro})
   for (const p of r.atletas) byId[teamCamp[p.equipe_id]]?.players.push({id: p.id, team: p.equipe_id, name: p.nome, num: p.numero, birth: p.nascimento,
-    bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: null})   // portal: só aprovados, sem nascimento
+    bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: p.foto_url ?? null})   // portal: só aprovados, sem nascimento nem foto
   const evs = {}
   for (const e of r.eventos) (evs[e.jogo_id] ??= []).push({id: e.id, type: e.tipo, team: e.equipe_id, player: e.atleta_id, min: e.minuto, half: e.tempo, sent: true})
   for (const j of r.jogos) {
@@ -57,15 +57,24 @@ async function toState(r) {
 }
 
 async function loadAll() {
-  const sec = role() === 'secretaria', arb = role() === 'arbitro', all = t => q(sb.from(t).select('*'))
+  const sec = role() === 'secretaria', arb = role() === 'arbitro', eq = role() === 'equipe', all = t => q(sb.from(t).select('*'))
   let r
   try {
     // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
-    const [campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis] = await Promise.all([
+    const [campeonatos, equipes, pub, jogos, eventos, sorteios, historico, suspensoes, perfis, meus] = await Promise.all([
       q(sb.from('campeonatos').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
       all(sec ? 'atletas' : 'atletas_publico'), all('jogos'), all('eventos'), all('sorteios_publico'),
       q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)),
-      sec || arb ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : []])
+      sec || arb || eq ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : [],
+      // equipe: o próprio elenco completo (com pendências); árbitro: fotos dos atletas dos seus jogos (o banco filtra)
+      eq ? q(sb.from('atletas').select('*').eq('equipe_id', S.session.teamId)) : arb ? q(sb.from('atletas').select('id, foto_path')) : []])
+    const foto = Object.fromEntries(meus.map(a => [a.id, a.foto_path]))
+    const atletas = eq ? [...pub.filter(a => a.equipe_id !== S.session.teamId), ...meus] : pub.map(a => ({...a, foto_path: a.foto_path ?? foto[a.id]}))
+    const paths = atletas.map(a => a.foto_path).filter(Boolean)
+    if (paths.length) {   // fotos ficam no arquivo privado: link temporário só para quem pode ver
+      const {data} = await sb.storage.from('fotos').createSignedUrls(paths, 3600), url = Object.fromEntries((data || []).map(x => [x.path, x.signedUrl]))
+      atletas.forEach(a => { a.foto_url = url[a.foto_path] })
+    }
     r = {campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis}
     if (arb) local.set('tnt-oficial-dados', JSON.stringify(r))   // árbitro abre a súmula mesmo sem sinal na quadra (só dados públicos)
     S.arbitros = perfis.filter(p => p.papel === 'arbitro')
@@ -79,34 +88,41 @@ async function loadAll() {
 
 async function enter(user) {
   let p
-  try { p = (await q(sb.from('perfis').select('nome, papel').eq('id', user.id)))[0] }
+  try { p = (await q(sb.from('perfis').select('nome, papel, equipe_id').eq('id', user.id)))[0] }
   catch (e) { const c = json('tnt-oficial-perfil'); if (e.code || c?.uid !== user.id) throw e; p = c }   // sem sinal: último perfil deste aparelho
-  if (p?.papel === 'secretaria' || p?.papel === 'arbitro') {
-    S.session = {role: p.papel, name: p.nome, uid: user.id}
-    local.set('tnt-oficial-perfil', JSON.stringify({uid: user.id, nome: p.nome, papel: p.papel})); return true
-  }
-  await sb.auth.signOut()
-  toast(p ? 'O acesso das equipes chega na próxima etapa. Por enquanto, veja o portal público.'
-          : `Conta ainda sem acesso. Peça à Secretaria para liberar o e-mail ${user.email}.`)
-  return false
+  if (!p) { ui.noProfile = {email: user.email}; return false }   // continua logado: pode vincular a equipe pelo código
+  S.session = {role: p.papel, name: p.nome, uid: user.id, teamId: p.equipe_id}; ui.noProfile = null
+  local.set('tnt-oficial-perfil', JSON.stringify({uid: user.id, nome: p.nome, papel: p.papel, equipe_id: p.equipe_id}))
+  return true
 }
+async function entrou(user) { if (await enter(user)) { resetTransient(); ui.tab = ROLE_TABS[role()][0][0]; scrollTo(0, 0) } await loadAll() }
 
 function loginReal() {
-  const form = ui.signup
-    ? `<form class="f" data-form="signup"><label class="span2">E-mail<input name="email" type="email" required autocomplete="username"></label>
-        <label class="span2">Crie uma senha (mínimo 8 caracteres)<input name="senha" type="password" required minlength="8" autocomplete="new-password"></label>
-        <div class="span2 btns"><button class="btn">Criar conta</button><button type="button" class="btn ghost" data-act="signupmode">Voltar</button></div></form>`
-    : `<form class="f" data-form="signin"><label class="span2">E-mail<input name="email" type="email" required autocomplete="username"></label>
-        <label class="span2">Senha<input name="senha" type="password" required autocomplete="current-password"></label>
-        <div class="span2 btns"><button class="btn">Entrar</button><button type="button" class="link" data-act="signupmode">Árbitro, primeira vez? Criar conta</button></div></form>`
+  const card = (ic, t, p, body) => `<div class="role"><div class="ic">${ic}</div><h3>${t}</h3><p>${p}</p>${body}</div>`
+  const senha = (l, auto) => `<label class="span2">${l}<input name="senha" type="password" required minlength="${auto === 'new-password' ? 8 : 1}" autocomplete="${auto}"></label>`
+  const email = '<label class="span2">E-mail<input name="email" type="email" required autocomplete="username"></label>'
+  const equipeCampos = `<label class="span2">Seu nome<input name="nome" required minlength="2" maxlength="60"></label>
+    <label class="span2">Código da equipe (a Secretaria passa)<input name="codigo" required autocomplete="off" style="text-transform:uppercase"></label>`
+  const np = ui.noProfile, ss = ui.signup
+  const main = np
+    ? card(IC.team, 'Conta sem acesso ainda', `Você entrou como <b>${esc(np.email)}</b>.`,
+        `<p class="sub"><b>Representante de equipe:</b> digite seu nome e o código da equipe.</p>
+        <form class="f" data-form="vincular">${equipeCampos}<div class="span2"><button class="btn">Vincular à equipe</button></div></form>
+        <p class="sub" style="margin-top:8px"><b>Árbitro:</b> peça à Secretaria para liberar este e-mail.</p><button class="btn ghost" data-act="logout">Sair</button>`)
+    : ss
+    ? card(ss === 'equipe' ? IC.team : IC.ref, ss === 'equipe' ? 'Criar conta da equipe' : 'Criar conta de árbitro',
+        ss === 'equipe' ? 'Para o representante: crie a conta e use o código da equipe que a Secretaria passou.' : 'Depois de criar a conta, peça à Secretaria para liberar o seu acesso pelo e-mail.',
+        `<form class="f" data-form="signup"><input type="hidden" name="tipo" value="${ss}">${email}${senha('Crie uma senha (mínimo 8 caracteres)', 'new-password')}${ss === 'equipe' ? equipeCampos : ''}
+          <div class="span2 btns"><button class="btn">Criar conta</button><button type="button" class="btn ghost" data-act="signupmode">Voltar</button></div></form>`)
+    : card(IC.sec, 'Entrar', 'Secretaria, árbitros e equipes entram com e-mail e senha.',
+        `${ui.signupDone ? `<div class="info">Conta criada para <b>${esc(ui.signupDone)}</b>. Se chegar um e-mail de confirmação, abra o link e depois entre aqui.</div>` : ''}
+        <form class="f" data-form="signin">${email}${senha('Senha', 'current-password')}<div class="span2"><button class="btn">Entrar</button></div></form>
+        <p class="sub" style="margin-top:10px">Primeira vez? <button class="link" data-act="signupmode" data-tipo="equipe">Criar conta da equipe</button> · <button class="link" data-act="signupmode" data-tipo="arbitro">Criar conta de árbitro</button></p>`)
   return `<div class="login"><div class="lhero"><div class="wrap"><div class="eyebrow">Secretaria Municipal de Esportes · Tonantins/AM</div>
     <h1>TNT ESPORTES</h1><p>Organizando o esporte. Conectando pessoas.</p></div></div>
-    <div class="wrap"><div class="roles">
-      <div class="role"><div class="ic">${IC.sec}</div><h3>${ui.signup ? 'Criar conta de árbitro' : 'Secretaria e árbitros'}</h3>
-        <p>${ui.signup ? 'Depois de criar a conta, peça à Secretaria para liberar o seu acesso pelo e-mail.' : 'Entre com o seu e-mail e senha.'}</p>
-        ${ui.signupDone ? `<div class="info">Conta criada para <b>${esc(ui.signupDone)}</b>. Se chegar um e-mail de confirmação, abra o link. Depois peça à Secretaria para liberar o seu acesso.</div>` : ''}${form}</div>
-      <div class="role"><div class="ic">${IC.pub}</div><h3>População</h3><p>Tabela, jogos, artilharia e súmulas abertos para todos, sem login.</p><button class="btn" data-act="login" data-role="publico">Ver o portal</button></div>
-    </div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais. O acesso das equipes chega na próxima etapa.</p></div></div>`
+    <div class="wrap"><div class="roles">${main}
+      ${card(IC.pub, 'População', 'Tabela, jogos, artilharia e súmulas abertos para todos, sem login.', '<button class="btn" data-act="login" data-role="publico">Ver o portal</button>')}
+    </div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais.</p></div></div>`
 }
 
 // Secretaria: escalar árbitro no jogo e liberar a conta de árbitros novos
@@ -182,8 +198,8 @@ const atleta = (id, campos) => q(sb.from('atletas').update(campos).eq('id', id))
 
 const DEMO = {ev: A.ev, pick: A.pick}
 const REAL_A = {
-  logout: async () => { await sb.auth.signOut(); S.session = null; resetTransient(); ui.doc = null; render(); await loadAll() },
-  signupmode: () => { ui.signup = !ui.signup; ui.signupDone = null },
+  logout: async () => { await sb.auth.signOut(); S.session = ui.noProfile = null; resetTransient(); ui.doc = null; render(); await loadAll() },
+  signupmode: d => { ui.signup = d.tipo || null; ui.signupDone = null },
   auth: write(d => atleta(d.id, {autorizacao: true})),
   approve: write(d => atleta(d.id, {aprovado: true})),
   reject: write(async d => { await q(sb.from('atletas').delete().eq('id', d.id)); toast('Inscrição recusada.') }),
@@ -230,15 +246,23 @@ const REAL_F = {
   signin: async d => {
     const {data, error} = await sb.auth.signInWithPassword({email: d.email.trim(), password: d.senha})
     if (error) return toast(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message === 'Email not confirmed' ? 'Confirme o e-mail pelo link que chegou na sua caixa de entrada.' : error.message)
-    if (await enter(data.user)) { resetTransient(); ui.tab = role() === 'secretaria' ? 'painel' : 'sumula'; scrollTo(0, 0) }
-    await loadAll()
+    await entrou(data.user)
   },
   signup: async d => {
+    const email = d.email.trim(), equipe = d.tipo === 'equipe'
     if (d.senha.length < 8) return toast('A senha precisa de pelo menos 8 caracteres.')
-    const email = d.email.trim(), {data, error} = await sb.auth.signUp({email, password: d.senha, options: {emailRedirectTo: location.href.split('#')[0]}})
+    if (equipe && ((d.nome || '').trim().length < 2 || !(d.codigo || '').trim())) return toast('Informe seu nome e o código da equipe.')
+    const {data, error} = await sb.auth.signUp({email, password: d.senha, options: {emailRedirectTo: location.href.split('#')[0]}})
     if (error) return toast(error.message === 'User already registered' ? 'Já existe uma conta com esse e-mail. Use “Entrar”.' : error.message)
-    if (data.session) await sb.auth.signOut()
-    ui.signup = false; ui.signupDone = email
+    ui.signup = null
+    if (!data.session) { ui.signupDone = email; return }   // confirmação por e-mail ligada: entra depois de confirmar
+    if (!equipe) { await sb.auth.signOut(); ui.signupDone = email; return }
+    try { await rpc('vincular_equipe', {cod: d.codigo, nome: d.nome.trim()}) } catch (e) { toast(e.message) }   // código errado: a tela pede de novo
+    await entrou(data.user)
+  },
+  vincular: async d => {
+    try { await rpc('vincular_equipe', {cod: d.codigo, nome: d.nome.trim()}) } catch (e) { return toast(e.message) }
+    const {data: {user}} = await sb.auth.getUser(); await entrou(user); toast('Pronto! Agora inscreva os atletas da equipe.')
   },
   liberar: write(async d => { await rpc('liberar_arbitro', {email_arbitro: d.email, nome_arbitro: d.nome.trim()}); toast('Acesso liberado. Escale o árbitro nos jogos.') }),
   reopen: write(async d => {
@@ -246,15 +270,20 @@ const REAL_F = {
     await rpc('reabrir_sumula', {j: cur().id, motivo: why}); local.set(draftKey(cur().id), null)
   }),
   athlete: write(async d => {
-    const c = C(), name = d.name.trim().replace(/\s+/g, ' '), num = +d.num
+    const c = C(), sec = role() === 'secretaria', team = sec ? ui.team : S.session.teamId, name = d.name.trim().replace(/\s+/g, ' '), num = +d.num
     if (name.length < 3 || !(num >= 1 && num <= 99) || !/^\d{4}-\d{2}-\d{2}$/.test(d.birth) || d.birth > c.start) return toast('Confira nome, número (1 a 99) e data de nascimento.')
     if (!d.consent) return toast('É preciso o consentimento para uso dos dados.')
-    if (c.players.some(p => p.team === ui.team && p.num === num)) return toast(`O número ${num} já está em uso nesta equipe.`)
-    // ponytail: foto ainda não vai para o bucket "fotos"; entra junto com o acesso das equipes
-    const p = {birth: d.birth, auth: !!d.auth, approved: true}
-    await q(sb.from('atletas').insert({equipe_id: ui.team, nome: name, numero: num, nascimento: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0],
-      autorizacao: p.auth, aprovado: true, consentimento: true}))
-    const [s, why] = insc(c, p); toast(`${name}: ${SPILL[s][1].toLowerCase()}${why ? '. ' + why : ''}.`)
+    if (c.players.some(p => p.team === team && p.num === num)) return toast(`O número ${num} já está em uso nesta equipe.`)
+    let photo; try { photo = await resizePhoto(d.photo) } catch { return toast('Não foi possível ler a foto. Use uma imagem JPG ou PNG.') }
+    const id = uid(), p = {birth: d.birth, auth: !!d.auth, approved: sec}
+    let foto_path = null
+    if (photo) {   // arquivo privado "fotos/<equipe>/<atleta>.jpg": só Secretaria, a equipe e o árbitro do jogo veem
+      const path = `${team}/${id}.jpg`, {error} = await sb.storage.from('fotos').upload(path, await (await fetch(photo)).blob(), {contentType: 'image/jpeg'})
+      if (error) toast('A foto não foi enviada: ' + error.message); else foto_path = path
+    }
+    await q(sb.from('atletas').insert({id, equipe_id: team, nome: name, numero: num, nascimento: d.birth, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0],
+      autorizacao: p.auth, aprovado: sec, consentimento: true, foto_path}))
+    const [s, why] = insc(c, p); toast(`${name}: ${sec ? SPILL[s][1].toLowerCase() : 'enviado para aprovação'}${why ? '. ' + why : ''}.`)
   }),
   newteam: write(async d => {
     const c = C(), name = d.name.trim().replace(/\s+/g, ' ')
