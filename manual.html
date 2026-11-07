@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de uso · TNT Esportes</title>
+<meta name="description" content="Passo a passo animado do TNT Esportes para a Secretaria, árbitros, equipes e população">
+<meta name="theme-color" content="#0d2f73">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .man{max-width:1000px;margin:18px auto 40px}
+  .papeis{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+  .papeis button{flex:1 1 160px;min-height:52px;border:2px solid var(--line);border-radius:14px;background:#fff;font:700 16px Barlow;color:var(--ink);cursor:pointer}
+  .papeis button.on{border-color:var(--g7);background:var(--g7);color:#fff}
+  .palco{position:relative;overflow:hidden;border-radius:16px;aspect-ratio:941/454;background:#eef2f8;border:1px solid var(--line);box-shadow:0 10px 30px rgba(13,22,40,.12)}
+  .cena{position:absolute;inset:0;opacity:0;transition:opacity .5s}
+  .cena.on{opacity:1;animation:aproxima 6s ease-out forwards}
+  .cena img{width:100%;height:100%;object-fit:cover;display:block}
+  @keyframes aproxima{from{transform:scale(1)}to{transform:scale(1.14)}}
+  .toque{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(45,179,93,.35);border:3px solid var(--gold);opacity:0}
+  .cena.on .toque{animation:toque 1.4s .9s ease-out forwards}
+  .toque::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid var(--gold);opacity:0}
+  .cena.on .toque::after{animation:onda 1.6s 1.6s ease-out infinite}
+  @keyframes toque{0%{opacity:0;transform:scale(2)}35%{opacity:1;transform:scale(1)}50%{transform:scale(.75)}65%{transform:scale(1)}100%{opacity:1;transform:scale(1)}}
+  @keyframes onda{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(2.4)}}
+  .tempo{height:5px;background:var(--line);border-radius:3px;margin-top:10px;overflow:hidden}
+  .tempo i{display:block;height:100%;width:0;background:var(--gold)}
+  .tempo i.corre{animation:enche linear forwards}
+  @keyframes enche{to{width:100%}}
+  .legenda{margin-top:12px;min-height:110px}
+  .legenda .eyebrow{color:var(--g7)}
+  .legenda h2{font-size:26px;margin:2px 0 6px}
+  .legenda p{font-size:16.5px;line-height:1.5;margin:0}
+  .controles{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .controles .btn{min-width:56px}
+  .pontos{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .pontos button{width:14px;height:14px;border-radius:50%;border:0;background:var(--line);cursor:pointer;padding:0}
+  .pontos button.on{background:var(--g7);transform:scale(1.25)}
+  .lista{margin:6px 0 0;padding-left:22px}
+  .lista li{margin:8px 0;font-size:15.5px}
+  .lista button{background:none;border:0;padding:0;font:700 15.5px Barlow;color:var(--g7);cursor:pointer;text-align:left;text-decoration:underline}
+  @media (prefers-reduced-motion: reduce){.cena.on{animation:none}.cena.on .toque{animation:none;opacity:1}.cena.on .toque::after{animation:none}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap brand"><div class="logo">TNT</div>
+  <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div>
+  <div class="hright"><a class="out" href="oficial.html" style="text-decoration:none">Abrir o sistema</a></div></div></header>
+<main class="wrap man">
+  <div class="hero"><div><div class="eyebrow">Manual de uso</div><h2>Como usar o TNT Esportes</h2>
+    <div style="color:#d6e2f7;font-size:15px;margin-top:4px">Escolha quem você é. Os passos passam sozinhos; a bolinha verde mostra onde tocar.</div></div></div>
+  <div class="papeis" role="tablist" id="papeis"></div>
+  <div class="card">
+    <div class="palco" id="palco" aria-live="polite"></div>
+    <div class="tempo"><i id="tempo"></i></div>
+    <div class="legenda" id="legenda"></div>
+    <div class="controles">
+      <button class="btn ghost" id="ant" aria-label="Passo anterior">◀ Voltar</button>
+      <button class="btn" id="play" aria-label="Pausar">⏸ Pausar</button>
+      <button class="btn ghost" id="prox" aria-label="Próximo passo">Avançar ▶</button>
+      <div class="pontos" id="pontos"></div>
+    </div>
+  </div>
+  <div class="card mt"><h3>Todos os passos</h3><ol class="lista" id="lista"></ol></div>
+  <p class="note" style="text-align:center;margin-top:18px">Imagens da demonstração, com dados fictícios. <a href="privacidade.html">Como usamos os dados</a></p>
+</main>
+<script src="js/manual.js"></script>
+</body>
+</html>

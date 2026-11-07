@@ -140,7 +140,7 @@ function loginReal() {
     <h1>TNT ESPORTES</h1><p>Organizando o esporte. Conectando pessoas.</p></div></div>
     <div class="wrap"><div class="roles">${main}
       ${card(IC.pub, 'População', 'Tabela, jogos, artilharia e súmulas abertos para todos, sem login.', '<button class="btn" data-act="login" data-role="publico">Ver o portal</button>')}
-    </div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais.</p></div></div>`
+    </div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais. · <a href="manual.html">Manual de uso</a></p></div></div>`
 }
 
 // Secretaria: escalar árbitro no jogo e liberar a conta de árbitros novos

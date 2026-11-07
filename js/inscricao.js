@@ -60,7 +60,8 @@ function render() {
       ${upload('rgv', 'Documento (RG) – verso', {capture: 'environment', required: true})}
       <p class="note span2">O documento serve só para a Secretaria conferir a idade. Ninguém mais vê, e ele é apagado quando o campeonato termina.</p>`)}
     <label class="chk" style="margin-top:12px"><input type="checkbox" name="consentimento"> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Se o atleta for menor de 18 anos, declaro ser o responsável legal e autorizo em nome dele. Nascimento, foto e documento não aparecem no portal público. <a href="privacidade.html" target="_blank" rel="noopener">Como usamos os dados</a></label>
-    <button class="btn block" style="margin-top:14px" id="enviar">Enviar inscrição</button></form>` + lista
+    <button class="btn block" style="margin-top:14px" id="enviar">Enviar inscrição</button>
+    <p class="note" style="text-align:center;margin-top:10px">Dúvidas? <a href="manual.html#equipe" target="_blank" rel="noopener">Veja como preencher</a></p></form>` + lista
   $('#form').onsubmit = enviar
   $('#form').oninput = e => {   // dados do responsável só aparecem para menor de 18
     if (e.target.name !== 'nascimento') return

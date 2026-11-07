@@ -1,6 +1,6 @@
 // Guarda o app no aparelho para abrir sem internet (só funciona quando hospedado em https).
 const CACHE = 'tnt-v3'
-const FILES = ['./', 'index.html', 'estilo.css', 'js/regras.js', 'js/dados.js', 'js/app.js', 'manifest.webmanifest', 'icone.svg', 'oficial.html', 'js/api.js', 'js/config.js']
+const FILES = ['./', 'index.html', 'estilo.css', 'js/regras.js', 'js/dados.js', 'js/app.js', 'manifest.webmanifest', 'icone.svg', 'oficial.html', 'js/api.js', 'js/config.js', 'manual.html', 'js/manual.js']
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())))
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())))
 // rede primeiro (pega versão nova), cache se estiver sem sinal
