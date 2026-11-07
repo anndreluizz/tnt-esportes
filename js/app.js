@@ -235,8 +235,10 @@ function calendarioCampos(c) {
   return `<input type="hidden" name="r_cal" value="1">
     <p class="note span2">Usado na hora de gerar a tabela (no sorteio). Cada rodada ocupa os próximos horários livres e a seguinte começa noutro dia. Sem dias marcados, o padrão é sábado e domingo, a partir das 19h.</p>
     <div class="span2 dias">${['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'].map((d, i) => `<label class="chk"><input type="checkbox" name="r_dia${i}" ${r.dias?.includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}</div>
-    <label>Horários dos jogos<input name="r_horarios" value="${(r.horarios || []).join(', ')}" placeholder="Ex.: 19h00, 20h00, 21h00"></label>
-    <label>Locais (um por linha · jogam ao mesmo tempo)<textarea name="r_locais" rows="3" placeholder="${esc(c?.venue || 'Quadra Poliesportiva Municipal')}">${esc((r.locais || []).join('\n'))}</textarea></label>
+    <div class="span2"><b class="rotulo">Horários dos jogos</b>
+      <div class="linhas horas">${(r.horarios?.length ? r.horarios : ['']).map(linhaHora).join('')}<button type="button" class="addrow" data-addrow="hora">+ Horário</button></div></div>
+    <div class="span2"><b class="rotulo">Locais <span class="sub">(campos ou quadras · jogam ao mesmo tempo)</span></b>
+      <div class="linhas locais">${(r.locais?.length ? r.locais : ['']).map(linhaLocal).join('')}<button type="button" class="addrow" data-addrow="local">+ Local</button></div></div>
     ${c && c.status !== 'inscricoes' ? '<p class="note span2">A tabela já foi gerada: mudar aqui não mexe nos jogos. Para mudar um jogo, use “Alterar” na aba Jogos e tabela.</p>' : ''}`
 }
 function excluirCampeonato(c) {   // só sem resultados; pede o nome para confirmar
@@ -273,7 +275,14 @@ function patRow(s, i = patN++) {   // um patrocinador; adicionar e remover mexem
     <label>Nome<input name="sp${i}" maxlength="40" required value="${esc(s?.name || '')}" placeholder="Nome do patrocinador"></label>
     ${s?.path ? `<input type="hidden" name="spp${i}" value="${esc(s.path)}">` : ''}${upload('spl' + i, 'Logo', {atual: s?.logo})}</div>`
 }
+// horários e locais do calendário: um por linha, com + e ×
+let linhaN = 1000
+const linhaHora = v => `<div class="linha"><input name="r_hora${linhaN++}" data-hora inputmode="numeric" maxlength="5" placeholder="19:00" value="${esc(String(v || '').replace('h', ':'))}"><button type="button" class="x" data-rmrow title="Remover" aria-label="Remover">×</button></div>`
+const linhaLocal = v => `<div class="linha"><input name="r_local${linhaN++}" maxlength="60" placeholder="Ex.: Campo do Bairro Novo" value="${esc(v || '')}"><button type="button" class="x" data-rmrow title="Remover" aria-label="Remover">×</button></div>`
 document.addEventListener('click', e => {
+  if (e.target.closest?.('[data-rmrow]')) return e.target.closest('.linha').remove()
+  const nova = e.target.closest?.('[data-addrow]')
+  if (nova) { nova.insertAdjacentHTML('beforebegin', nova.dataset.addrow === 'hora' ? linhaHora() : linhaLocal()); nova.previousElementSibling.querySelector('input').focus() }
   if (e.target.closest?.('[data-rmpat]')) return e.target.closest('.pat').remove()
   const add = e.target.closest?.('[data-addpat]')
   if (add) { add.insertAdjacentHTML('beforebegin', patRow()); add.previousElementSibling.querySelector('input').focus() }
@@ -430,13 +439,51 @@ function vInscricoes() {
   </div>`
 }
 
+/* ---------- imprevisto: trocar o campo de todos os jogos de um dia de uma vez ---------- */
+const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+const diaSem = iso => DIAS[new Date(iso + 'T12:00:00Z').getUTCDay()]
+// jogos que ainda podem mudar, por dia e campo: {'2027-03-06|Campo X': [jogos]}
+function jogosPorCampo(c) {
+  const g = {}
+  for (const m of c.matches) if (!isDone(m) && !m.events.length && !m.pendingConfirm) (g[m.date + '|' + (m.local || c.venue)] ??= []).push(m)
+  return g
+}
+function avisoTroca(c, sw, jogos) {
+  let portal = ''; try { portal = new URL(REAL ? 'oficial.html#portal' : 'index.html#publico/portal', location.href).href } catch {}
+  const txt = `📍 TROCA DE CAMPO · ${c.name}\n${diaSem(sw.date)} ${dmy(sw.date)}: os jogos do ${sw.antigo} passam para o ${sw.novo}.\n\n`
+    + jogos.sort(byDate).map(m => `${m.time} · ${tname(c, m, 'home')} × ${tname(c, m, 'away')}`).join('\n')
+    + `\n\nMotivo: ${sw.why}\nAcompanhe: ${portal}`
+  return 'https://wa.me/?text=' + encodeURIComponent(txt)
+}
+function trocaCampo(c) {
+  const g = jogosPorCampo(c), ks = Object.keys(g).sort(), sw = ui.swap
+  if (sw?.feito) return `<div class="card info" style="margin-bottom:14px"><b>Campo trocado.</b> ${sw.n} jogo(s) de ${diaSem(sw.date)} ${dmy(sw.date)} foram para ${esc(sw.novo)}. Tudo ficou no histórico com o motivo.
+    <div class="btns" style="margin-top:10px"><a class="btn gold" target="_blank" rel="noopener" href="${sw.wa}">Avisar no WhatsApp</a><button class="btn ghost" data-act="swap">Fechar</button></div></div>`
+  if (!sw) return ks.length ? '<div class="btns" style="margin-bottom:12px"><button class="btn ghost" data-act="swap">Imprevisto: trocar campo</button></div>' : ''
+  if (sw.ids) {   // confirmação: mostra o que vai mudar
+    const ms = sw.ids.map(id => findMatch(c, id)).filter(Boolean).sort(byDate)
+    return `<div class="card info warn" style="margin-bottom:14px"><h3>Confirmar troca de campo</h3>
+      <p>${diaSem(sw.date)} ${dmy(sw.date)}: <b>${esc(sw.antigo)}</b> → <b>${esc(sw.novo)}</b> · motivo: ${esc(sw.why)}</p>
+      ${ms.map(m => `<div class="row"><span>${m.time} · ${esc(label(c, m))}</span><span class="sub">${esc(mtitle(m))}</span></div>`).join('')}
+      <div class="btns" style="margin-top:10px"><button class="btn" data-act="swapok">Trocar ${ms.length} jogo(s)</button><button class="btn ghost" data-act="swap">Cancelar</button></div></div>`
+  }
+  const campos = [...new Set([c.venue, ...(regras(c).locais || []), ...c.matches.map(m => m.local).filter(Boolean)])]
+  return `<div class="card" style="margin-bottom:14px"><h3>Imprevisto: trocar campo</h3>
+    <p class="sub">Move de uma vez todos os jogos de um dia que estavam marcados num campo. Só jogos que ainda não começaram.</p>
+    <form class="f" data-form="swap" style="margin-top:8px">
+      <label class="span2">Dia e campo que não vai poder ser usado<select name="chave" required>${ks.map(k => { const [d, l] = k.split('|')
+        return `<option value="${esc(k)}">${diaSem(d)} ${dmy(d)} · ${esc(l)} · ${g[k].length} jogo(s)</option>` }).join('')}</select></label>
+      <label>Novo campo<input name="novo" required maxlength="60" list="campos" placeholder="Ex.: Campo da Vila"><datalist id="campos">${campos.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+      <label>Motivo (fica no histórico)<input name="why" required minlength="5" maxlength="120" placeholder="Ex.: campo alagado pela chuva"></label>
+      <div class="btns span2"><button class="btn">Ver os jogos que mudam</button><button type="button" class="btn ghost" data-act="swap">Cancelar</button></div></form></div>`
+}
 function vJogos() {
   const c = C()
   const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: ' + regras(c).desempate.map(k => CRITERIOS[k].toLowerCase()).join(', ')}</span></div>`
   if (!c.matches.length) return head + `<div class="card empty">A tabela é gerada automaticamente depois do sorteio.<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button></div></div>`
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
-  return head + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
+  return head + (mode === 'sec' ? trocaCampo(c) : '') + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
   <div class="card mt"><h3>Tabela de jogos</h3>${fixtureSections(c, sec)}</div>`
 }
 
@@ -969,6 +1016,12 @@ const A = {
   canceldel: () => { ui.confirmDel = null },
   delchamp: () => { ui.confirmDel = 'champ' },
   allscorers: () => { ui.allScorers = !ui.allScorers },
+  swap: () => { ui.swap = ui.swap ? null : {} },
+  swapok: () => {
+    const c = C(), sw = ui.swap, ms = sw.ids.map(id => findMatch(c, id)).filter(Boolean)
+    for (const m of ms) { m.local = sw.novo; log(c, SEC, `Jogo alterado: ${label(c, m)}, de ${sw.antigo} para ${sw.novo}`, sw.why, m) }
+    ui.swap = {feito: true, n: ms.length, date: sw.date, novo: sw.novo, wa: avisoTroca(c, sw, ms)}; toast('Campo trocado.')
+  },
   delteam: d => {
     if (ui.confirmDel !== 'team:' + d.id) { ui.confirmDel = 'team:' + d.id; ui.editTeam = null; return }
     const c = C(), t = T(c, d.id); c.teams = c.teams.filter(x => x !== t); c.players = c.players.filter(p => p.team !== t.id)
@@ -1002,6 +1055,13 @@ function lerAtleta(c, p, d) {
   return {name, num, birth: d.birth, nick: t(d.nick), pos: d.pos || null, phone: t(d.phone), address: t(d.endereco), bairro: t(d.bairro), city: t(d.municipio), resp: t(d.resp), respPhone: t(d.respPhone)}
 }
 const F = {
+  swap: d => {
+    const c = C(), jogos = jogosPorCampo(c)[d.chave], novo = d.novo.trim(), why = d.why.trim(), [date, antigo] = d.chave.split('|')
+    if (!jogos?.length) return toast('Nenhum jogo nesse dia e campo.')
+    if (novo.length < 3 || novo.toLowerCase() === antigo.toLowerCase()) return toast('Informe um campo diferente do atual.')
+    if (why.length < 5) return toast('Informe o motivo.')
+    ui.swap = {date, antigo, novo, why, ids: jogos.map(m => m.id)}
+  },
   editteam: async d => {
     const c = C(), t = T(c, ui.editTeam); if (!t) return
     const v = await lerEquipe(c, t, d); if (!v) return

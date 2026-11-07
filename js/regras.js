@@ -312,13 +312,15 @@ function lerRegras(d, sport, atual) {
         ? [...new Set([1, 2, 3, 4].map(i => d['r_d' + i]).filter(k => CRITERIOS[k]))] : base.desempate,
       // calendário da tabela (r_cal marca que a seção veio no formulário)
       dias: d.r_cal ? [0, 1, 2, 3, 4, 5, 6].filter(i => d['r_dia' + i]) : base.dias,
-      horarios: d.r_cal ? lerHoras(d.r_horarios) : base.horarios,
-      locais: d.r_cal ? String(d.r_locais || '').split('\n').map(x => x.trim().slice(0, 60)).filter(Boolean).slice(0, 10) : base.locais})}
+      horarios: d.r_cal ? lerHoras([d.r_horarios, ...Object.keys(d).filter(k => /^r_hora\d+$/.test(k)).map(k => d[k])].join(', ')) : base.horarios,
+      locais: d.r_cal ? [...new Set([...String(d.r_locais || '').split('\n'), ...Object.keys(d).filter(k => /^r_local\d+$/.test(k)).map(k => d[k])]
+        .map(x => String(x).trim().slice(0, 60)).filter(Boolean))].slice(0, 10) : base.locais})}
 }
 // "19h, 20:30, 21h00" -> ['19h00', '20h30', '21h00']
-function lerHoras(txt) {
-  const hs = String(txt || '').match(/\d{1,2}\s*[:hH]\s*\d{0,2}/g) || []
-  return [...new Set(hs.map(x => { const [h, m] = x.split(/\s*[:hH]\s*/); return +h < 24 && (+m || 0) < 60 ? String(+h).padStart(2, '0') + 'h' + String(+m || 0).padStart(2, '0') : null }).filter(Boolean))].sort()
+function lerHoras(txt) {   // aceita 19, 19h, 1930, 19:30, 19h30
+  const hs = String(txt || '').split(/[,;\s]+/).map(t => t.match(/^(\d{1,2})(?:[:hH]?(\d{2}))?[hH]?$/)).filter(Boolean)
+    .map(([, h, m = '0']) => +h < 24 && +m < 60 ? String(+h).padStart(2, '0') + 'h' + String(+m).padStart(2, '0') : null)
+  return [...new Set(hs.filter(Boolean))].sort()
 }
 
 /* ---------- datas digitadas (dd/mm/aaaa), sem o calendário do celular ---------- */
@@ -335,6 +337,11 @@ if (typeof document !== 'undefined') document.addEventListener('input', e => {  
   if (!e.target.matches?.('[data-data]')) return
   const n = e.target.value.replace(/\D/g, '').slice(0, 8)
   e.target.value = [n.slice(0, 2), n.slice(2, 4), n.slice(4)].filter(Boolean).join('/')
+}, true)
+if (typeof document !== 'undefined') document.addEventListener('input', e => {   // horário: 1930 -> 19:30
+  if (!e.target.matches?.('[data-hora]')) return
+  const n = e.target.value.replace(/\D/g, '').slice(0, 4)
+  e.target.value = n.length > 2 ? n.slice(0, 2) + ':' + n.slice(2) : n
 }, true)   // antes dos outros: quem lê o campo já recebe com as barras
 // mata-mata que sai dos grupos: no máximo 16 classificados (oitavas) e pelo menos 2
 function ajustaGrupos(rules) {

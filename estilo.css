@@ -289,3 +289,12 @@ form:has(input[name=format][value=mata]:checked) .so-rodadas{display:none}
 .tabs button{padding:14px 14px;font-size:15px}
 .link{font-size:inherit;padding:4px 2px}
 .tbtn{padding:14px 10px;font-size:15px}
+/* horários e locais, um por linha */
+.rotulo{display:block;font-size:13.5px;margin-bottom:6px}
+.linhas{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.linha{display:flex;gap:6px;align-items:center}
+.linhas.horas .linha input{width:110px;text-align:center;font-size:17px}
+.linhas.locais .linha{flex:1 1 280px}
+.linha .x{flex:none;width:40px;height:40px;border:0;border-radius:50%;background:var(--redbg);color:var(--red);font:700 20px Barlow;cursor:pointer}
+.addrow{min-height:48px;padding:0 18px;border:2px dashed #b9c6de;border-radius:12px;background:none;font:600 15px Barlow;color:var(--g7);cursor:pointer}
+.addrow:hover{border-color:var(--g7);background:#eaf1fc}

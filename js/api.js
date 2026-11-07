@@ -299,6 +299,13 @@ const REAL_A = {
     await apagarArquivos([['fotos', d.id], ['documentos', d.id]])
     ui.confirmDel = ui.team = null; toast(`Equipe ${t.name} excluída.`)
   }),
+  swapok: async () => {   // oficial: cada jogo passa pela mesma função de alterar jogo (histórico com motivo)
+    const c = C(), sw = ui.swap, ms = sw.ids.map(id => findMatch(c, id)).filter(Boolean), feitos = []
+    try { for (const m of ms) { await rpc('alterar_jogo', {j: m.id, nova_data: m.date, nova_hora: m.time, novo_local: sw.novo, motivo: sw.why}); feitos.push(m) } }
+    catch (e) { toast(`${feitos.length} de ${ms.length} jogos trocados. Erro: ${e.message}`) }
+    ui.swap = feitos.length ? {feito: true, n: feitos.length, date: sw.date, novo: sw.novo, wa: avisoTroca(c, sw, feitos)} : null
+    await loadAll().catch(() => {})
+  },
   // súmula: o evento fica no aparelho na hora e é enviado logo em seguida (ou quando o sinal voltar)
   ev: async d => { DEMO.ev(d); if (d.type === 'falta') { saveDrafts(); await syncReal() } },
   pick: async d => { DEMO.pick(d); saveDrafts(); await syncReal() },
