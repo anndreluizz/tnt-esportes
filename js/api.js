@@ -9,7 +9,7 @@ const local = {get: k => { try { return localStorage.getItem(k) } catch { return
                set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch {} }}
 const json = k => { try { return JSON.parse(local.get(k)) } catch { return null } }
 
-const ERR = {'42501': 'Sem permissão para isso.', '23505': 'Já existe um registro igual (nome ou número repetido).', '23514': 'Algum dado está fora do permitido.'}
+const ERR = {'23503': 'Não dá para excluir: já existem jogos ou resultados ligados a isso.', '42501': 'Sem permissão para isso.', '23505': 'Já existe um registro igual (nome ou número repetido).', '23514': 'Algum dado está fora do permitido.'}
 // erro sem código = não chegou ao banco (sem internet)
 async function q(p) { const {data, error} = await p; if (error) throw Object.assign(new Error(ERR[error.code] || error.message), {code: error.code}); return data }
 
@@ -18,7 +18,7 @@ async function toState(r) {
   const marca = p => p ? `${SUPABASE_URL}/storage/v1/object/public/marcas/${p}` : null   // logos são públicas
   const camps = r.campeonatos.map(c => champBase({id: c.id, name: c.nome, sport: c.modalidade, category: c.categoria, minAge: c.idade_min,
     maxAge: c.idade_max, start: c.inicio, venue: c.local, status: c.status, format: c.formato, rules: c.regras || {}, logo: marca(c.logo_path), responsible: c.responsavel,
-    responsiblePhone: c.responsavel_telefone, regUntil: c.inscricao_ate, maxPlayers: c.max_atletas,
+    responsiblePhone: c.responsavel_telefone, regUntil: c.inscricao_ate, maxPlayers: c.max_atletas, cancelledDraws: [],
     sponsors: (c.patrocinadores || []).map(x => ({name: x.nome, logo: marca(x.logo_path), path: x.logo_path}))}))
   const byId = Object.fromEntries(camps.map(c => [c.id, c]))
   const teamCamp = Object.fromEntries(r.equipes.map(t => [t.id, t.campeonato_id])), jogoCamp = Object.fromEntries(r.jogos.map(j => [j.id, j.campeonato_id]))
@@ -35,7 +35,7 @@ async function toState(r) {
     const a = j.assinaturas || {}, m = newMatch({id: j.id, phase: j.fase, round: j.rodada, group: j.grupo, title: j.titulo,
       home: j.mandante_id, away: j.visitante_id, slotH: j.vaga_mandante, slotA: j.vaga_visitante, date: j.data, time: j.hora, status: j.status,
       events: evs[j.id] || [], pen: j.pen_mandante == null ? null : [j.pen_mandante, j.pen_visitante], wo: j.wo_ausente_id, postponed: j.adiado,
-      notes: j.observacoes, hash: j.hash, woGoals: byId[j.campeonato_id] ? regras(byId[j.campeonato_id]).wo : 3, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
+      notes: j.observacoes, hash: j.hash, local: j.local, woGoals: byId[j.campeonato_id] ? regras(byId[j.campeonato_id]).wo : 3, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
       signatures: Object.fromEntries([['arbitro', a.arbitro], ['home', a.mandante], ['away', a.visitante]].filter(x => x[1]))})
     const d = j.status !== 'encerrado' && json(draftKey(j.id))   // súmula em andamento neste aparelho
     if (d) { const ids = new Set(m.events.map(e => e.id))
@@ -50,6 +50,7 @@ async function toState(r) {
   }
   for (const s of r.suspensoes) { const c = byId[teamCamp[r.atletas.find(p => p.id === s.atleta_id)?.equipe_id]]
     c?.punishments.push({player: s.atleta_id, matches: s.jogo_ids, why: s.motivo}) }
+  for (const x of r.cancelados || []) byId[x.campeonato_id]?.cancelledDraws.push({at: x.cancelado_em, why: x.motivo, hash: x.hash, seed: x.semente})
   for (const d of r.sorteios) {
     const c = byId[d.campeonato_id]; if (!c) continue
     if (d.grupos) { c.draw = {seed: d.semente, entrada: d.entrada_publica, final: await finalSeed(d.semente, d.entrada_publica), hash: d.hash, groups: d.grupos, at: d.revelado_em}; continue }
@@ -66,13 +67,15 @@ async function loadAll() {
   let r
   try {
     // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
-    const [campeonatos, equipes, pub, jogos, eventos, sorteios, historico, suspensoes, perfis, meus] = await Promise.all([
+    const [campeonatos, equipes, pub, jogos, eventos, sorteios, historico, suspensoes, perfis, meus, cancelados, minha] = await Promise.all([
       q(sb.from('campeonatos').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
       all(sec ? 'atletas' : 'atletas_publico'), all('jogos'), all('eventos'), all('sorteios_publico'),
       q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)),
       sec || arb || eq ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : [],
       // equipe: o próprio elenco completo (com pendências); árbitro: fotos dos atletas dos seus jogos (o banco filtra)
-      eq ? q(sb.from('atletas').select('*').eq('equipe_id', S.session.teamId)) : arb ? q(sb.from('atletas').select('id, foto_path')) : []])
+      eq ? q(sb.from('atletas').select('*').eq('equipe_id', S.session.teamId)) : arb ? q(sb.from('atletas').select('id, foto_path')) : [],
+      all('sorteios_cancelados'), eq ? q(sb.from('equipes').select('id, link_token').eq('id', S.session.teamId)) : []])
+    for (const x of minha) Object.assign(equipes.find(t => t.id === x.id) || {}, x)   // representante vê o link da própria equipe
     const foto = Object.fromEntries(meus.map(a => [a.id, a.foto_path]))
     const atletas = eq ? [...pub.filter(a => a.equipe_id !== S.session.teamId), ...meus] : pub.map(a => ({...a, foto_path: a.foto_path ?? foto[a.id]}))
     const paths = atletas.map(a => a.foto_path).filter(Boolean)
@@ -80,7 +83,7 @@ async function loadAll() {
       const {data} = await sb.storage.from('fotos').createSignedUrls(paths, 3600), url = Object.fromEntries((data || []).map(x => [x.path, x.signedUrl]))
       atletas.forEach(a => { a.foto_url = url[a.foto_path] })
     }
-    r = {campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis}
+    r = {campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis, cancelados}
     if (arb) local.set('tnt-oficial-dados', JSON.stringify(r))   // árbitro abre a súmula mesmo sem sinal na quadra (só dados públicos)
     S.arbitros = perfis.filter(p => p.papel === 'arbitro'); S.secretarias = perfis.filter(p => p.papel === 'secretaria')
   } catch (e) {
@@ -213,6 +216,14 @@ async function syncReal(quiet) {   // devolve true se tudo foi enviado
 }
 const pending = () => S.champs.some(c => c.matches.some(m => m.pendingConfirm || m.events.some(e => !e.sent)))
 
+async function listarTudo(bucket, pasta) {
+  const {data} = await sb.storage.from(bucket).list(pasta, {limit: 1000}), out = []
+  for (const x of data || []) { const p = pasta + '/' + x.name; if (x.id) out.push(p); else out.push(...await listarTudo(bucket, p)) }
+  return out
+}
+async function apagarArquivos(lista) {   // [[bucket, pasta], ...]
+  for (const [b, pasta] of lista) { const ps = await listarTudo(b, pasta); if (ps.length) await sb.storage.from(b).remove(ps) }
+}
 // mudança no banco: mostra o erro em português e sempre recarrega, para a tela ficar igual ao banco
 const write = fn => async d => { try { await fn(d) } catch (e) { toast(e.code || navigator.onLine ? e.message : 'Sem internet. Tente de novo quando o sinal voltar.') }
   try { await loadAll() } catch (e) { toast('Sem conexão com o banco: ' + e.message) } }
@@ -253,7 +264,7 @@ const REAL_A = {
     const ms = buildFixtures(c, d.groups, c.start), id = Object.fromEntries(ms.map(m => [m.id, uid()]))   // o banco usa uuid
     const vaga = s => s && s.replace(/^([VP]):(.+)$/, (_, k, x) => `${k}:${id[x]}`)
     await rpc('aplicar_sorteio', {c: c.id, g: d.groups, jogos_novos: ms.map(m => ({id: id[m.id], fase: m.phase, rodada: m.round, grupo: m.group, titulo: m.title,
-      mandante_id: m.home, visitante_id: m.away, vaga_mandante: vaga(m.slotH), vaga_visitante: vaga(m.slotA), data: m.date, hora: m.time}))})
+      mandante_id: m.home, visitante_id: m.away, vaga_mandante: vaga(m.slotH), vaga_visitante: vaga(m.slotA), data: m.date, hora: m.time, local: m.local}))})
     local.set(seedKey(c.id), null); ui.draw = null; ui.tab = 'jogos'; scrollTo(0, 0); toast('Tabela gerada!')
   }),
   backup: async () => {   // tudo o que está no banco, num arquivo (fotos e documentos ficam fora)
@@ -266,6 +277,20 @@ const REAL_A = {
     } catch (e) { toast('Não foi possível gerar a cópia: ' + e.message) }
     return 'stay'
   },
+  doc: async d => {   // súmula: assinaturas por link temporário (só Secretaria e árbitro)
+    ui.doc = {c: d.c, id: d.id}; ui.docSigs = null
+    const m = findMatch(S.champs.find(x => x.id === d.c), d.id), ps = Object.values(m?.signatures || {}).filter(p => p && !p.startsWith('data:'))
+    if (!ps.length || !['secretaria', 'arbitro'].includes(role())) return
+    const {data} = await sb.storage.from('assinaturas').createSignedUrls(ps, 600)
+    ui.docSigs = Object.fromEntries(Object.entries(m.signatures).map(([k, p]) => [k, data?.find(x => x.path === p)?.signedUrl]))
+  },
+  delteam: write(async d => {
+    if (ui.confirmDel !== 'team:' + d.id) { ui.confirmDel = 'team:' + d.id; ui.editTeam = null; return }
+    const c = C(), t = T(c, d.id)
+    await q(sb.from('equipes').delete().eq('id', d.id))
+    await apagarArquivos([['fotos', d.id], ['documentos', d.id]])
+    ui.confirmDel = ui.team = null; toast(`Equipe ${t.name} excluída.`)
+  }),
   // súmula: o evento fica no aparelho na hora e é enviado logo em seguida (ou quando o sinal voltar)
   ev: async d => { DEMO.ev(d); if (d.type === 'falta') { saveDrafts(); await syncReal() } },
   pick: async d => { DEMO.pick(d); saveDrafts(); await syncReal() },
@@ -323,6 +348,30 @@ const REAL_F = {
   reopen: write(async d => {
     const why = d.why.trim(); if (why.length < 5) return toast('Informe o motivo da correção.')
     await rpc('reabrir_sumula', {j: cur().id, motivo: why}); local.set(draftKey(cur().id), null)
+  }),
+  editteam: write(async d => {
+    const c = C(), t = T(c, ui.editTeam), name = d.name.trim().replace(/\s+/g, ' ')
+    if (!t || name.length < 3) return toast('Informe o nome da equipe.')
+    await q(sb.from('equipes').update({nome: name, bairro: BAIRROS.includes(d.bairro) ? d.bairro : t.bairro, ...(c.status === 'inscricoes' ? {pote: d.seedpot ? 1 : 2} : {})}).eq('id', t.id))
+    ui.editTeam = null; toast('Equipe atualizada.')
+  }),
+  editplayer: write(async d => {
+    const c = C(), p = P(c, ui.editPlayer), v = lerAtleta(c, p, d); if (!v) return
+    await q(sb.from('atletas').update({nome: v.name, numero: v.num, nascimento: v.birth, apelido: v.nick, posicao: v.pos, telefone: v.phone, bairro: v.bairro,
+      responsavel: v.resp, responsavel_telefone: v.respPhone}).eq('id', p.id))
+    ui.editPlayer = null; toast('Atleta atualizado.')
+  }),
+  cancelsorteio: write(async d => {
+    const c = C(); await rpc('cancelar_sorteio', {c: c.id, motivo: d.why.trim()})
+    local.set(seedKey(c.id), null); ui.draw = null; toast('Sorteio cancelado. O registro fica público, com o motivo.')
+  }),
+  delchamp: write(async d => {
+    const c = C()
+    if (d.confirma.trim().toLowerCase() !== c.name.trim().toLowerCase()) return toast('O nome digitado não confere com o nome do campeonato.')
+    const pastas = [['marcas', c.id], ...c.teams.flatMap(t => [['fotos', t.id], ['documentos', t.id]])]
+    await q(sb.from('campeonatos').delete().eq('id', c.id))
+    await apagarArquivos(pastas)
+    ui.confirmDel = ui.editChamp = null; S.champId = null; resetTransient(); ui.tab = 'campeonatos'; toast(`Campeonato ${c.name} excluído.`)
   }),
   athlete: write(async d => {
     const c = C(), sec = role() === 'secretaria', team = sec ? ui.team : S.session.teamId, name = d.name.trim().replace(/\s+/g, ' '), num = +d.num
@@ -388,8 +437,8 @@ const REAL_F = {
     if (why.length < 5) return toast('Informe o motivo.')
     if (d.acao === 'wo') await rpc('registrar_wo', {j: m.id, ausente: d.ausente, motivo: why})
     else {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || !/^\d{2}:\d{2}$/.test(d.time)) return toast('Informe nova data e horário.')
-      await rpc('adiar_jogo', {j: m.id, nova_data: d.date, nova_hora: d.time.replace(':', 'h'), motivo: why})
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || !/^\d{2}:\d{2}$/.test(d.time)) return toast('Informe data e horário.')
+      await rpc('alterar_jogo', {j: m.id, nova_data: d.date, nova_hora: d.time.replace(':', 'h'), novo_local: d.local || '', motivo: why})
     }
     ui.manage = null; toast('Registrado no histórico.')
   }),

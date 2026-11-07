@@ -262,6 +262,28 @@ ok(await ordem() === 'DE Z,DE W,DE Y,DE X', 'padrão (vitórias, saldo, gols): Y
 await como(SEC); await q(`update campeonatos set regras = '{"desempate": ["confronto", "saldo"]}' where id = $1`, [DE.id])
 ok(await ordem() === 'DE Z,DE W,DE X,DE Y', 'com confronto direto primeiro: X passa Y (venceu o jogo entre eles)')
 
+console.log('Jogos e sorteio')
+// cancelar sorteio: só antes da tabela, fica público com o motivo
+await como(SEC)
+const [{ id: CS }] = await q(`insert into campeonatos (nome, modalidade, idade_min, inicio) values ('Copa Cancela', 'Futsal', 15, '2027-08-01') returning id`)
+await q(`select publicar_compromisso($1, $2)`, [CS, sha('1111222233334444')])
+await erro(`select cancelar_sorteio($1, 'ok')`, [CS], 'motivo', 'cancelar sorteio exige motivo')
+await como(ARB); await erro(`select cancelar_sorteio($1, 'equipe faltando')`, [CS], 'Secretaria', 'só a Secretaria cancela sorteio')
+await como(SEC); await q(`select cancelar_sorteio($1, 'faltou cadastrar uma equipe')`, [CS])
+await como(null)
+ok((await q(`select motivo from sorteios_cancelados where campeonato_id = $1`, [CS]))[0]?.motivo === 'faltou cadastrar uma equipe', 'sorteio cancelado fica público com o motivo')
+await como(SEC)
+await q(`select publicar_compromisso($1, $2)`, [CS, sha('5555666677778888')])
+ok((await q(`select count(*)::int n from sorteios_publico where campeonato_id = $1`, [CS]))[0].n === 1, 'depois de cancelar, dá para publicar um novo compromisso')
+await erro(`select cancelar_sorteio($1, 'mudar o resultado')`, [C], 'já foi gerada', 'depois da tabela o sorteio não pode ser cancelado')
+// alterar data, hora e local de um jogo
+const [ja1] = await q(`select id from jogos where campeonato_id = $1 and status <> 'encerrado' limit 1`, [SU.id])
+await q(`select alterar_jogo($1, '2027-09-10', '18h30', 'Ginásio do Bairro Novo', 'quadra em reforma')`, [ja1.id])
+const [ja2] = await q(`select data::text, hora, local, adiado from jogos where id = $1`, [ja1.id])
+ok(ja2.hora === '18h30' && ja2.local === 'Ginásio do Bairro Novo' && ja2.adiado === true, 'Secretaria altera data, hora e local do jogo')
+ok((await q(`select motivo from historico where jogo_id = $1 order by em desc limit 1`, [ja1.id]))[0].motivo === 'quadra em reforma', 'alteração do jogo fica no histórico com motivo')
+await como(ARB); await erro(`select alterar_jogo($1, '2027-09-11', '18h30', '', 'quero mudar')`, [ja1.id], 'Secretaria', 'árbitro não altera jogo')
+
 console.log('Acesso de árbitros')
 const NOVO = randomUUID()
 await db.exec('reset role'); await db.query(`insert into auth.users values ($1, 'Novo.Arbitro@exemplo.com')`, [NOVO])

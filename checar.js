@@ -99,6 +99,28 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   ok(await formato('mm', 6, 'mata', {terceiro: false}) === 5, 'mata-mata com 6 equipes: 2 quartas, 2 semis e a final (sem 3º lugar)')
   ok(run(`(() => { const c = C(), q = c.matches.filter(m => m.phase === 'quartas'), s = c.matches.filter(m => m.phase === 'semi')
     return q.every(m => m.home && m.away && !m.slotH) && s[0].home === c.draw.groups.A[0] && s[1].home === c.draw.groups.A[1] && !!champion(c) })()`), 'mata-mata: cabeças de chave com folga direto na semifinal')
+  // calendário escolhido: quartas-feiras, 2 horários × 2 quadras; cada rodada num dia, ninguém joga 2× no mesmo dia
+  run(`(() => { const c = champBase({id: 'cal', name: 'Teste cal', sport: 'Futsal', category: 'Livre', minAge: 15, maxAge: null, start: '2027-03-01', venue: 'Quadra',
+    ...lerRegras({r_cal: '1', r_dia3: 'on', r_horarios: '19h, 20:30', r_locais: 'Quadra 1\\nQuadra 2'}, 'Futsal'), format: 'pontos'})
+    for (let i = 0; i < 5; i++) c.teams.push({id: 'k' + i, name: 'K' + i, group: 'A', pot: 2, code: 'X', bairro: 'Centro'})
+    c.matches = buildFixtures(c, {A: c.teams.map(t => t.id)}, c.start); S.champs.push(c) })()`)
+  ok(run(`(() => { const ms = S.champs.find(c => c.id === 'cal').matches, porDia = {}
+    for (const m of ms) { const d = porDia[m.date] ??= []; if (d.includes(m.home) || d.includes(m.away)) return false; d.push(m.home, m.away) }
+    return ms.every(m => new Date(m.date + 'T12:00:00Z').getUTCDay() === 3 && ['19h00', '20h30'].includes(m.time) && ['Quadra 1', 'Quadra 2'].includes(m.local))
+      && ms[0].date === '2027-03-03' && Object.keys(porDia).length === 5 })()`), 'calendário: só quartas, horários e quadras escolhidos, uma rodada por dia')
+  ok(run(`JSON.stringify(lerHoras('19h, 20:30, 7h5, 25h00, 19h00'))`) === '["07h05","19h00","20h30"]', 'horários digitados de qualquer jeito viram 19h00, 20h30...')
+  // editar atleta, excluir equipe, aviso de WhatsApp, estatísticas
+  run(`S.champId = 'cal'; S.session = {role: 'secretaria'}`)
+  run(`(() => { const c = C(); c.players.push({id: 'kp', team: 'k0', name: 'Erro Digitado', num: 5, birth: '1990-01-01', auth: true, approved: true, consent: true, bairro: 'Centro'}) })()`)
+  run(`ui.editPlayer = 'kp'; F.editplayer({name: 'Nome Certo', num: '7', birth: '1990-01-01', nick: 'Certinho', pos: 'Ala', phone: '', bairro: 'Centro', resp: '', respPhone: ''})`)
+  ok(run(`(() => { const p = P(C(), 'kp'); return p.name === 'Nome Certo' && p.num === 7 && p.nick === 'Certinho' })()`), 'Secretaria corrige nome e número do atleta')
+  run(`(() => { const c = C(); c.matches = []; c.status = 'inscricoes' })()`)
+  run(`A.delteam({id: 'k4'})`); ok(run(`!!T(C(), 'k4')`), 'excluir equipe pede confirmação')
+  run(`A.delteam({id: 'k4'})`); ok(run(`!T(C(), 'k4')`), 'equipe excluída depois de confirmar')
+  ok(decodeURIComponent(run(`waLink(S.champs[0], S.champs[0].matches.find(isDone))`)).includes('RESULTADO'), 'aviso de resultado pronto para o WhatsApp')
+  run(`S.champId = 'futsal26'; S.session = {role: 'publico'}; ui.tab = 'portal'; render()`)
+  ok(els['#app'].innerHTML.includes('Melhor ataque') && els['#app'].innerHTML.includes('Defesa menos vazada'), 'estatísticas no portal')
+  run(`S.session = {role: 'secretaria'}`)
   run(`ui.doc = null; ui.reg = 'g4'; render()`); ok(els['#doc'].innerHTML.includes('REGULAMENTO') && els['#doc'].innerHTML.includes('4 grupos') && els['#doc'].innerHTML.includes('quartas de final'), 'regulamento gerado com o formato')
   run(`ui.reg = 'pc'; render()`); ok(els['#doc'].innerHTML.includes('turno e returno') && els['#doc'].innerHTML.includes('Vitória vale 2 pontos'), 'regulamento com as regras escolhidas')
   run(`ui.reg = null; render()`)

@@ -276,3 +276,4 @@ form:has(input[name=format][value=pontos]:checked) .so-mata-mata{display:none}
 @media(max-width:620px){.bracket{grid-template-columns:1fr}}
 .paper.reg ol{margin:4px 0 10px;padding-left:22px}.paper.reg li{margin:3px 0}
 form:has(input[name=format][value=mata]:checked) .so-rodadas{display:none}
+.dias{display:flex;flex-wrap:wrap;gap:8px}.dias label.chk{padding:10px 14px}

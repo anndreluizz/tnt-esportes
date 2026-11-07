@@ -20,7 +20,7 @@ const FORMATOS = {
   mata:   {nome: 'Mata-mata', desc: 'Eliminatória desde o primeiro jogo: quem perde está fora.'},
 }
 const regrasPadrao = sport => { const s = SPORTS[sport] || SPORTS.Futsal
-  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true, inscricao_rodada: null, desempate: ['vitorias', 'saldo', 'gols']} }
+  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true, inscricao_rodada: null, desempate: ['vitorias', 'saldo', 'gols'], dias: null, horarios: null, locais: null} }
 // critérios de desempate (depois dos pontos), na ordem escolhida; no fim, ordem alfabética
 const CRITERIOS = {confronto: 'Confronto direto', vitorias: 'Mais vitórias', saldo: 'Melhor saldo de gols', gols: 'Mais gols marcados'}
 const regras = c => ({...regrasPadrao(c.sport), ...c.rules})
@@ -171,36 +171,50 @@ function roundRobin(ids) {   // método do círculo: todos contra todos
 }
 function newMatch(o) {
   return {group: null, round: null, home: null, away: null, slotH: null, slotA: null, title: null, status: 'agendado', events: [], half: 1,
-    pen: null, wo: null, postponed: null, signatures: {}, notes: '', hash: null, pendingConfirm: false, referee: 'João Paulo', history: [], ...o}
+    pen: null, wo: null, postponed: null, local: null, signatures: {}, notes: '', hash: null, pendingConfirm: false, referee: 'João Paulo', history: [], ...o}
 }
 // ordem das posições numa chave (1º enfrenta o último, e os melhores só se cruzam no fim): 8 → 1,8,4,5,2,7,3,6
 function seedOrder(n) { let a = [1]; while (a.length < n) a = a.flatMap(s => [s, a.length * 2 + 1 - s]); return a }
 const KO_QTD = {2: ['semi', 'Semifinal'], 4: ['quartas', 'Quartas de final'], 8: ['oitavas', 'Oitavas de final']}
-// Grupos ímpares (A, C...) jogam aos sábados e pares (B, D...) aos domingos; mata-mata uma semana depois de cada fase.
+// Calendário escolhido pela Secretaria (dias da semana, horários e locais): cada rodada ou fase ocupa os próximos
+// horários livres e a seguinte começa noutro dia (ninguém joga duas vezes no mesmo dia). Sem dias marcados: padrão.
+function calendario(start, r0) {
+  if (!r0.dias?.length) return null
+  const horas = r0.horarios?.length ? r0.horarios : ['19h00', '20h00', '21h00'], locais = r0.locais?.length ? r0.locais : [null]
+  let dia = addDays(start, -1), fila = []
+  const proximoDia = () => {
+    do dia = addDays(dia, 1); while (!r0.dias.includes(new Date(dia + 'T12:00:00Z').getUTCDay()))
+    fila = horas.flatMap(time => locais.map(local => ({date: dia, time, local})))
+  }
+  return n => { const out = []; while (out.length < n) { if (!fila.length) proximoDia(); out.push(fila.shift()) } fila = []; return out }
+}
+// Sem calendário: grupos ímpares (A, C...) jogam aos sábados e pares (B, D...) aos domingos; mata-mata uma semana depois de cada fase.
 function buildFixtures(c, groups, start) {
-  const r0 = regras(c), ms = [], perDay = {}; let n = 0
+  const r0 = regras(c), ms = [], perDay = {}, cal = calendario(start, r0); let n = 0
   const id = () => `${c.id}-m${++n}`
   const hora = date => { const k = perDay[date] = (perDay[date] ?? -1) + 1; return k < TIMES.length ? TIMES[k] : String(21 - k).padStart(2, '0') + 'h00' }
+  const agenda = jogos => { if (cal && jogos.length) cal(jogos.length).forEach((s, i) => Object.assign(jogos[i], s)); ms.push(...jogos) }
   // mata-mata: lados = {team}, {slot} ou null (folga: passa direto para a fase seguinte)
   const chave = (lados, date) => {
     let semis = null
     while (lados.length > 1) {
-      const qtd = lados.length / 2, prox = [], jogos = []
+      const qtd = lados.length / 2, prox = [], fase = []
       if (qtd === 1) {
         const [a, b] = lados
-        if (semis && r0.terceiro) ms.push(newMatch({id: id(), phase: 'terceiro', title: 'Disputa de 3º lugar', slotH: 'P:' + semis[0], slotA: 'P:' + semis[1], date, time: '18h30'}))
-        ms.push(newMatch({id: id(), phase: 'final', title: 'Final', home: a.team ?? null, away: b.team ?? null, slotH: a.slot ?? null, slotA: b.slot ?? null, date, time: '20h00'}))
-        return
+        if (semis && r0.terceiro) fase.push(newMatch({id: id(), phase: 'terceiro', title: 'Disputa de 3º lugar', slotH: 'P:' + semis[0], slotA: 'P:' + semis[1], date, time: '18h30'}))
+        fase.push(newMatch({id: id(), phase: 'final', title: 'Final', home: a.team ?? null, away: b.team ?? null, slotH: a.slot ?? null, slotA: b.slot ?? null, date, time: '20h00'}))
+        return agenda(fase)
       }
-      const [fase, tit] = KO_QTD[qtd]
+      const [tipo, tit] = KO_QTD[qtd]
       for (let i = 0; i < qtd; i++) {
         const a = lados[2 * i], b = lados[2 * i + 1]
         if (!a || !b) { prox.push(a || b); continue }
-        const mid = id(); jogos.push(mid)
-        ms.push(newMatch({id: mid, phase: fase, title: `${tit} ${jogos.length}`, home: a.team ?? null, away: b.team ?? null, slotH: a.slot ?? null, slotA: b.slot ?? null, date, time: hora(date)}))
+        const mid = id()
+        fase.push(newMatch({id: mid, phase: tipo, title: `${tit} ${fase.length + 1}`, home: a.team ?? null, away: b.team ?? null, slotH: a.slot ?? null, slotA: b.slot ?? null, date, time: cal ? null : hora(date)}))
         prox.push({slot: 'V:' + mid})
       }
-      semis = fase === 'semi' && jogos.length === 2 ? jogos : null
+      agenda(fase)
+      semis = tipo === 'semi' && fase.length === 2 ? fase.map(m => m.id) : null
       lados = prox; date = addDays(date, 7)
     }
   }
@@ -212,10 +226,14 @@ function buildFixtures(c, groups, start) {
   const gs = Object.keys(groups).sort(), rr = gs.map(g => {
     const rs = roundRobin(groups[g]); return r0.returno ? [...rs, ...rs.map(p => p.map(([a, b]) => [b, a]))] : rs })
   const R = Math.max(...rr.map(x => x.length))
-  for (let k = 0; k < R; k++) gs.forEach((g, gi) => (rr[gi][k] || []).forEach(([h, a]) => {
-    const date = addDays(start, k * 7 + gi % 2)
-    ms.push(newMatch({id: id(), phase: 'grupos', round: k + 1, group: g, home: h, away: a, date, time: hora(date)}))
-  }))
+  for (let k = 0; k < R; k++) {
+    const rodada = []
+    gs.forEach((g, gi) => (rr[gi][k] || []).forEach(([h, a]) => {
+      const date = addDays(start, k * 7 + gi % 2)
+      rodada.push(newMatch({id: id(), phase: 'grupos', round: k + 1, group: g, home: h, away: a, date, time: cal ? null : hora(date)}))
+    }))
+    agenda(rodada)
+  }
   if (formato(c) === 'pontos') return ms
   // 2 grupos: semifinal 1ºA×2ºB e 1ºB×2ºA; 4 grupos: quartas 1ºA×2ºB, 1ºC×2ºD, 1ºB×2ºA, 1ºD×2ºC
   const cruz = gs.length === 4 ? ['1A', '2B', '1C', '2D', '1B', '2A', '1D', '2C'] : ['1A', '2B', '1B', '2A']
@@ -287,5 +305,14 @@ function lerRegras(d, sport, atual) {
       grupos: trava ? base.grupos : d.r_grupos === '4' ? 4 : 2, returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro,
       inscricao_rodada: d.r_inscricao_rodada === '' ? null : n('inscricao_rodada', 1, 60),
       desempate: [1, 2, 3, 4].map(i => d['r_d' + i]).some(x => x !== undefined)
-        ? [...new Set([1, 2, 3, 4].map(i => d['r_d' + i]).filter(k => CRITERIOS[k]))] : base.desempate}}
+        ? [...new Set([1, 2, 3, 4].map(i => d['r_d' + i]).filter(k => CRITERIOS[k]))] : base.desempate,
+      // calendário da tabela (r_cal marca que a seção veio no formulário)
+      dias: d.r_cal ? [0, 1, 2, 3, 4, 5, 6].filter(i => d['r_dia' + i]) : base.dias,
+      horarios: d.r_cal ? lerHoras(d.r_horarios) : base.horarios,
+      locais: d.r_cal ? String(d.r_locais || '').split('\n').map(x => x.trim().slice(0, 60)).filter(Boolean).slice(0, 10) : base.locais}}
+}
+// "19h, 20:30, 21h00" -> ['19h00', '20h30', '21h00']
+function lerHoras(txt) {
+  const hs = String(txt || '').match(/\d{1,2}\s*[:hH]\s*\d{0,2}/g) || []
+  return [...new Set(hs.map(x => { const [h, m] = x.split(/\s*[:hH]\s*/); return +h < 24 && (+m || 0) < 60 ? String(+h).padStart(2, '0') + 'h' + String(+m || 0).padStart(2, '0') : null }).filter(Boolean))].sort()
 }
