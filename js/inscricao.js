@@ -46,12 +46,11 @@ function render() {
       <label>Nº da camisa<input name="numero" type="number" min="1" max="99" required inputmode="numeric"></label>
       <label>Data de nascimento${campoData('nascimento', '', 'required')}</label>
       <label>Posição<select name="posicao"><option value="">—</option>${(POSICOES[i.modalidade] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
-      <label>Telefone / WhatsApp<input name="telefone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
       <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>`)}
-    ${step(2, 'Responsável <small class="sub">(obrigatório para menor de 18 anos)</small>', `
+    <div id="resp" hidden>${step(2, 'Responsável <small class="sub">(atleta menor de 18 anos)</small>', `
       <label>Nome do responsável<input name="responsavel" maxlength="60"></label>
       <label>Telefone do responsável<input name="responsavel_telefone" type="tel" maxlength="20"></label>
-      <p class="note span2">Menor de 18 anos também precisa levar a autorização assinada pelo responsável à Secretaria.</p>`)}
+      <p class="note span2">Menor de 18 anos também precisa levar a autorização assinada pelo responsável à Secretaria.</p>`)}</div>
     ${step(3, 'Foto e documento', `
       ${upload('foto', 'Foto do rosto do atleta', {capture: 'user', required: true, dica: 'De frente, sem boné nem óculos escuros'})}
       ${upload('rgf', 'Documento (RG) – frente', {capture: 'environment', required: true})}
@@ -60,6 +59,10 @@ function render() {
     <label class="chk" style="margin-top:12px"><input type="checkbox" name="consentimento"> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Se o atleta for menor de 18 anos, declaro ser o responsável legal e autorizo em nome dele. Nascimento, foto e documento não aparecem no portal público. <a href="privacidade.html" target="_blank" rel="noopener">Como usamos os dados</a></label>
     <button class="btn block" style="margin-top:14px" id="enviar">Enviar inscrição</button></form>` + lista
   $('#form').onsubmit = enviar
+  $('#form').oninput = e => {   // dados do responsável só aparecem para menor de 18
+    if (e.target.name !== 'nascimento') return
+    const iso = dataISO(e.target.value); $('#resp').hidden = !(iso && ageAt(iso, info.inicio) < 18)
+  }
 }
 
 async function enviar(e) {
@@ -90,7 +93,7 @@ async function enviar(e) {
                  rg_verso_path: await envia('documentos', '-rg-verso.jpg', d.rgv, 1400)} }
     catch (err) { throw err.message === 'foto' ? new Error('Não foi possível ler a imagem. Tire a foto de novo ou use JPG/PNG.') : err }
     const {error} = await sb.rpc('inscrever_pelo_link', {t: token, a: {id, nome, apelido: d.apelido, numero, nascimento: d.nascimento, posicao: d.posicao,
-      telefone: d.telefone, bairro: d.bairro, responsavel: d.responsavel, responsavel_telefone: d.responsavel_telefone, consentimento: true, ...arq}})
+      bairro: d.bairro, responsavel: d.responsavel, responsavel_telefone: d.responsavel_telefone, consentimento: true, ...arq}})
     if (error && !/atletas_pkey/.test(error.message))   // pkey = já tinha chegado (toque duplo ou reenvio)
       throw new Error(/numero/.test(error.message) ? `O número ${numero} já está com outro atleta da equipe.` : error.message)
     feito = nome; await carregar(); scrollTo(0, 0)

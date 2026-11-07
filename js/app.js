@@ -137,8 +137,8 @@ function manageForm(c, m) {
 
 const KO_PLURAL = {oitavas: 'Oitavas de final', quartas: 'Quartas de final', semi: 'Semifinais'}
 function table(c, g) {
-  const pts = formato(c) === 'pontos', q = pts ? 1 : 2
-  const note = pts ? 'Campeão: quem somar mais pontos' : `Classificam-se para ${regras(c).grupos === 4 ? 'as quartas de final' : 'a semifinal'}${groupDone(c, g) ? ' · grupo encerrado' : ''}`
+  const pts = formato(c) === 'pontos', r = regras(c), q = pts ? 1 : r.classificam
+  const note = pts ? 'Campeão: quem somar mais pontos' : `${q === 1 ? 'O 1º passa' : `Os ${q} primeiros passam`} para o mata-mata${groupDone(c, g) ? ' · grupo encerrado' : ''}`
   return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
   ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l">${crest(r.t)} <b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
   </tbody></table></div><p class="note"><span class="qmark"></span>${note}</p></div>`
@@ -154,7 +154,7 @@ function bracket(c) {
     return `<div class="bbox ${cls}">${line('home', h)}${line('away', a)}<div class="bmeta"><span>${m.title}</span><span>${d ? (m.pen ? `pênaltis ${m.pen[0]}×${m.pen[1]}` : m.wo ? 'W.O.' : 'encerrado') : `${dm(m.date)} · ${m.time}`}</span></div></div>`
   }
   const cols = ['oitavas', 'quartas', 'semi'].map(f => c.matches.filter(m => m.phase === f)).filter(x => x.length)
-  const sub = formato(c) === 'mata' ? 'eliminatória' : regras(c).grupos === 4 ? '1º de um grupo × 2º de outro' : '1º A × 2º B e 1º B × 2º A'
+  const sub = formato(c) === 'mata' ? 'eliminatória' : 'melhores colocados contra os piores de outros grupos'
   return `<div class="card"><h3>Mata-mata <small>${sub} · empate decidido nos pênaltis</small></h3><div class="bracket" style="--cols:${cols.length + 1}">
     ${cols.map(ms => `<div><div class="bt">${KO_PLURAL[ms[0].phase]}</div>${ms.map(m => box(m)).join('')}</div>`).join('')}
     <div><div class="bt">Final</div>${box(fin, 'final')}${third ? `<div class="bt">3º lugar</div>${box(third)}` : ''}</div></div></div>`
@@ -251,8 +251,10 @@ function regrasCampos(c) {
   const num = (k, l, min, max, dica = '') => `<label>${l}<input name="r_${k}" type="number" min="${min}" max="${max}" value="${r[k] ?? ''}" ${dica ? `placeholder="${dica}"` : 'required'}></label>`
   return `<div class="formatos span2">${Object.entries(FORMATOS).map(([k, x]) => `<label class="formato"><input type="radio" name="format" value="${k}" ${k === f ? 'checked' : ''} ${trava}><b>${x.nome}</b><span>${x.desc}</span></label>`).join('')}</div>
     ${trava ? '<p class="note span2">O formato não muda depois do sorteio. As regras de pontos e cartões podem ser ajustadas.</p>' : ''}
-    <label class="so-grupos">Número de grupos<select name="r_grupos" ${trava}><option value="2" ${r.grupos === 2 ? 'selected' : ''}>2 grupos (semifinal) · 4 a 40 equipes</option><option value="4" ${r.grupos === 4 ? 'selected' : ''}>4 grupos (quartas de final) · 8 a 40 equipes</option></select></label>
-    <label class="chk so-pontos"><input type="checkbox" name="r_returno" ${r.returno ? 'checked' : ''} ${trava}> Turno e returno (ida e volta)</label>
+    <label class="so-grupos">Número de grupos (1 a 8)<input name="r_grupos" type="number" min="1" max="8" value="${r.grupos}" required ${trava}></label>
+    <label class="so-grupos">Quantos passam de cada grupo (1 a 4)<input name="r_classificam" type="number" min="1" max="4" value="${r.classificam}" required ${trava}></label>
+    <p class="note span2 so-grupos">Exemplos: 2 grupos e passam 2 = semifinal · 4 grupos e passam 2 = quartas · 1 grupo e passam 4 = pontos corridos com semifinal. Se as vagas não fecharem a chave, os melhores têm folga.</p>
+    <label class="chk so-rodadas"><input type="checkbox" name="r_returno" ${r.returno ? 'checked' : ''} ${trava}> Turno e returno (ida e volta)</label>
     <label class="chk so-mata-mata"><input type="checkbox" name="r_terceiro" ${r.terceiro ? 'checked' : ''} ${trava}> Disputa de 3º lugar</label>
     ${num('tempo', 'Minutos de cada tempo', 5, 60)}${num('vitoria', 'Pontos por vitória', 1, 5)}${num('empate', 'Pontos por empate', 0, 3)}
     ${num('amarelos', 'Amarelos para suspensão', 2, 5)}${num('vermelho', 'Jogos de suspensão (vermelho)', 1, 5)}${num('wo', 'Placar do W.O. (gols)', 1, 10)}
@@ -311,7 +313,7 @@ function vCamps() {
     return `<div class="card"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px">${clogo(c.logo)}<h3 style="font-size:22px">${esc(c.name)}</h3></div>
       <p class="sub">${ageRange(c)} · início ${dmy(c.start)} · ${esc(c.venue)}</p>
-      <p class="sub"><b>${FORMATOS[formato(c)].nome}</b>${formato(c) === 'grupos' ? ` · ${regras(c).grupos} grupos` : ''}</p>
+      <p class="sub"><b>${FORMATOS[formato(c)].nome}</b>${formato(c) === 'grupos' ? ` · ${regras(c).grupos} grupo${regras(c).grupos > 1 ? 's' : ''}, passam ${regras(c).classificam}` : ''}</p>
       ${c.responsible ? `<p class="sub">Responsável: ${esc(c.responsible)}${c.responsiblePhone ? ' · ' + esc(c.responsiblePhone) : ''}</p>` : ''}
       <p class="sub">${c.teams.length} equipes · ${c.players.length} atletas · ${c.matches.length ? `${done}/${c.matches.length} jogos` : 'tabela após o sorteio'}${ch ? ` · campeão: <b>${esc(T(c, ch).name)}</b>` : ''}</p>
       ${c.regUntil ? `<p class="sub">Inscrições até ${dmy(c.regUntil)}</p>` : ''}${sponsorsBar(c)}
@@ -648,10 +650,11 @@ function vReg() {
   const c = S.champs.find(x => x.id === ui.reg); if (!c) return ''
   const r = regras(c), f = formato(c), n = c.teams.length, li = xs => `<ol>${xs.filter(Boolean).map(x => `<li>${x}</li>`).join('')}</ol>`
   const pl = (k, s, p) => `${k} ${k === 1 ? s : p}`
-  const cruz = r.grupos === 4 ? 'quartas de final: 1º A × 2º B, 1º C × 2º D, 1º B × 2º A e 1º D × 2º C; depois semifinais e final' : 'semifinais: 1º do Grupo A × 2º do Grupo B e 1º do Grupo B × 2º do Grupo A; depois a final'
+  const nk = r.grupos * r.classificam, cruz = `${faseInicial(nk)}, com os melhores colocados enfrentando os piores de outros grupos${nk & (nk - 1) ? '; se as vagas não fecharem a chave, os melhores avançam direto (folga)' : ''}`
   const fmt = {
-    grupos: [`As equipes são divididas em ${r.grupos} grupos por <b>sorteio público e auditável</b>. Os cabeças de chave ficam em grupos diferentes.`,
-             'Dentro de cada grupo, todos jogam contra todos, em turno único.', `Os 2 primeiros de cada grupo vão para o mata-mata: ${cruz}.`],
+    grupos: [`As equipes são divididas em ${r.grupos} grupo${r.grupos > 1 ? 's' : ''} por <b>sorteio público e auditável</b>.${r.grupos > 1 ? ' Os cabeças de chave ficam em grupos diferentes.' : ''}`,
+             `Dentro de cada grupo, todos jogam contra todos, em ${r.returno ? 'turno e returno (ida e volta)' : 'turno único'}.`,
+             `${r.classificam === 1 ? 'O 1º' : `Os ${r.classificam} primeiros`} de cada grupo vão para o mata-mata, a partir d${cruz}.`],
     pontos: [`Todos jogam contra todos, em ${r.returno ? 'turno e returno (ida e volta)' : 'turno único'}. A ordem dos jogos sai de <b>sorteio público e auditável</b>.`,
              'É campeã a equipe que somar mais pontos ao fim de todas as rodadas.'],
     mata:   ['O chaveamento sai de <b>sorteio público e auditável</b>. Os cabeças de chave ficam em lados opostos da chave.',

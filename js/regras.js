@@ -15,18 +15,18 @@ const KO_ORDER = ['oitavas', 'quartas', 'semi', 'terceiro', 'final']
 
 /* ---------- formato e regras de cada campeonato (o que não for escolhido usa o padrão da modalidade) ---------- */
 const FORMATOS = {
-  grupos: {nome: 'Grupos + mata-mata', desc: 'Grupos de todos contra todos. Os 2 melhores de cada grupo vão para o mata-mata.'},
+  grupos: {nome: 'Grupos + mata-mata', desc: 'Você escolhe quantos grupos e quantos passam de cada um para o mata-mata.'},
   pontos: {nome: 'Pontos corridos', desc: 'Todos contra todos. Campeão é quem somar mais pontos.'},
   mata:   {nome: 'Mata-mata', desc: 'Eliminatória desde o primeiro jogo: quem perde está fora.'},
 }
 const regrasPadrao = sport => { const s = SPORTS[sport] || SPORTS.Futsal
-  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true, inscricao_rodada: null, desempate: ['vitorias', 'saldo', 'gols'], dias: null, horarios: null, locais: null} }
+  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, classificam: 2, returno: false, terceiro: true, inscricao_rodada: null, desempate: ['vitorias', 'saldo', 'gols'], dias: null, horarios: null, locais: null} }
 // critérios de desempate (depois dos pontos), na ordem escolhida; no fim, ordem alfabética
 const CRITERIOS = {confronto: 'Confronto direto', vitorias: 'Mais vitórias', saldo: 'Melhor saldo de gols', gols: 'Mais gols marcados'}
 const regras = c => ({...regrasPadrao(c.sport), ...c.rules})
 const formato = c => c.format || 'grupos'
 const groupsOf = c => [...new Set(c.teams.map(t => t.group).filter(Boolean))].sort()
-const minTeams = c => formato(c) === 'grupos' ? regras(c).grupos * 2 : 3
+const minTeams = c => formato(c) === 'grupos' ? regras(c).grupos * Math.max(2, regras(c).classificam) : 3
 const maxTeams = c => formato(c) === 'mata' ? 16 : 40
 const allDone = c => c.matches.length > 0 && c.matches.every(isDone)
 // novos atletas pelo link ou pela equipe (a Secretaria sempre pode): prazo e "até o fim da rodada X"
@@ -235,9 +235,12 @@ function buildFixtures(c, groups, start) {
     agenda(rodada)
   }
   if (formato(c) === 'pontos') return ms
-  // 2 grupos: semifinal 1ºA×2ºB e 1ºB×2ºA; 4 grupos: quartas 1ºA×2ºB, 1ºC×2ºD, 1ºB×2ºA, 1ºD×2ºC
-  const cruz = gs.length === 4 ? ['1A', '2B', '1C', '2D', '1B', '2A', '1D', '2C'] : ['1A', '2B', '1B', '2A']
-  chave(cruz.map(slot => ({slot})), addDays(start, R * 7))
+  // classificados em ordem (todos os 1º, depois os 2º...) e chave com os melhores enfrentando os piores; quem sobra tem folga.
+  // 2 grupos: semifinal 1ºA×2ºB e 1ºB×2ºA
+  const seeds = []
+  for (let p = 1; p <= r0.classificam; p++) for (const g of gs) if (groups[g].length >= p) seeds.push(p + g)
+  if (seeds.length < 2) return ms
+  chave(seedOrder(2 ** Math.ceil(Math.log2(seeds.length))).map(s => s <= seeds.length ? {slot: seeds[s - 1]} : null), addDays(start, R * 7))
   return ms
 }
 
@@ -300,16 +303,17 @@ function lerRegras(d, sport, atual) {
   const n = (k, min, max) => { const v = parseInt(d['r_' + k]); return v >= min && v <= max ? v : base[k] }
   const trava = atual && !d.format   // campos de estrutura vêm desabilitados: mantém os atuais
   return {format: trava ? formato(atual) : FORMATOS[d.format] ? d.format : 'grupos',
-    rules: {tempo: n('tempo', 5, 60), vitoria: n('vitoria', 1, 5), empate: n('empate', 0, 3), amarelos: n('amarelos', 2, 5), vermelho: n('vermelho', 1, 5),
+    rules: ajustaGrupos({tempo: n('tempo', 5, 60), vitoria: n('vitoria', 1, 5), empate: n('empate', 0, 3), amarelos: n('amarelos', 2, 5), vermelho: n('vermelho', 1, 5),
       wo: n('wo', 1, 10), faltas: d.r_faltas === '' ? null : n('faltas', 3, 10),
-      grupos: trava ? base.grupos : d.r_grupos === '4' ? 4 : 2, returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro,
+      grupos: trava ? base.grupos : n('grupos', 1, 8), returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro,
+      classificam: trava ? base.classificam : n('classificam', 1, 4),
       inscricao_rodada: d.r_inscricao_rodada === '' ? null : n('inscricao_rodada', 1, 60),
       desempate: [1, 2, 3, 4].map(i => d['r_d' + i]).some(x => x !== undefined)
         ? [...new Set([1, 2, 3, 4].map(i => d['r_d' + i]).filter(k => CRITERIOS[k]))] : base.desempate,
       // calendário da tabela (r_cal marca que a seção veio no formulário)
       dias: d.r_cal ? [0, 1, 2, 3, 4, 5, 6].filter(i => d['r_dia' + i]) : base.dias,
       horarios: d.r_cal ? lerHoras(d.r_horarios) : base.horarios,
-      locais: d.r_cal ? String(d.r_locais || '').split('\n').map(x => x.trim().slice(0, 60)).filter(Boolean).slice(0, 10) : base.locais}}
+      locais: d.r_cal ? String(d.r_locais || '').split('\n').map(x => x.trim().slice(0, 60)).filter(Boolean).slice(0, 10) : base.locais})}
 }
 // "19h, 20:30, 21h00" -> ['19h00', '20h30', '21h00']
 function lerHoras(txt) {
@@ -332,3 +336,10 @@ if (typeof document !== 'undefined') document.addEventListener('input', e => {  
   const n = e.target.value.replace(/\D/g, '').slice(0, 8)
   e.target.value = [n.slice(0, 2), n.slice(2, 4), n.slice(4)].filter(Boolean).join('/')
 })
+// mata-mata que sai dos grupos: no máximo 16 classificados (oitavas) e pelo menos 2
+function ajustaGrupos(rules) {
+  if (rules.grupos * rules.classificam > 16) rules.classificam = Math.max(1, Math.floor(16 / rules.grupos))
+  if (rules.grupos * rules.classificam < 2) rules.classificam = 2
+  return rules
+}
+const faseInicial = n => ({2: 'a final', 4: 'a semifinal', 8: 'as quartas de final', 16: 'as oitavas de final'})[2 ** Math.ceil(Math.log2(Math.max(2, n)))]
