@@ -28,7 +28,8 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   // sorteio do exemplo confere
   const d = run('C().draw')
   ok(createHash('sha256').update(d.seed).digest('hex') === d.hash, 'hash do sorteio de exemplo')
-  ok(run(`sameSet(drawGroups(C().teams, C().draw.seed).A, ['rsf','atc','unb','est'])`), 'semente refaz os grupos')
+  ok(createHash('sha256').update(d.seed + d.entrada).digest('hex').slice(0, 16) === d.final, 'semente final = sha256(semente + entrada pública)')
+  ok(run(`sameSet(drawGroups(C().teams, C().draw.final).A, ['rsf','atc','unb','est'])`), 'semente final refaz os grupos')
   // mata-mata: antes do fim dos grupos as vagas estão vazias
   ok(run(`C().matches.find(m=>m.phase==='semi').home`) === null, 'semifinal ainda sem time')
 
@@ -52,8 +53,10 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   run(`ui.doc={c:C().id,id:C().matches.find(m=>m.phase==='final').id}; render()`); ok(els['#doc'].innerHTML.includes('SÚMULA DE JOGO'), 'documento da súmula')
   // sorteio real no Sub-15 gera a tabela
   run(`S.champId='sub15'; resetTransient()`)
-  await run('A.commit()'); run('A.dodraw()'); await run('A.reveal()'); run('A.applydraw()')
+  await run('A.commit()'); await run(`F.dodraw({entrada: '4 15 8'})`); await run('A.reveal()'); run('A.applydraw()')
   ok(run('C().status') === 'andamento' && run('C().matches.length') === 16, 'sorteio aplicado: 12 jogos de grupo + 4 do mata-mata')
+  const s15 = run('C().draw')
+  ok(s15.final === createHash('sha256').update(s15.seed + '4 15 8').digest('hex').slice(0, 16) && run(`JSON.stringify(drawGroups(C().teams, C().draw.final)) === JSON.stringify(C().draw.groups)`), 'sorteio real usa a entrada pública')
   await allViews()
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()

@@ -4,7 +4,7 @@ const SEC = 'Secretaria (Ana Souza)', REFEREE = 'Árbitro João Paulo'
 const BAIRROS = ['Centro', 'Beira Rio', 'São Francisco', 'Vila Nova', 'Bairro Novo', 'Comunidade ribeirinha']
 
 function seed() {
-  return {v: 2, champs: [seedFutsal(), seedSub15()], champId: 'futsal26', offline: false, session: null}
+  return {v: 3, champs: [seedFutsal(), seedSub15()], champId: 'futsal26', offline: false, session: null}
 }
 
 function champBase(o) { return {teams: [], players: [], matches: [], punishments: [], draw: null, log: [], status: 'inscricoes', ...o} }
@@ -50,10 +50,10 @@ function seedFutsal() {
     const e = {at: `${m.date}T${+m.time.slice(0, 2) + 1}:05:00`, who: REFEREE, what: `Súmula confirmada: ${T(c, m.home).name} ${h} × ${a} ${T(c, m.away).name}`}
     c.log.unshift(e); m.history.push(e)
   }
-  // registro do sorteio feito antes da competição (semente e hash conferíveis no portal)
-  const seedHex = 'df1330695d260b98'
-  c.draw = {seed: seedHex, hash: 'b8ee9613b404e8d457efaf262a91fef6b98ad1c887756005d3c1b12e15344335', groups: drawGroups(c.teams, seedHex), at: '2026-10-10T10:00:00'}
-  c.log.push({at: c.draw.at, who: SEC, what: `Sorteio dos grupos realizado. Semente revelada: ${seedHex}`})
+  // registro do sorteio feito antes da competição; final = sha256(semente + entrada).slice(0,16), conferível no portal
+  const final = '38b89e91108af4c7'
+  c.draw = {seed: '92f50b21f7502dcf', entrada: '07 21 33', final, hash: 'd17c636c6f85ff3ac3c90d620e296900adc007d14e3959a125a7728fcbc176ff', groups: drawGroups(c.teams, final), at: '2026-10-10T10:00:00'}
+  c.log.push({at: c.draw.at, who: SEC, what: `Sorteio dos grupos realizado. Semente revelada: ${c.draw.seed} · entrada pública: ${c.draw.entrada}`})
   return c
 }
 

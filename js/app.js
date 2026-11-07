@@ -3,7 +3,7 @@
 const $ = s => document.querySelector(s)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 const KEY = 'tnt-esportes-prototipo-v2'
-function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 2 ? s : null } catch { return null } }
+function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 3 ? s : null } catch { return null } }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)) } catch { toast('Memória do navegador cheia: as últimas alterações podem não ficar guardadas.') } }
 
 let S = load() || seed()
@@ -360,11 +360,15 @@ function vEquipe() {
 
 /* ---------- sorteio ---------- */
 const sameSet = (a, b) => [...a].sort().join() === [...b].sort().join()
+// semente final = sha256(semente secreta + entrada pública dita na hora): ninguém escolhe antes uma semente favorável
+const finalSeed = async (seed, entrada) => (await sha(seed + entrada)).slice(0, 16)
+const drawInfo = d => `<p class="sub">Compromisso publicado antes (SHA-256):</p><code class="hash">${d.hash}</code><p class="sub">Semente revelada depois:</p><code class="hash">${d.seed}</code><p class="sub">Entrada pública: <b>${esc(d.entrada)}</b> · semente final: <code>${d.final}</code></p>`
 function verifyForm(c) {
   const v = ui.verify && ui.verify.cid === c.id ? ui.verify : null
   const target = (ui.draw && ui.draw.cid === c.id && ui.draw.hash) || c.draw?.hash
-  return `<form class="f" data-form="verify" style="margin-top:8px"><label>Semente<input name="seed" required pattern="[0-9a-fA-F]{16}" title="16 caracteres de 0-9 e a-f" placeholder="16 caracteres" value="${esc(v ? v.seed : '')}" autocomplete="off"></label><button class="btn">Conferir sorteio</button></form>
-  ${v ? `<p class="sub" style="margin-top:10px">Hash calculado:</p><code class="hash">${v.hash}</code>
+  return `<form class="f" data-form="verify" style="margin-top:8px"><label>Semente<input name="seed" required pattern="[0-9a-fA-F]{16}" title="16 caracteres de 0-9 e a-f" placeholder="16 caracteres" value="${esc(v ? v.seed : '')}" autocomplete="off"></label>
+    <label>Entrada pública<input name="entrada" required minlength="3" placeholder="ex.: 07 21 33" value="${esc(v ? v.entrada : '')}" autocomplete="off"></label><button class="btn">Conferir sorteio</button></form>
+  ${v ? `<p class="sub" style="margin-top:10px">Hash calculado:</p><code class="hash">${v.hash}</code><p class="sub">Semente final: <code>${v.final}</code></p>
     ${target ? `<span class="pill ${v.hash === target ? 'green' : 'red'}">${v.hash === target ? 'Igual ao compromisso publicado' : 'Diferente do compromisso publicado'}</span>` : ''}
     ${c.draw ? ` <span class="pill ${sameSet(v.groups.A, c.draw.groups.A) ? 'green' : 'red'}">${sameSet(v.groups.A, c.draw.groups.A) ? 'Grupos iguais aos do campeonato' : 'Grupos diferentes'}</span>` : ''}
     <p class="sub" style="margin-top:8px">Grupo A: ${v.groups.A.map(id => esc(T(c, id).name)).join(', ')}<br>Grupo B: ${v.groups.B.map(id => esc(T(c, id).name)).join(', ')}</p>` : ''}`
@@ -372,13 +376,13 @@ function verifyForm(c) {
 function vSorteio() {
   const c = C(), d = ui.draw && ui.draw.cid === c.id ? ui.draw : {}
   const head = `<div class="head"><div><div class="eyebrow">Transparência · ${esc(c.name)}</div><h2>Sorteio auditável</h2>
-    <p class="sub" style="max-width:660px">O sistema publica a “impressão digital” (hash SHA-256) de uma semente secreta antes do sorteio. Depois revela a semente, e qualquer pessoa confere que o resultado não foi alterado.</p></div>
+    <p class="sub" style="max-width:660px">O sistema publica a “impressão digital” (hash SHA-256) de uma semente secreta antes do sorteio. Na hora, o público dita uma entrada (ex.: números falados por pessoas da plateia), que se mistura à semente. Depois a semente é revelada, e qualquer pessoa confere que ninguém escolheu o resultado.</p></div>
     ${c.status === 'inscricoes' && d.hash ? '<button class="btn ghost" data-act="redraw">Recomeçar</button>' : ''}</div>`
   const grp = (g, ids) => `<div class="card"><h3>Grupo ${g}</h3>${ids ? ids.map(id => `<div class="team-chip">${esc(T(c, id).name)}</div>`).join('') : '<p class="sub">Aguardando sorteio.</p>'}</div>`
   const pots = `<div class="card"><h3>Potes <small>cabeças de chave no pote 1</small></h3><div class="grid g2">${[1, 2].map(k => `<div><div class="eyebrow">Pote ${k}</div>${c.teams.filter(t => (t.pot === 1) === (k === 1)).map(t => `<div class="row">${esc(t.name)}</div>`).join('') || '<p class="sub">—</p>'}</div>`).join('')}</div></div>`
-  const verify = `<div class="card"><h3>Conferir um sorteio</h3><p class="sub">Digite a semente revelada. O sistema recalcula o hash e refaz o sorteio.</p>${verifyForm(c)}</div>`
+  const verify = `<div class="card"><h3>Conferir um sorteio</h3><p class="sub">Digite a semente revelada e a entrada pública. O sistema recalcula o hash e refaz o sorteio.</p>${verifyForm(c)}</div>`
   if (c.status !== 'inscricoes') return head + (c.draw
-    ? `<div class="card"><h3>Sorteio realizado <small>${fdt(c.draw.at)}</small></h3><p class="sub">Compromisso publicado antes (SHA-256):</p><code class="hash">${c.draw.hash}</code><p class="sub">Semente revelada depois:</p><code class="hash">${c.draw.seed}</code></div>
+    ? `<div class="card"><h3>Sorteio realizado <small>${fdt(c.draw.at)}</small></h3>${drawInfo(c.draw)}</div>
        <div class="grid g2 mt">${grp('A', c.draw.groups.A)}${grp('B', c.draw.groups.B)}</div>`
     : '<div class="card empty">Este campeonato não tem registro de sorteio.</div>') + `<div class="grid g2 mt">${pots}${verify}</div>`
   const pend = c.teams.filter(t => teamInsc(c, t)[0] !== 'aprovado'), few = c.teams.length < 4
@@ -386,7 +390,7 @@ function vSorteio() {
     : pend.length ? `<div class="info warn">${pend.length} equipe(s) com pendências de inscrição: ${pend.map(t => esc(t.name)).join(', ')}. O sorteio pode ser feito, mas resolva antes do primeiro jogo.</div>` : ''
   return head + warn + `<div class="grid g3 mt">
     <div class="card"><h3>1 · Publicar o compromisso</h3><p class="sub" style="margin-bottom:8px">Hash divulgado antes do ato, no portal e no grupo das equipes.</p>${d.hash ? `<code class="hash">${d.hash}</code>` : `<button class="btn" data-act="commit" ${few ? 'disabled' : ''}>Gerar e publicar</button>`}</div>
-    <div class="card"><h3>2 · Sortear em público</h3><p class="sub" style="margin-bottom:8px">Cabeças de chave separados; os demais distribuídos.</p>${d.groups ? '<span class="pill green">Realizado</span>' : `<button class="btn" data-act="dodraw" ${d.hash ? '' : 'disabled'}>Sortear</button>`}</div>
+    <div class="card"><h3>2 · Sortear em público</h3><p class="sub" style="margin-bottom:8px">Peça ao público alguns números e digite aqui. Cabeças de chave separados; os demais distribuídos.</p>${d.groups ? `<p class="sub">Entrada pública: <b>${esc(d.entrada)}</b></p><span class="pill green">Realizado</span>` : `<form class="f" data-form="dodraw"><label>Entrada pública<input name="entrada" required minlength="3" placeholder="ex.: 07 21 33" autocomplete="off" ${d.hash ? '' : 'disabled'}></label><button class="btn" ${d.hash ? '' : 'disabled'}>Sortear</button></form>`}</div>
     <div class="card"><h3>3 · Revelar a semente</h3><p class="sub" style="margin-bottom:8px">Qualquer pessoa confere o hash e repete o sorteio.</p>${d.revealed ? `<code class="hash">${d.seed}</code><span class="pill ${d.ok ? 'green' : 'red'}">${d.ok ? 'Confere com o hash publicado' : 'Não confere!'}</span>` : `<button class="btn" data-act="reveal" ${d.groups ? '' : 'disabled'}>Revelar</button>`}</div>
     <div class="card"><h3>4 · Gerar a tabela</h3><p class="sub" style="margin-bottom:8px">Aplica os grupos e cria todos os jogos, com o mata-mata.</p><button class="btn gold" data-act="applydraw" ${d.revealed && d.ok ? '' : 'disabled'}>Aplicar e gerar tabela</button></div>
   </div>
@@ -426,7 +430,7 @@ function transparency(c) {
   return `<div class="card"><h3>Transparência</h3>
     <h4>Conferir uma súmula</h4><p class="sub">Digite o código de autenticidade impresso na súmula.</p>
     <form class="f" data-form="sumcheck" style="margin-top:6px"><label>Código<input name="code" required placeholder="XXXX-XXXX-XXXX" autocomplete="off"></label><button class="btn">Conferir</button></form>${res}
-    ${c.draw ? `<h4 style="margin-top:18px">Sorteio dos grupos</h4><p class="sub">Compromisso (SHA-256) publicado antes do sorteio:</p><code class="hash">${c.draw.hash}</code><p class="sub">Semente revelada depois:</p><code class="hash">${c.draw.seed}</code>${verifyForm(c)}` : ''}</div>`
+    ${c.draw ? `<h4 style="margin-top:18px">Sorteio dos grupos</h4>${drawInfo(c.draw)}${verifyForm(c)}` : ''}</div>`
 }
 function vPortal() {
   const c = C()
@@ -668,7 +672,6 @@ const A = {
   commit: async () => {
     const seed = [...crypto.getRandomValues(new Uint8Array(8))].map(x => x.toString(16).padStart(2, '0')).join('')
     try { ui.draw = {seed, hash: await sha(seed), cid: C().id}; log(C(), SEC, `Compromisso do sorteio publicado: ${ui.draw.hash.slice(0, 16)}…`) } catch (e) { toast(e.message) } },
-  dodraw: () => { ui.draw.groups = drawGroups(C().teams, ui.draw.seed) },
   reveal: async () => { ui.draw.revealed = true; ui.draw.ok = (await sha(ui.draw.seed)) === ui.draw.hash; log(C(), SEC, `Semente do sorteio revelada: ${ui.draw.seed}`) },
   redraw: () => { ui.draw = ui.verify = null },
   applydraw: () => {
@@ -676,7 +679,7 @@ const A = {
     if (!d?.ok || c.status !== 'inscricoes' || c.teams.length < 4) return
     c.teams.forEach(t => { t.group = d.groups.A.includes(t.id) ? 'A' : 'B' })
     c.matches = buildFixtures(c, d.groups, c.start)
-    c.draw = {seed: d.seed, hash: d.hash, groups: d.groups, at: new Date().toISOString()}; c.status = 'andamento'
+    c.draw = {seed: d.seed, entrada: d.entrada, final: d.final, hash: d.hash, groups: d.groups, at: new Date().toISOString()}; c.status = 'andamento'
     log(c, SEC, `Sorteio aplicado: grupos definidos e tabela de ${c.matches.length} jogos gerada`)
     ui.draw = null; ui.tab = 'jogos'; scrollTo(0, 0); toast('Tabela gerada!')
   },
@@ -758,10 +761,17 @@ const F = {
     if (m.phase === 'final') c.status = 'andamento'
     log(c, SEC, `Súmula reaberta para correção: ${label(c, m)}`, why, m)
   },
+  dodraw: async d => {
+    const entrada = d.entrada.trim()
+    if (!ui.draw?.hash || ui.draw.groups) return
+    if (entrada.length < 3) return toast('Digite a entrada pública (pelo menos 3 caracteres).')
+    try { const final = await finalSeed(ui.draw.seed, entrada); Object.assign(ui.draw, {entrada, final, groups: drawGroups(C().teams, final)})
+      log(C(), SEC, `Sorteio feito em público · entrada pública: ${entrada}`) } catch (e) { toast(e.message) }
+  },
   verify: async d => {
-    const c = C(), seed = d.seed.trim().toLowerCase()
+    const c = C(), seed = d.seed.trim().toLowerCase(), entrada = d.entrada.trim()
     if (!/^[0-9a-f]{16}$/.test(seed)) return toast('A semente tem 16 caracteres (0 a 9 e a a f).')
-    try { ui.verify = {seed, hash: await sha(seed), groups: drawGroups(c.teams, seed), cid: c.id} } catch (e) { toast(e.message) }
+    try { const final = await finalSeed(seed, entrada); ui.verify = {seed, entrada, final, hash: await sha(seed), groups: drawGroups(c.teams, final), cid: c.id} } catch (e) { toast(e.message) }
   },
   sumcheck: async d => {
     const k = d.code.toLowerCase().replace(/[^0-9a-f]/g, '')
