@@ -23,7 +23,8 @@ function render() {
   const i = info, faixa = i.idade_max ? `${i.idade_min} a ${i.idade_max} anos` : `a partir de ${i.idade_min} anos`
   const pats = (i.patrocinadores || []).length ? `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${i.patrocinadores.map(p => p.logo_path
     ? `<img src="${esc(marca(p.logo_path))}" alt="${esc(p.nome)}" title="${esc(p.nome)}">` : `<b>${esc(p.nome)}</b>`).join('')}</div>` : ''
-  const head = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${i.logo ? `<img class="clogo" src="${esc(marca(i.logo))}" alt="" style="width:64px;height:64px">` : ''}
+  const img = i.escudo || i.logo   // escudo da equipe; sem escudo, a logo do campeonato
+  const head = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${img ? `<img class="clogo" src="${esc(marca(img))}" alt="" style="width:64px;height:64px">` : ''}
     <div><div class="eyebrow">Inscrição de atletas · ${esc(i.campeonato)}</div><h2>${esc(i.equipe)}</h2>
     <div style="color:#cfe3d6;font-size:14px;margin-top:4px">${esc(i.modalidade)} · ${esc(i.categoria)} · ${faixa}${i.inscricao_ate ? ` · inscrições até ${dmy(i.inscricao_ate)}` : ''}</div></div></div></div>${pats}`
   const lista = `<div class="card"><h3>Atletas já inscritos <small>${i.inscritos.length} de ${i.max_atletas}</small></h3>

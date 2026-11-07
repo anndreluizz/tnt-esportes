@@ -24,7 +24,8 @@ async function toState(r) {
   const teamCamp = Object.fromEntries(r.equipes.map(t => [t.id, t.campeonato_id])), jogoCamp = Object.fromEntries(r.jogos.map(j => [j.id, j.campeonato_id]))
   const nomes = Object.fromEntries((r.perfis || []).map(p => [p.id, p.nome]))
   if (S.session?.uid) nomes[S.session.uid] = S.session.name
-  for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro, token: t.link_token})
+  for (const t of r.equipes) byId[t.campeonato_id]?.teams.push({id: t.id, name: t.nome, group: t.grupo, pot: t.pote, code: t.codigo, bairro: t.bairro ?? '', token: t.link_token,
+    crest: marca(t.escudo_path), colors: t.cores, coach: t.responsavel, coachPhone: t.responsavel_telefone})
   for (const p of r.atletas) byId[teamCamp[p.equipe_id]]?.players.push({id: p.id, team: p.equipe_id, name: p.nome, num: p.numero, birth: p.nascimento,
     bairro: p.bairro ?? '', auth: p.autorizacao ?? true, approved: p.aprovado ?? true, consent: true, photo: p.foto_url ?? null, photoPath: p.foto_path,
     nick: p.apelido, pos: p.posicao, phone: p.telefone, resp: p.responsavel, respPhone: p.responsavel_telefone, origin: p.origem,
@@ -224,6 +225,13 @@ async function listarTudo(bucket, pasta) {
 async function apagarArquivos(lista) {   // [[bucket, pasta], ...]
   for (const [b, pasta] of lista) { const ps = await listarTudo(b, pasta); if (ps.length) await sb.storage.from(b).remove(ps) }
 }
+const equipeCampos = v => ({nome: v.name, bairro: v.bairro, cores: v.colors, responsavel: v.coach, responsavel_telefone: v.coachPhone, ...(v.pot ? {pote: v.pot} : {})})
+async function enviaEscudo(c, tid, blob) {   // escudo vai para o arquivo público das marcas
+  if (!blob) return
+  const path = `${c.id}/equipe-${tid}-${Date.now()}.png`, {error} = await sb.storage.from('marcas').upload(path, blob, {contentType: 'image/png'})
+  if (error) return toast('Escudo não enviado: ' + error.message)
+  await q(sb.from('equipes').update({escudo_path: path}).eq('id', tid))
+}
 // mudança no banco: mostra o erro em português e sempre recarrega, para a tela ficar igual ao banco
 const write = fn => async d => { try { await fn(d) } catch (e) { toast(e.code || navigator.onLine ? e.message : 'Sem internet. Tente de novo quando o sinal voltar.') }
   try { await loadAll() } catch (e) { toast('Sem conexão com o banco: ' + e.message) } }
@@ -350,9 +358,9 @@ const REAL_F = {
     await rpc('reabrir_sumula', {j: cur().id, motivo: why}); local.set(draftKey(cur().id), null)
   }),
   editteam: write(async d => {
-    const c = C(), t = T(c, ui.editTeam), name = d.name.trim().replace(/\s+/g, ' ')
-    if (!t || name.length < 3) return toast('Informe o nome da equipe.')
-    await q(sb.from('equipes').update({nome: name, bairro: BAIRROS.includes(d.bairro) ? d.bairro : t.bairro, ...(c.status === 'inscricoes' ? {pote: d.seedpot ? 1 : 2} : {})}).eq('id', t.id))
+    const c = C(), t = T(c, ui.editTeam); if (!t) return
+    const v = await lerEquipe(c, t, d); if (!v) return
+    await q(sb.from('equipes').update(equipeCampos(v)).eq('id', t.id)); await enviaEscudo(c, t.id, v.escudo)
     ui.editTeam = null; toast('Equipe atualizada.')
   }),
   editplayer: write(async d => {
@@ -399,10 +407,9 @@ const REAL_F = {
     const [s, why] = insc(c, p); toast(`${name}: ${sec ? SPILL[s][1].toLowerCase() : 'enviado para aprovação'}${why ? '. ' + why : ''}.`)
   }),
   newteam: write(async d => {
-    const c = C(), name = d.name.trim().replace(/\s+/g, ' ')
-    if (name.length < 3) return toast('Informe o nome da equipe.')
-    const [t] = await q(sb.from('equipes').insert({campeonato_id: c.id, nome: name, bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0], pote: d.seedpot ? 1 : 2}).select('id'))
-    ui.team = t.id; toast('Equipe cadastrada.')
+    const c = C(), v = await lerEquipe(c, null, d); if (!v) return
+    const [t] = await q(sb.from('equipes').insert({campeonato_id: c.id, ...equipeCampos(v)}).select('id'))
+    await enviaEscudo(c, t.id, v.escudo); ui.team = t.id; toast('Equipe cadastrada.')
   }),
   newchamp: write(async d => {
     const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max, maxPlayers = +d.maxPlayers || 20

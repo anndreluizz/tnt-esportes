@@ -284,6 +284,15 @@ ok(ja2.hora === '18h30' && ja2.local === 'Ginásio do Bairro Novo' && ja2.adiado
 ok((await q(`select motivo from historico where jogo_id = $1 order by em desc limit 1`, [ja1.id]))[0].motivo === 'quadra em reforma', 'alteração do jogo fica no histórico com motivo')
 await como(ARB); await erro(`select alterar_jogo($1, '2027-09-11', '18h30', '', 'quero mudar')`, [ja1.id], 'Secretaria', 'árbitro não altera jogo')
 
+console.log('Dados da equipe')
+await como(SEC)
+const [eqd] = await q(`insert into equipes (campeonato_id, nome, escudo_path, responsavel, responsavel_telefone, cores) values ($1, 'Sem Bairro FC', 'x/escudo.png', 'Técnico João', '97 98888-1111', 'verde e branco') returning id, bairro`, [CS])
+ok(eqd.bairro === null, 'equipe sem bairro é aceita')
+await como(null)
+const [pubE] = await q(`select * from equipes_publico where id = $1`, [eqd.id])
+ok(pubE.escudo_path === 'x/escudo.png' && pubE.cores === 'verde e branco', 'portal mostra escudo e cores da equipe')
+ok(!('responsavel' in pubE) && !('responsavel_telefone' in pubE), 'portal não mostra responsável nem telefone da equipe')
+
 console.log('Acesso de árbitros')
 const NOVO = randomUUID()
 await db.exec('reset role'); await db.query(`insert into auth.users values ($1, 'Novo.Arbitro@exemplo.com')`, [NOVO])

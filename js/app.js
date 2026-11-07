@@ -54,7 +54,32 @@ const spill = s => `<span class="pill ${SPILL[s][0]}">${SPILL[s][1]}</span>`
 const cpill = c => `<span class="pill ${CSTATUS[c.status][0]}">${CSTATUS[c.status][1]}</span>`
 const mtitle = m => m.title || `Grupo ${m.group} · Rodada ${m.round}`
 const tname = (c, m, k) => m[k] ? T(c, m[k]).name : slotLabel(c, k === 'home' ? m.slotH : m.slotA)
-const side = (c, m, k) => m[k] ? esc(T(c, m[k]).name) : `<span class="tbd">${esc(tname(c, m, k))}</span>`
+function crest(t, size = 22) {   // escudo da equipe; sem escudo, as iniciais numa bolinha colorida
+  if (!t) return ''
+  if (t.crest) return `<img class="crest" src="${esc(t.crest)}" alt="" style="width:${size}px;height:${size}px">`
+  const hue = [...t.name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 360
+  const ini = t.name.split(/\s+/).filter(w => /^[A-Za-zÀ-ú0-9]/.test(w) && w.length > 2).map(w => w[0]).slice(0, 2).join('').toUpperCase() || t.name[0]
+  return `<span class="crest" style="width:${size}px;height:${size}px;background:hsl(${hue} 40% 34%);font-size:${Math.round(size * .42)}px">${esc(ini)}</span>`
+}
+const side = (c, m, k) => m[k] ? `${crest(T(c, m[k]), 20)} ${esc(T(c, m[k]).name)}` : `<span class="tbd">${esc(tname(c, m, k))}</span>`
+// campos da equipe (cadastrar e editar)
+const teamFields = (c, t) => `<label class="span2">Nome da equipe<input name="name" required minlength="3" maxlength="40" value="${esc(t?.name || '')}"></label>
+  ${upload('crest', 'Escudo da equipe', {atual: t?.crest, dica: 'Opcional · PNG ou JPG'})}
+  <label>Cores do uniforme<input name="colors" maxlength="40" value="${esc(t?.colors || '')}" placeholder="Ex.: verde e branco"></label>
+  <label>Responsável / técnico<input name="coach" maxlength="60" value="${esc(t?.coach || '')}" placeholder="Nome"></label>
+  <label>WhatsApp do responsável<input name="coachPhone" type="tel" maxlength="20" value="${esc(t?.coachPhone || '')}" placeholder="(97) 9 9999-9999"></label>
+  <label>Bairro ou comunidade<input name="bairro" maxlength="40" list="bairros" value="${esc(t?.bairro || '')}" placeholder="Opcional"></label>
+  <datalist id="bairros">${BAIRROS.map(b => `<option value="${b}">`).join('')}</datalist>
+  <label class="chk"><input type="checkbox" name="seedpot" ${t?.pot === 1 ? 'checked' : ''} ${c.status === 'inscricoes' ? '' : 'disabled'}> Cabeça de chave</label>`
+// lê o formulário da equipe; o escudo vira imagem pequena (o protótipo guarda no aparelho)
+async function lerEquipe(c, t, d) {
+  const name = d.name.trim().replace(/\s+/g, ' '), s = v => v?.trim() || null
+  if (name.length < 3) return toast('Informe o nome da equipe.')
+  if (c.teams.some(x => x !== t && x.name.toLowerCase() === name.toLowerCase())) return toast('Já existe uma equipe com esse nome.')
+  let escudo = null; try { escudo = await fitImage(d.crest, 200, 'image/png') } catch { return toast('Não foi possível ler o escudo. Use uma imagem PNG ou JPG.') }
+  return {name, bairro: s(d.bairro), colors: s(d.colors), coach: s(d.coach), coachPhone: s(d.coachPhone), escudo, ...(c.status === 'inscricoes' ? {pot: d.seedpot ? 1 : 2} : {})}
+}
+const blobURL = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b) })
 const label = (c, m) => `${tname(c, m, 'home')} × ${tname(c, m, 'away')}`
 const scoreTxt = m => `${score(m).join(' × ')}${m.pen ? ` <small>(${m.pen[0]}×${m.pen[1]} pên.)</small>` : ''}`
 function mpill(m) {
@@ -115,7 +140,7 @@ function table(c, g) {
   const pts = formato(c) === 'pontos', q = pts ? 1 : 2
   const note = pts ? 'Campeão: quem somar mais pontos' : `Classificam-se para ${regras(c).grupos === 4 ? 'as quartas de final' : 'a semifinal'}${groupDone(c, g) ? ' · grupo encerrado' : ''}`
   return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
-  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l"><b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
+  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l">${crest(r.t)} <b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
   </tbody></table></div><p class="note"><span class="qmark"></span>${note}</p></div>`
 }
 const tables = c => formato(c) === 'mata' ? '' : `<div class="grid ${groupsOf(c).length > 1 ? 'g2' : ''}">${groupsOf(c).map(g => table(c, g)).join('')}</div>`
@@ -369,14 +394,13 @@ function teamDetail(c, t, mode) {
   }).join('')
   const podeExcluir = c.status === 'inscricoes' && !c.matches.some(m => m.home === t.id || m.away === t.id)
   const gestao = mode !== 'sec' ? '' : ui.editTeam === t.id ? `<form class="f manage" data-form="editteam" style="margin-bottom:12px">
-      <label class="span2">Nome da equipe<input name="name" required minlength="3" maxlength="40" value="${esc(t.name)}"></label>
-      <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option ${b === t.bairro ? 'selected' : ''}>${b}</option>`).join('')}</select></label>
-      <label class="chk"><input type="checkbox" name="seedpot" ${t.pot === 1 ? 'checked' : ''} ${c.status === 'inscricoes' ? '' : 'disabled'}> Cabeça de chave</label>
+      ${teamFields(c, t)}
       <div class="btns span2"><button class="btn">Salvar equipe</button><button type="button" class="btn ghost" data-act="editteam" data-id="">Cancelar</button></div></form>`
     : ui.confirmDel === 'team:' + t.id ? `<div class="info warn" style="margin-bottom:12px"><b>Excluir ${esc(t.name)}?</b> Os ${ps.length} atletas, fotos e documentos da equipe também serão apagados. Não dá para desfazer.
       <div class="btns" style="margin-top:8px"><button class="btn danger sm" data-act="delteam" data-id="${t.id}">Sim, excluir a equipe</button><button class="btn ghost sm" data-act="canceldel">Cancelar</button></div></div>`
     : `<div class="btns" style="margin-bottom:10px"><button class="btn ghost sm" data-act="editteam" data-id="${t.id}">Editar equipe</button>${podeExcluir ? `<button class="btn ghost sm" data-act="delteam" data-id="${t.id}">Excluir equipe</button>` : ''}</div>`
-  return `<h3>${esc(t.name)} <small>${ps.length}${c.maxPlayers ? ' de ' + c.maxPlayers : ''} atletas · ${esc(t.bairro)}${t.group ? ' · Grupo ' + t.group : ''}</small></h3>
+  return `<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${crest(t, 52)}<div><h3>${esc(t.name)} <small>${ps.length}${c.maxPlayers ? ' de ' + c.maxPlayers : ''} atletas${t.group ? ' · Grupo ' + t.group : ''}</small></h3>
+    <div class="sub">${[t.colors && 'Uniforme ' + esc(t.colors), t.bairro && esc(t.bairro), mode === 'sec' && t.coach && 'Responsável: ' + esc(t.coach) + (t.coachPhone ? ' · ' + esc(t.coachPhone) : '')].filter(Boolean).join(' · ')}</div></div></div>
   ${gestao}${mode === 'team' ? teamLink(c, t, true) : ''}
   ${mode === 'sec' ? teamLink(c, t) + `<p class="sub" style="margin-bottom:8px">Código de acesso da equipe: <span class="codebox">${t.code}</span> · o representante usa para entrar no sistema.</p>` : ''}
   <div class="scroll"><table class="st"><thead><tr><th class="l">Atleta</th><th>Nº</th><th>Idade</th><th class="l">Situação</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nenhum atleta inscrito.</td></tr>'}</tbody></table></div>
@@ -389,11 +413,9 @@ function vInscricoes() {
   return `<div class="head"><div><div class="eyebrow">Inscrições · ${esc(c.name)}</div><h2>Equipes e atletas</h2></div><span class="sub">Faixa etária: ${ageRange(c)} · menores de 18 precisam de autorização do responsável</span></div>
   <div class="grid side2">
     <div class="card" style="align-self:start"><h3>Equipes <small>${c.teams.length}</small></h3>
-      ${c.teams.map(x => `<button class="tbtn ${x.id === t?.id ? 'on' : ''}" data-act="team" data-team="${x.id}"><span>${esc(x.name)}${x.pot === 1 ? ' <span class="sub">· cabeça de chave</span>' : ''}</span>${spill(teamInsc(c, x)[0])}</button>`).join('') || '<p class="sub">Nenhuma equipe.</p>'}
+      ${c.teams.map(x => `<button class="tbtn ${x.id === t?.id ? 'on' : ''}" data-act="team" data-team="${x.id}"><span>${crest(x)} ${esc(x.name)}${x.pot === 1 ? ' <span class="sub">· cabeça de chave</span>' : ''}</span>${spill(teamInsc(c, x)[0])}</button>`).join('') || '<p class="sub">Nenhuma equipe.</p>'}
       ${c.status === 'inscricoes' ? `<h3 style="margin-top:18px">Nova equipe</h3><form class="f" data-form="newteam">
-        <label class="span2">Nome<input name="name" required minlength="3" maxlength="40"></label>
-        <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
-        <label class="chk"><input type="checkbox" name="seedpot"> Cabeça de chave</label>
+        ${teamFields(c)}
         <div class="span2"><button class="btn">Cadastrar equipe</button></div></form>` : '<p class="note">Novas equipes só durante as inscrições.</p>'}
     </div>
     <div class="card">${t ? teamDetail(c, t, 'sec') : '<p class="empty">Cadastre a primeira equipe.</p>'}</div>
@@ -611,7 +633,7 @@ function vPortal() {
     ${nx ? `<div class="next"><div class="eyebrow">Próximo jogo · ${dm(nx.date)} · ${nx.time}</div><b class="cond" style="font-size:20px">${esc(label(c, nx))}</b></div>` : ''}</div>`
   const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD). <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>'
   if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
-    ${c.teams.map(t => `<div class="row"><b>${esc(t.name)}</b><span class="sub">${esc(t.bairro)}</span></div>`).join('')}
+    ${c.teams.map(t => `<div class="row"><span>${crest(t)} <b>${esc(t.name)}</b></span><span class="sub">${esc([t.colors, t.bairro].filter(Boolean).join(' · '))}</span></div>`).join('')}
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
   const up = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 4), last = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 5)
   return chips + hero + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
@@ -968,12 +990,12 @@ function lerAtleta(c, p, d) {
   return {name, num, birth: d.birth, nick: t(d.nick), pos: d.pos || null, phone: t(d.phone), bairro: BAIRROS.includes(d.bairro) ? d.bairro : p.bairro, resp: t(d.resp), respPhone: t(d.respPhone)}
 }
 const F = {
-  editteam: d => {
-    const c = C(), t = T(c, ui.editTeam), name = d.name.trim().replace(/\s+/g, ' ')
-    if (!t || name.length < 3) return toast('Informe o nome da equipe.')
-    if (c.teams.some(x => x !== t && x.name.toLowerCase() === name.toLowerCase())) return toast('Já existe uma equipe com esse nome.')
-    log(c, SEC, `Equipe editada: ${t.name}${t.name !== name ? ' → ' + name : ''}`)
-    Object.assign(t, {name, bairro: BAIRROS.includes(d.bairro) ? d.bairro : t.bairro}, c.status === 'inscricoes' ? {pot: d.seedpot ? 1 : 2} : {})
+  editteam: async d => {
+    const c = C(), t = T(c, ui.editTeam); if (!t) return
+    const v = await lerEquipe(c, t, d); if (!v) return
+    const {escudo, ...dados} = v
+    log(c, SEC, `Equipe editada: ${t.name}${t.name !== v.name ? ' → ' + v.name : ''}`)
+    Object.assign(t, dados, escudo ? {crest: await blobURL(escudo)} : {})
     ui.editTeam = null; toast('Equipe atualizada.')
   },
   editplayer: d => {
@@ -994,13 +1016,11 @@ const F = {
     log(c, mode === 'team' ? `Equipe ${T(c, t).name}` : SEC, `${mode === 'team' ? 'Atleta enviado para aprovação' : 'Atleta inscrito'}: ${name} (${T(c, t).name})`)
     toast(`${name}: ${SPILL[s][1].toLowerCase()}${why ? '. ' + why : ''}.`)
   },
-  newteam: d => {
-    const c = C(), name = d.name.trim().replace(/\s+/g, ' ')
-    if (name.length < 3) return toast('Informe o nome da equipe.')
-    if (c.teams.some(t => t.name.toLowerCase() === name.toLowerCase())) return toast('Já existe uma equipe com esse nome.')
-    const id = 't' + uid().replace(/-/g, '').slice(0, 8)
-    c.teams.push({id, name, group: null, pot: d.seedpot ? 1 : 2, code: code(name.replace(/[^A-Za-z]/g, '') || 'EQP', c.teams.length + 11), bairro: BAIRROS.includes(d.bairro) ? d.bairro : BAIRROS[0]})
-    ui.team = id; log(c, SEC, `Equipe cadastrada: ${name}`); toast('Equipe cadastrada.')
+  newteam: async d => {
+    const c = C(), v = await lerEquipe(c, null, d); if (!v) return
+    const id = 't' + uid().replace(/-/g, '').slice(0, 8), {escudo, ...dados} = v
+    c.teams.push({id, group: null, pot: 2, code: code(v.name.replace(/[^A-Za-z]/g, '') || 'EQP', c.teams.length + 11), ...dados, crest: escudo && await blobURL(escudo)})
+    ui.team = id; log(c, SEC, `Equipe cadastrada: ${v.name}`); toast('Equipe cadastrada.')
   },
   newchamp: d => {
     const name = d.name.trim(), min = +d.min, max = d.max === '' ? null : +d.max
