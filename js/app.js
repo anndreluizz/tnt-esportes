@@ -234,14 +234,14 @@ function athleteForm(c, mode) {
   return `<h3 style="margin-top:22px">${sec ? 'Inscrever atleta pela Secretaria' : 'Inscrever atleta'}</h3>
   <form class="f" data-form="athlete">
     <label>Nome completo<input name="name" required minlength="3" maxlength="50" autocomplete="off"></label>
-    <label>Apelido <span class="sub">(opcional)</span><input name="nick" maxlength="30" autocomplete="off" placeholder="Como é chamado no jogo"></label>
+    <label>Apelido<input name="nick" maxlength="30" autocomplete="off" placeholder="Opcional · como é chamado no jogo"></label>
     <label>Nº da camisa<input name="num" type="number" min="1" max="99" required></label>
     <label>Nascimento<input name="birth" type="date" required min="1940-01-01" max="${c.start}"></label>
     <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
-    <label>Telefone / WhatsApp <span class="sub">(opcional)</span><input name="phone" type="tel" maxlength="20" placeholder="(97) 9 9999-9999"></label>
+    <label>Telefone / WhatsApp<input name="phone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
     <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>
     <label>Foto do atleta<input name="photo" type="file" accept="image/*" capture="user"></label>
-    <label>Responsável <span class="sub">(se menor de 18)</span><input name="resp" maxlength="60"></label>
+    <label>Responsável<input name="resp" maxlength="60" placeholder="Se for menor de 18 anos"></label>
     <label>Telefone do responsável<input name="respPhone" type="tel" maxlength="20"></label>
     ${REAL && sec ? `<label>Documento (RG) – frente<input name="rgf" type="file" accept="image/*"></label><label>Documento (RG) – verso<input name="rgv" type="file" accept="image/*"></label>` : ''}
     <label class="chk span2"><input type="checkbox" name="auth"> Menor de 18: autorização do responsável entregue</label>

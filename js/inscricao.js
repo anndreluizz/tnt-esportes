@@ -42,11 +42,11 @@ function render() {
   app.innerHTML = head + `<form id="form" novalidate>
     ${step(1, 'Dados do atleta', `
       <label class="span2">Nome completo<input name="nome" required minlength="3" maxlength="50" autocomplete="off"></label>
-      <label>Apelido <span class="sub">(opcional)</span><input name="apelido" maxlength="30" autocomplete="off"></label>
+      <label>Apelido<input name="apelido" maxlength="30" autocomplete="off" placeholder="Opcional · como é chamado no jogo"></label>
       <label>Nº da camisa<input name="numero" type="number" min="1" max="99" required inputmode="numeric"></label>
       <label>Data de nascimento<input name="nascimento" type="date" required min="1940-01-01" max="${i.inicio}"></label>
       <label>Posição<select name="posicao"><option value="">—</option>${(POSICOES[i.modalidade] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
-      <label>Telefone / WhatsApp <span class="sub">(opcional)</span><input name="telefone" type="tel" maxlength="20" placeholder="(97) 9 9999-9999"></label>
+      <label>Telefone / WhatsApp<input name="telefone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
       <label>Bairro<select name="bairro">${BAIRROS.map(b => `<option>${b}</option>`).join('')}</select></label>`)}
     ${step(2, 'Responsável <small class="sub">(obrigatório para menor de 18 anos)</small>', `
       <label>Nome do responsável<input name="responsavel" maxlength="60"></label>
