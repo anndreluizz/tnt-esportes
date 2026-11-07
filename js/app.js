@@ -204,7 +204,7 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
     <label>Inscrições até<input name="regUntil" type="date" value="${v('regUntil')}"></label>
     <label>Máximo de atletas por equipe<input name="maxPlayers" type="number" min="5" max="40" value="${v('maxPlayers', 20)}" required></label>
     <p class="note span2">Cada equipe recebe um link para inscrever os atletas com foto e documento. Depois do prazo, o link para de aceitar inscrições.</p>`)
-  + step(4, 'Patrocinadores <small class="sub">(opcional · aparecem no portal, na súmula e no link)</small>', [0, 1, 2, 3].map(i => `
+  + step(4, 'Patrocinadores <small class="sub">(opcional · até 12 · aparecem no portal, na súmula e no link)</small>', [...Array(Math.min(12, Math.max(4, sp.length + 2))).keys()].map(i => `
     <label>Patrocinador ${i + 1}<input name="sp${i}" maxlength="40" value="${esc(sp[i]?.name || '')}" placeholder="Nome"></label>
     <label>Logo ${sp[i]?.logo ? '<span class="sub">(já tem)</span>' : ''}<input name="spl${i}" type="file" accept="image/*"></label>`).join('')) : ''}
   <div class="btns" style="margin-top:12px"><button class="btn">${c ? 'Salvar alterações' : 'Criar e abrir inscrições'}</button>${c ? '<button type="button" class="btn ghost" data-act="editchamp" data-id="">Cancelar</button>' : ''}</div>

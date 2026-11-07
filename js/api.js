@@ -346,7 +346,7 @@ const REAL_F = {
     }
     const antes = S.champs.find(c => c.id === id)?.sponsors || [], extra = {patrocinadores: []}
     const logo = await marca(d.logo, 'logo'); if (logo) extra.logo_path = logo
-    for (let i = 0; i < 4; i++) { const n = t(d['sp' + i]); if (n) extra.patrocinadores.push({nome: n, logo_path: (await marca(d['spl' + i], 'patrocinio' + (i + 1))) || antes[i]?.path || null}) }
+    for (let i = 0; i < 12; i++) { const n = t(d['sp' + i]); if (n) extra.patrocinadores.push({nome: n, logo_path: (await marca(d['spl' + i], 'patrocinio' + (i + 1))) || antes[i]?.path || null}) }
     await q(sb.from('campeonatos').update(extra).eq('id', id))
     if (d.id) { ui.editChamp = null; toast('Dados do campeonato atualizados.') }
     else { S.champId = id; resetTransient(); ui.tab = 'inscricoes'; toast('Campeonato criado. Cadastre as equipes e mande o link de inscrição.') }
