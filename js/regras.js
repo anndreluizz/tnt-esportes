@@ -20,7 +20,9 @@ const FORMATOS = {
   mata:   {nome: 'Mata-mata', desc: 'Eliminatória desde o primeiro jogo: quem perde está fora.'},
 }
 const regrasPadrao = sport => { const s = SPORTS[sport] || SPORTS.Futsal
-  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true, inscricao_rodada: null} }
+  return {tempo: s.half, vitoria: 3, empate: 1, amarelos: 3, vermelho: 1, wo: 3, faltas: s.fouls, grupos: 2, returno: false, terceiro: true, inscricao_rodada: null, desempate: ['vitorias', 'saldo', 'gols']} }
+// critérios de desempate (depois dos pontos), na ordem escolhida; no fim, ordem alfabética
+const CRITERIOS = {confronto: 'Confronto direto', vitorias: 'Mais vitórias', saldo: 'Melhor saldo de gols', gols: 'Mais gols marcados'}
 const regras = c => ({...regrasPadrao(c.sport), ...c.rules})
 const formato = c => c.format || 'grupos'
 const groupsOf = c => [...new Set(c.teams.map(t => t.group).filter(Boolean))].sort()
@@ -93,10 +95,15 @@ function standings(c, g) {
     H.J++; A.J++; H.GP += h; H.GC += a; A.GP += a; A.GC += h
     if (h > a) { H.V++; A.D++ } else if (h < a) { A.V++; H.D++ } else { H.E++; A.E++ }
   }
-  const r0 = regras(c)
-  rows.forEach(x => { x.P = x.V * r0.vitoria + x.E * r0.empate; x.SG = x.GP - x.GC })
-  // desempate: pontos, vitórias, saldo, gols marcados, ordem alfabética
-  return rows.sort((a, b) => b.P - a.P || b.V - a.V || b.SG - a.SG || b.GP - a.GP || a.t.name.localeCompare(b.t.name))
+  const r0 = regras(c), crits = r0.desempate
+  rows.forEach(x => { x.P = x.V * r0.vitoria + x.E * r0.empate; x.SG = x.GP - x.GC; x.CD = 0 })
+  // confronto direto: pontos ganhos só nos jogos entre equipes empatadas em pontos (com 2 empatadas, é o jogo entre elas)
+  for (const m of c.matches) if (m.phase === 'grupos' && m.group === g && isDone(m)) {
+    const H = r(m.home), A = r(m.away), [h, a] = score(m)
+    if (H.P === A.P) { H.CD += h > a ? r0.vitoria : h === a ? r0.empate : 0; A.CD += a > h ? r0.vitoria : h === a ? r0.empate : 0 }
+  }
+  const key = {confronto: x => x.CD, vitorias: x => x.V, saldo: x => x.SG, gols: x => x.GP}
+  return rows.sort((a, b) => b.P - a.P || crits.reduce((d, k) => d || (key[k] ? key[k](b) - key[k](a) : 0), 0) || a.t.name.localeCompare(b.t.name))
 }
 const groupMatches = (c, g) => c.matches.filter(m => m.phase === 'grupos' && m.group === g)
 const groupDone = (c, g) => { const ms = groupMatches(c, g); return ms.length > 0 && ms.every(isDone) }
@@ -278,5 +285,7 @@ function lerRegras(d, sport, atual) {
     rules: {tempo: n('tempo', 5, 60), vitoria: n('vitoria', 1, 5), empate: n('empate', 0, 3), amarelos: n('amarelos', 2, 5), vermelho: n('vermelho', 1, 5),
       wo: n('wo', 1, 10), faltas: d.r_faltas === '' ? null : n('faltas', 3, 10),
       grupos: trava ? base.grupos : d.r_grupos === '4' ? 4 : 2, returno: trava ? base.returno : !!d.r_returno, terceiro: trava ? base.terceiro : !!d.r_terceiro,
-      inscricao_rodada: d.r_inscricao_rodada === '' ? null : n('inscricao_rodada', 1, 60)}}
+      inscricao_rodada: d.r_inscricao_rodada === '' ? null : n('inscricao_rodada', 1, 60),
+      desempate: [1, 2, 3, 4].map(i => d['r_d' + i]).some(x => x !== undefined)
+        ? [...new Set([1, 2, 3, 4].map(i => d['r_d' + i]).filter(k => CRITERIOS[k]))] : base.desempate}}
 }

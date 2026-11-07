@@ -20,6 +20,8 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   ok(run(`standings(C(),'A').map(r=>r.t.id+':'+r.P).join()`) === 'rsf:4,atc:3,unb:2,est:1', 'classificação do grupo A')
   ok(run(`standings(C(),'B').map(r=>r.t.id+':'+r.P).join()`) === 'gre:4,tjr:3,juv:3,svi:1', 'classificação do grupo B (desempate por saldo)')
   ok(run(`(()=>{const c=C(),d=discipline(c),cl=c.players.find(p=>p.name==='Cleiton'),m=nextMatches(c,'est')[0];return !!d.susp[m.id][cl.id]})()`), 'Cleiton suspenso')
+  ok(run(`(() => { const c = C(), antes = c.rules; c.rules = {desempate: ['confronto', 'saldo']}
+    const o = standings(c, 'B').map(r => r.t.id).join(); c.rules = antes; return o })()`) === 'gre,juv,tjr,svi', 'desempate editável: confronto direto põe a Juventude (venceu o jogo) na frente do Tonantins Jr.')
   ok(run(`discipline(C()).st[C().players.find(p=>p.name==='Diego').id].y`) === 2, 'Diego pendurado')
   ok(run(`scorers(C())[0].p.name+scorers(C())[0].n`) === 'Rafael4', 'artilharia')
   // inscrição por idade

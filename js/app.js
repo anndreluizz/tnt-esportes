@@ -205,7 +205,10 @@ function regrasCampos(c) {
     <label class="chk so-mata-mata"><input type="checkbox" name="r_terceiro" ${r.terceiro ? 'checked' : ''} ${trava}> Disputa de 3º lugar</label>
     ${num('tempo', 'Minutos de cada tempo', 5, 60)}${num('vitoria', 'Pontos por vitória', 1, 5)}${num('empate', 'Pontos por empate', 0, 3)}
     ${num('amarelos', 'Amarelos para suspensão', 2, 5)}${num('vermelho', 'Jogos de suspensão (vermelho)', 1, 5)}${num('wo', 'Placar do W.O. (gols)', 1, 10)}
-    ${num('faltas', 'Faltas por tempo até o tiro livre', 3, 10, 'sem limite')}`
+    ${num('faltas', 'Faltas por tempo até o tiro livre', 3, 10, 'sem limite')}
+    <div class="span2 so-rodadas"><b style="font-size:13.5px">Desempate quando as equipes empatam em pontos</b>
+      <p class="note">Escolha a ordem. Se tudo empatar, vale a ordem alfabética. Confronto direto: fica na frente quem venceu o jogo entre as empatadas.</p>
+      <div class="f" style="margin-top:6px">${[1, 2, 3, 4].map(i => `<label>${i}º critério<select name="r_d${i}"><option value="">—</option>${Object.entries(CRITERIOS).map(([k, l]) => `<option value="${k}" ${r.desempate[i - 1] === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`).join('')}</div></div>`
 }
 document.addEventListener('change', e => {   // trocou a modalidade num campeonato novo: tempo e faltas da modalidade
   if (e.target.name !== 'sport' || !e.target.closest?.('#champform')) return
@@ -350,7 +353,7 @@ function vInscricoes() {
 
 function vJogos() {
   const c = C()
-  const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: pontos, vitórias, saldo, gols marcados'}</span></div>`
+  const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: ' + regras(c).desempate.map(k => CRITERIOS[k].toLowerCase()).join(', ')}</span></div>`
   if (!c.matches.length) return head + `<div class="card empty">A tabela é gerada automaticamente depois do sorteio.<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button></div></div>`
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
@@ -582,7 +585,8 @@ function vReg() {
       `A equipe que não comparecer perde por W.O., com placar de ${r.wo} × 0, registrado pela Secretaria com o motivo.`,
       'O árbitro registra a partida na súmula digital, assinada por ele e pelos capitães das duas equipes.'])}
     <h4>5. Da pontuação e do desempate</h4>${li([`Vitória vale ${pl(r.vitoria, 'ponto', 'pontos')}, empate ${pl(r.empate, 'ponto', 'pontos')} e derrota 0.`,
-      f === 'mata' ? '' : 'Em caso de empate em pontos: 1º) mais vitórias; 2º) melhor saldo de gols; 3º) mais gols marcados; 4º) ordem alfabética.'])}
+      f === 'mata' ? '' : `Em caso de empate em pontos: ${[...r.desempate.map(k => CRITERIOS[k].toLowerCase()), 'ordem alfabética'].map((x, i) => `${i + 1}º) ${x}`).join('; ')}.`,
+      f !== 'mata' && r.desempate.includes('confronto') ? 'Confronto direto: contam só os pontos dos jogos entre as equipes empatadas.' : ''])}
     <h4>6. Da disciplina</h4>${li([`${r.amarelos} cartões amarelos acumulados suspendem o atleta no jogo seguinte. O segundo amarelo na mesma partida vira vermelho.`,
       `O cartão vermelho suspende o atleta por ${pl(r.vermelho, 'jogo', 'jogos')}.`, 'O sistema bloqueia o atleta suspenso na súmula.',
       'Casos graves são julgados pela comissão disciplinar; a suspensão é registrada pela Secretaria com o motivo.'])}

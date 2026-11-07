@@ -250,6 +250,18 @@ ok(!!(await q(`select inscrever_pelo_link($1, $2) id`, [LSU, novoLink(31)]))[0].
 await como(SEC)
 ok((await q(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, consentimento) values ($1, 'Pela Secretaria', 32, '1995-01-01', 'Centro', true) returning id`, [su1.id])).length === 1, 'Secretaria inscreve mesmo fora do prazo')
 
+console.log('Desempate editável')
+// X e Y empatam com 3 pontos; X venceu o jogo entre eles, mas Y tem saldo melhor
+const DE = await novoCamp('pontos', {}, ['DE W', 'DE X', 'DE Y', 'DE Z'])
+const [dw, dx, dy, dz] = DE.eq, dj = (a, b, k) => jg({ mandante_id: a.id, visitante_id: b.id, rodada: k, data: `2027-07-0${k}` })
+const des = [dj(dx, dy, 1), dj(dy, dw, 2), dj(dy, dz, 3), dj(dx, dw, 4), dj(dx, dz, 5), dj(dw, dz, 6)]
+await como(SEC); await q(`select aplicar_sorteio($1, $2, $3)`, [DE.id, { A: [dw.id, dx.id, dy.id, dz.id] }, des])
+for (const [k, gols] of [[0, [dx]], [1, [dy, dy, dy, dy, dy]], [2, [dz]], [3, [dw]], [4, [dz]], [5, []]]) await apita(DE.id, des[k].id, gols)
+const ordem = async () => (await q(`select nome from classificacao where campeonato_id = $1 order by posicao`, [DE.id])).map(r => r.nome).join()
+ok(await ordem() === 'DE Z,DE W,DE Y,DE X', 'padrão (vitórias, saldo, gols): Y na frente de X pelo saldo')
+await como(SEC); await q(`update campeonatos set regras = '{"desempate": ["confronto", "saldo"]}' where id = $1`, [DE.id])
+ok(await ordem() === 'DE Z,DE W,DE X,DE Y', 'com confronto direto primeiro: X passa Y (venceu o jogo entre eles)')
+
 console.log('Acesso de árbitros')
 const NOVO = randomUUID()
 await db.exec('reset role'); await db.query(`insert into auth.users values ($1, 'Novo.Arbitro@exemplo.com')`, [NOVO])
