@@ -48,7 +48,7 @@ function render() {
       <label>Posição<select name="posicao"><option value="">—</option>${(POSICOES[i.modalidade] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
       <label class="span2">Endereço (rua e número, ou comunidade)<input name="endereco" maxlength="100" required value="" placeholder="Ex.: Rua da Matriz, 120"></label>
     <label>Bairro ou comunidade<input name="bairro" maxlength="60" list="bairros" required value=""></label>
-    <label>Município<input name="municipio" maxlength="40" required value=""></label>
+    <label>Município<input name="municipio" maxlength="40" required value="" data-opcoes="Tonantins"></label>
     <datalist id="bairros">${BAIRROS.map(b => `<option value="${b}">`).join('')}</datalist>`)}
     <div id="resp" hidden>${step(2, 'Responsável <small class="sub">(atleta menor de 18 anos)</small>', `
       <label>Nome do responsável<input name="responsavel" maxlength="60"></label>
@@ -59,11 +59,13 @@ function render() {
       ${upload('rgf', 'Documento (RG) – frente', {capture: 'environment', required: true})}
       ${upload('rgv', 'Documento (RG) – verso', {capture: 'environment', required: true})}
       <p class="note span2">O documento serve só para a Secretaria conferir a idade. Ninguém mais vê, e ele é apagado quando o campeonato termina.</p>`)}
-    <label class="chk" style="margin-top:12px"><input type="checkbox" name="consentimento"> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Se o atleta for menor de 18 anos, declaro ser o responsável legal e autorizo em nome dele. Nascimento, foto e documento não aparecem no portal público. <a href="privacidade.html" target="_blank" rel="noopener">Como usamos os dados</a></label>
+    <label class="chk" style="margin-top:12px"><input type="checkbox" name="consentimento" required> Autorizo o uso destes dados para a gestão do campeonato (LGPD). Se o atleta for menor de 18 anos, declaro ser o responsável legal e autorizo em nome dele. Nascimento, foto e documento não aparecem no portal público. <a href="privacidade.html" target="_blank" rel="noopener">Como usamos os dados</a></label>
     <button class="btn block" style="margin-top:14px" id="enviar">Enviar inscrição</button>
     <p class="note" style="text-align:center;margin-top:10px">Dúvidas? <a href="manual.html#equipe" target="_blank" rel="noopener">Veja como preencher</a></p></form>` + lista
   $('#form').onsubmit = enviar
   $('#form').oninput = e => {   // dados do responsável só aparecem para menor de 18
+    if (e.target.name === 'numero')   // número repetido: avisa já no campo, não só no fim
+      e.target.setCustomValidity(info.inscritos.some(a => a.numero === +e.target.value) ? `O número ${e.target.value} já está com outro atleta da equipe.` : '')
     if (e.target.name !== 'nascimento') return
     const iso = dataISO(e.target.value); $('#resp').hidden = !(iso && ageAt(iso, info.inicio) < 18)
   }
@@ -73,17 +75,17 @@ async function enviar(e) {
   e.preventDefault()
   const f = e.target, d = lerForm(f), i = info, btn = $('#enviar')
   const nome = d.nome.trim().replace(/\s+/g, ' '), numero = +d.numero
-  const erro = msg => { toast(msg); return false }
-  if (nome.length < 3) return erro('Digite o nome completo do atleta.')
-  if (!(numero >= 1 && numero <= 99)) return erro('O número da camisa vai de 1 a 99.')
-  if (i.inscritos.some(a => a.numero === numero)) return erro(`O número ${numero} já está com outro atleta da equipe.`)
-  if (d.endereco.trim().length < 3 || d.bairro.trim().length < 2 || d.municipio.trim().length < 2) return erro('Informe o endereço, o bairro ou comunidade e o município.')
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return erro('Data de nascimento inválida. Digite assim: 20/05/2010.')
+  const erro = (msg, campo) => { if (!Etapas.erro(f, msg, campo)) toast(msg); return false }   // erro embaixo do campo certo
+  if (nome.length < 3) return erro('Digite o nome completo do atleta.', 'nome')
+  if (!(numero >= 1 && numero <= 99)) return erro('O número da camisa vai de 1 a 99.', 'numero')
+  if (i.inscritos.some(a => a.numero === numero)) return erro(`O número ${numero} já está com outro atleta da equipe.`, 'numero')
+  if (d.endereco.trim().length < 3 || d.bairro.trim().length < 2 || d.municipio.trim().length < 2) return erro('Informe o endereço, o bairro ou comunidade e o município.', d.endereco.trim().length < 3 ? 'endereco' : d.bairro.trim().length < 2 ? 'bairro' : 'municipio')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.nascimento)) return erro('Data de nascimento inválida. Digite assim: 20/05/2010.', 'nascimento')
   const idade = ageAt(d.nascimento, i.inicio)
-  if (idade < i.idade_min || (i.idade_max && idade > i.idade_max)) return erro(`Fora da faixa etária do campeonato: o atleta terá ${idade} anos.`)
-  if (idade < 18 && (!d.responsavel.trim() || !d.responsavel_telefone.trim())) return erro('Menor de 18 anos: informe o nome e o telefone do responsável.')
-  if (!d.foto.size || !d.rgf.size || !d.rgv.size) return erro('Envie a foto do atleta e o documento (frente e verso).')
-  if (!d.consentimento) return erro('Marque a autorização de uso dos dados (LGPD).')
+  if (idade < i.idade_min || (i.idade_max && idade > i.idade_max)) return erro(`Fora da faixa etária do campeonato: o atleta terá ${idade} anos.`, 'nascimento')
+  if (idade < 18 && (!d.responsavel.trim() || !d.responsavel_telefone.trim())) return erro('Menor de 18 anos: informe o nome e o telefone do responsável.', d.responsavel.trim() ? 'responsavel_telefone' : 'responsavel')
+  if (!d.foto.size || !d.rgf.size || !d.rgv.size) return erro('Envie a foto do atleta e o documento (frente e verso).', !d.foto.size ? 'foto' : !d.rgf.size ? 'rgf' : 'rgv')
+  if (!d.consentimento) return erro('Marque a autorização de uso dos dados (LGPD).', 'consentimento')
   btn.disabled = true; btn.textContent = 'Enviando… (com internet fraca pode demorar um pouco)'
   try {
     const id = crypto.randomUUID(), pasta = `${i.equipe_id}/${token}/`
@@ -103,7 +105,7 @@ async function enviar(e) {
       throw new Error(/numero/.test(error.message) ? `O número ${numero} já está com outro atleta da equipe.` : error.message)
     feito = nome; await carregar(); scrollTo(0, 0)
   } catch (err) {
-    toast(/fetch/i.test(err.message) ? 'Sem internet. Confira a conexão e toque em enviar de novo.' : err.message)
+    erro(/fetch/i.test(err.message) ? 'Sem internet. Confira a conexão e toque em enviar de novo.' : err.message)
     btn.disabled = false; btn.textContent = 'Enviar inscrição'
   }
 }

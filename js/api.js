@@ -233,8 +233,11 @@ async function enviaEscudo(c, tid, blob) {   // escudo vai para o arquivo públi
   await q(sb.from('equipes').update({escudo_path: path}).eq('id', tid))
 }
 // mudança no banco: mostra o erro em português e sempre recarrega, para a tela ficar igual ao banco
-const write = fn => async d => { try { await fn(d) } catch (e) { toast(e.code || navigator.onLine ? e.message : 'Sem internet. Tente de novo quando o sinal voltar.') }
-  try { await loadAll() } catch (e) { toast('Sem conexão com o banco: ' + e.message) } }
+// erro de validação (return toast) não recarrega: o formulário fica preenchido. Devolve false quando deu erro.
+const write = fn => async d => { let r
+  try { r = await fn(d); if (r === false) return false } catch (e) { r = toast(e.code || navigator.onLine ? e.message : 'Sem internet. Tente de novo quando o sinal voltar.') }
+  const msg = toast.ultimo; try { await loadAll() } catch (e) { toast('Sem conexão com o banco: ' + e.message) }
+  toast.ultimo = msg; return r }
 const rpc = (f, args) => q(sb.rpc(f, args))
 const atleta = (id, campos) => q(sb.from('atletas').update(campos).eq('id', id))
 

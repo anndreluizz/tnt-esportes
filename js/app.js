@@ -19,7 +19,8 @@ function log(c, who, what, why, m) {
   const e = {at: new Date().toISOString(), who, what, ...(why ? {why} : {})}
   c.log.unshift(e); if (m) m.history.push(e)
 }
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3800) }
+// devolve false: `return toast('erro')` num formulário mantém o formulário preenchido e mostra o erro no campo (js/etapas.js)
+function toast(msg) { const t = $('#toast'); t.textContent = toast.ultimo = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3800); return false }
 
 /* ---------- ícones e pequenos componentes ---------- */
 const svg = d => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`
@@ -292,11 +293,11 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
   const step = (n, t, body) => `<fieldset class="step"><legend><span>${n}</span>${t}</legend><div class="f">${body}</div></fieldset>`
   return `<div class="card mt" id="champform"><h3>${c ? `Editar: ${esc(c.name)}` : 'Novo campeonato'}</h3>
   <p class="note">Campos com <span class="obr">*</span> são obrigatórios.</p>
-  <form data-form="newchamp">${c ? `<input type="hidden" name="id" value="${c.id}">` : ''}
+  <form data-form="newchamp" data-etapas="blocos">${c ? `<input type="hidden" name="id" value="${c.id}">` : ''}
   ${step(1, 'Identidade', `
     <label class="span2"><span>Nome<span class="obr">*</span></span><input name="name" required minlength="5" maxlength="60" value="${v('name')}" placeholder="Ex.: Copa Feminina de Futsal 2027"></label>
     <label><span>Modalidade<span class="obr">*</span></span><select name="sport" ${c ? 'disabled' : ''}>${Object.keys(SPORTS).map(s => `<option ${c?.sport === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
-    <label><span>Categoria<span class="obr">*</span></span><input name="category" required minlength="3" maxlength="20" value="${v('category')}" placeholder="Livre, Sub-17, Feminino, Veteranos..."></label>
+    <label><span>Categoria<span class="obr">*</span></span><input name="category" required minlength="3" maxlength="20" value="${v('category')}" placeholder="Livre, Sub-17, Feminino, Veteranos..." data-opcoes="Livre|Sub-17|Feminino|Veteranos"></label>
     <label><span>Idade mínima<span class="obr">*</span></span><input name="min" type="number" min="5" max="80" value="${v('minAge', 15)}" required></label>
     <label>Idade máxima<input name="max" type="number" min="5" max="99" value="${v('maxAge')}" placeholder="sem limite"></label>
     ${REAL ? upload('logo', 'Logo do campeonato', {atual: c?.logo, dica: 'PNG ou JPG · aparece no portal, na súmula e no link'}) : ''}`)}
@@ -343,13 +344,13 @@ function athleteForm(c, mode) {
   <form class="f" data-form="athlete">
     <label>Nome completo<input name="name" required minlength="3" maxlength="50" autocomplete="off"></label>
     <label>Apelido<input name="nick" maxlength="30" autocomplete="off" placeholder="Opcional · como é chamado no jogo"></label>
-    <label>Nº da camisa<input name="num" type="number" min="1" max="99" required></label>
+    <label>Nº da camisa<input name="num" data-erro="número" type="number" min="1" max="99" required></label>
     <label>Nascimento${campoData('birth', '', 'required')}</label>
     <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(p => `<option>${p}</option>`).join('')}</select></label>
     <label>Telefone / WhatsApp<input name="phone" type="tel" maxlength="20" placeholder="Opcional · (97) 9 9999-9999"></label>
     <label class="span2">Endereço (rua e número, ou comunidade)<input name="endereco" maxlength="100"  value="" placeholder="Ex.: Rua da Matriz, 120"></label>
     <label>Bairro ou comunidade<input name="bairro" maxlength="60" list="bairros"  value=""></label>
-    <label>Município<input name="municipio" maxlength="40"  value=""></label>
+    <label>Município<input name="municipio" maxlength="40"  value="" data-opcoes="Tonantins"></label>
     <datalist id="bairros">${BAIRROS.map(b => `<option value="${b}">`).join('')}</datalist>
     <label>Responsável<input name="resp" maxlength="60" placeholder="Se for menor de 18 anos"></label>
     <label>Telefone do responsável<input name="respPhone" type="tel" maxlength="20"></label>
@@ -397,7 +398,7 @@ function teamDetail(c, t, mode) {
     const edit = mode === 'sec' && ui.editPlayer === p.id ? `<tr><td colspan="5"><form class="f manage" data-form="editplayer">
       <label class="span2">Nome completo<input name="name" required minlength="3" maxlength="50" value="${esc(p.name)}"></label>
       <label>Apelido<input name="nick" maxlength="30" value="${esc(p.nick || '')}"></label>
-      <label>Nº da camisa<input name="num" type="number" min="1" max="99" required value="${p.num}"></label>
+      <label>Nº da camisa<input name="num" data-erro="número" type="number" min="1" max="99" required value="${p.num}"></label>
       <label>Nascimento${campoData('birth', p.birth, 'required')}</label>
       <label>Posição<select name="pos"><option value="">—</option>${(POSICOES[c.sport] || POSICOES.Futsal).map(x => `<option ${x === p.pos ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label>Telefone<input name="phone" type="tel" maxlength="20" value="${esc(p.phone || '')}"></label>
@@ -1194,7 +1195,9 @@ document.addEventListener('click', async e => {
 })
 document.addEventListener('submit', async e => {
   e.preventDefault(); const f = e.target
-  await F[f.dataset.form](lerForm(f)); save(); render()
+  const r = await F[f.dataset.form](lerForm(f))
+  if (r === false && typeof Etapas !== 'undefined' && Etapas.erro(f, toast.ultimo)) { $('#toast').classList.remove('show'); return }
+  save(); render()
 })
 document.addEventListener('change', e => {
   if (e.target.id === 'sel-match') { ui.matchId = e.target.value; ui.picker = ui.signing = null; render() }
