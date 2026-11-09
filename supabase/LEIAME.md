@@ -11,14 +11,18 @@ Roda o banco num Postgres de verdade (PGlite) e tenta o uso certo e o indevido c
 ## Colocar no ar
 1. Crie um projeto em https://supabase.com, região **São Paulo (sa-east-1)**.
 2. No painel, abra **SQL Editor** e rode, nesta ordem:
-   - `migrations/20261106000000_inicial.sql`
-   - `migrations/20261106000100_storage.sql`
+   - todos os arquivos de `migrations/`, em ordem de nome (o que tem `_storage_limpeza` só depois do passo 5)
 3. Crie a primeira conta da Secretaria em **Authentication → Users → Add user**. Depois, no SQL Editor:
    ```sql
    insert into perfis (id, nome, papel)
    select id, 'Ana Souza', 'secretaria' from auth.users where email = 'email-da-secretaria@exemplo.com';
    ```
 4. Árbitros entram do mesmo jeito, com `papel = 'arbitro'`. As equipes não precisam disso: o representante cria a conta e informa o código da equipe (função `vincular_equipe`).
+5. **Limpeza automática do RG (LGPD).** Copie a chave em **Project Settings → API Keys → Secret key** (`sb_secret_...`) (secreta: nunca coloque no app nem no GitHub). No SQL Editor:
+   ```sql
+   select vault.create_secret('COLE-A-CHAVE-AQUI', 'service_role_key');
+   ```
+   Depois rode `migrations/20261116000000_storage_limpeza.sql`. Para testar na hora: `select limpar_documentos_encerrados();` (devolve quantos arquivos pediu para apagar). Para ver as execuções: `select * from cron.job_run_details order by start_time desc limit 5;`
 
 ## Quem pode o quê
 | Perfil | Pode |
