@@ -1082,6 +1082,7 @@ const A = {
       else { download(+d.i); toast('O compartilhamento direto funciona no celular. A imagem foi baixada.') } })
     return 'stay' },
   reset: async () => {
+    if (!confirm('Restaurar os dados de exemplo? Tudo o que foi criado ou alterado no demo será apagado.')) return 'stay'
     const sess = S.session; S = seed(); resetTransient(); ui.doc = null
     S.session = sess && (sess.role !== 'equipe' || S.champs.some(c => T(c, sess.teamId))) ? sess : null
     if (S.session?.role === 'equipe') S.champId = S.champs.find(c => T(c, sess.teamId)).id
