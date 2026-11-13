@@ -175,6 +175,8 @@ function fixtureSections(c, sec) {
 const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div class="why">Motivo: ${esc(l.why)}</div>` : ''}<div class="sub">${esc(l.who)} · ${fdt(l.at)}</div></div></div>`
 
 /* ---------- login ---------- */
+// fotos de Tonantins: ginásio, praça (piso nas cores da bandeira) e orla; só lugares, sem rostos em destaque
+const FAIXA = ['ginasio', 'praca', 'orla'].map(n => `<img src="img/faixa-${n}.jpg" width="720" height="540" alt="" loading="lazy">`).join('')
 function vLogin() {
   if (REAL) return loginReal()
   const card = (r, ic, t, d, btn) => `<div class="role"><div class="ic">${ic}</div><h3>${t}</h3><p>${d}</p><button class="btn" data-act="login" data-role="${r}">${btn}</button></div>`
@@ -187,7 +189,7 @@ function vLogin() {
       <div class="role"><div class="ic">${IC.team}</div><h3>Equipe</h3><p>Inscreve os atletas e acompanha a situação do elenco e os jogos.</p>
         <select id="login-team" aria-label="Equipe">${teams}</select><button class="btn" data-act="login" data-role="equipe">Entrar como equipe</button></div>
       ${card('publico', IC.pub, 'População', 'Tabela, jogos, artilharia e súmulas abertos para todos, sem login.', 'Ver o portal')}
-    </div><p class="note" style="text-align:center;margin:20px 0">Protótipo com dados de exemplo. Na versão real, Secretaria, árbitros e equipes entram com senha.</p></div></div>`
+    </div><div class="faixa">${FAIXA}</div><p class="note" style="text-align:center;margin:20px 0">Protótipo com dados de exemplo. Na versão real, Secretaria, árbitros e equipes entram com senha.</p></div></div>`
 }
 
 /* ---------- Secretaria ---------- */
@@ -721,7 +723,7 @@ function vReg() {
   if (f !== 'pontos') fmt.push('Empate no mata-mata é decidido em cobranças de pênaltis.', r.terceiro ? 'Os perdedores das semifinais disputam o 3º lugar.' : '')
   return `<div class="docbar noprint"><button class="btn gold" data-act="print">Imprimir / salvar PDF</button><button class="btn ghost" data-act="closedoc">Fechar</button></div>
   <div class="paper reg">
-    <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><div class="logo">TNT</div><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes</div></div></div>
+    <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><img class="logo" src="img/marca.svg" alt="" width="44" height="44"><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes</div></div></div>
       <div style="text-align:right;display:flex;gap:10px;align-items:center"><div><h1>REGULAMENTO</h1><div class="sub">${esc(c.name)}</div></div>${clogo(c.logo, 48)}</div></div>
     <h4>1. Do campeonato</h4>${li([`O(A) <b>${esc(c.name)}</b> é organizado(a) pela Secretaria Municipal de Esportes de Tonantins/AM${c.responsible ? `, sob a responsabilidade de ${esc(c.responsible)}${c.responsiblePhone ? ` (${esc(c.responsiblePhone)})` : ''}` : ''}.`,
       `Modalidade: ${esc(c.sport)} · categoria ${esc(c.category)} · faixa etária ${ageRange(c)} (idade conferida na data de início).`,
@@ -770,7 +772,7 @@ function vDoc() {
     : `<div class="sigs">${sig('arbitro', 'Árbitro · ' + m.referee)}${sig('home', 'Capitão · ' + T(c, m.home).name)}${sig('away', 'Capitão · ' + T(c, m.away).name)}</div>`
   return `<div class="docbar noprint"><button class="btn gold" data-act="print">Imprimir / salvar PDF</button><button class="btn ghost" data-act="closedoc">Fechar</button></div>
   <div class="paper">
-    <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><div class="logo">TNT</div><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes · documento gerado pelo sistema</div></div></div>
+    <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><img class="logo" src="img/marca.svg" alt="" width="44" height="44"><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes · documento gerado pelo sistema</div></div></div>
       <div style="text-align:right;display:flex;gap:10px;align-items:center"><div><h1>SÚMULA DE JOGO</h1><div class="sub">${esc(c.name)}</div></div>${clogo(c.logo, 48)}</div></div>
     <div class="dgrid"><div><span>Modalidade</span>${esc(c.sport)} · ${esc(c.category)}</div><div><span>Fase</span>${esc(mtitle(m))}</div><div><span>Data e horário</span>${dmy(m.date)} · ${m.time}</div>
       <div><span>Local</span>${esc(m.local || c.venue)}</div><div><span>Árbitro</span>${esc(m.referee)}</div><div><span>Situação</span>${isDone(m) ? 'Confirmada' : 'Em aberto'}</div></div>
@@ -801,8 +803,7 @@ function canvasCard(c, title, body) {
   const x = cv.getContext('2d'), F = {C: '"Barlow Condensed", sans-serif', B: 'Barlow, sans-serif'}
   x.fillStyle = '#0d2f73'; x.fillRect(0, 0, 1080, 1350)
   x.fillStyle = '#1d55b8'; x.fillRect(0, 0, 1080, 190); x.fillRect(0, 1270, 1080, 80)
-  x.fillStyle = '#2db35d'; x.beginPath(); x.arc(110, 95, 52, 0, 7); x.fill()
-  x.fillStyle = '#0d2f73'; x.font = `700 40px ${F.C}`; x.textAlign = 'center'; x.fillText('TNT', 110, 110)
+  desenharMarca(x, 110, 95, 58)
   x.textAlign = 'left'; x.fillStyle = '#fff'; x.font = `700 64px ${F.C}`; x.fillText('TNT ESPORTES', 190, 88)
   x.fillStyle = '#d6e2f7'; x.font = `400 30px ${F.B}`; x.fillText(c.name, 190, 134)
   x.fillStyle = '#2db35d'; x.font = `700 54px ${F.C}`; x.fillText(title, 60, 275)
@@ -820,6 +821,16 @@ function canvasCard(c, title, body) {
   x.textAlign = 'left'; x.fillStyle = '#d6e2f7'; x.font = `400 26px ${F.B}`
   x.fillText(`Atualizado em ${new Date().toLocaleDateString('pt-BR')} · Secretaria Municipal de Esportes de Tonantins`, 60, 1318)
   return cv
+}
+// marca da TNT (hexágono, igual a img/marca.svg) desenhada no canvas: centro (cx, cy), raio r
+function desenharMarca(x, cx, cy, r) {
+  const k = r / 29, X = v => cx + (v - 32) * k, Y = v => cy + (v - 32) * k
+  const poli = (pts, fill) => { x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(X(a), Y(b)) : x.moveTo(X(a), Y(b))); x.closePath(); fill ? x.fill() : x.stroke() }
+  x.fillStyle = '#2db35d'; poli([[32, 3], [57.1, 17.5], [57.1, 46.5], [32, 61], [6.9, 46.5], [6.9, 17.5]], true)
+  x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 1.5 * k; poli([[32, 7], [53.65, 19.5], [53.65, 44.5], [32, 57], [10.35, 44.5], [10.35, 19.5]], false)
+  x.fillStyle = '#0d2f73'
+  ;[[14.5, 23, 8.5, 3.4], [17.05, 23, 3.4, 18], [25, 23, 3.4, 18], [35.6, 23, 3.4, 18], [41, 23, 8.5, 3.4], [43.55, 23, 3.4, 18]].forEach(([a, b, w, h]) => x.fillRect(X(a), Y(b), w * k, h * k))
+  poli([[25, 23], [29, 23], [39, 41], [35, 41]], true)
 }
 function fit(x, txt, X, Y, maxW, weight, size, fam) { do { x.font = `${weight} ${size}px ${fam}`; size -= 2 } while (x.measureText(txt).width > maxW && size > 16); x.fillText(txt, X, Y) }
 async function marcasImg(c) {   // logo e patrocinadores como imagem para as artes (o arquivo público permite)

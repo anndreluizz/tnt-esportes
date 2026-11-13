@@ -8,8 +8,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 
 /* cabeçalho */
 header.top{background:var(--g9);color:#fff;position:sticky;top:0;z-index:5}
-.brand{display:flex;align-items:center;gap:12px;padding:12px 0;flex-wrap:wrap}
-.logo{flex:none;width:40px;height:40px;border-radius:50%;background:var(--gold);color:var(--g9);display:grid;place-items:center;font:700 15px "Barlow Condensed"}
+.brand{display:flex;align-items:center;gap:12px;padding-block:12px;flex-wrap:wrap}
+.logo{flex:none;width:44px;height:44px;display:block}
 .bname{font:700 22px/1 "Barlow Condensed"}.bname span{color:var(--gold)}
 .bsub{font-size:12px;color:#b3c7ea}
 .hright{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -114,7 +114,7 @@ label.chk{display:flex;align-items:flex-start;gap:7px;font-weight:500;padding-bo
 
 /* login */
 .login{min-height:calc(100vh - 60px);display:flex;flex-direction:column}
-.lhero{background:var(--g9);color:#fff;padding:56px 0 90px}
+.lhero{background:linear-gradient(90deg,rgba(13,47,115,.95) 0%,rgba(13,47,115,.82) 38%,rgba(13,47,115,.1) 78%),url(img/hero-rio.jpg) center 50%/cover var(--g9);color:#fff;padding:72px 0 110px}
 .lhero h1{font-size:clamp(46px,9vw,92px);line-height:.95;letter-spacing:.01em}
 .lhero p{color:#d6e2f7;font-size:18px;margin-top:10px}
 .lhero .eyebrow{color:var(--gold)}
@@ -123,6 +123,11 @@ label.chk{display:flex;align-items:flex-start;gap:7px;font-weight:500;padding-bo
 .role .ic{width:46px;height:46px;border-radius:12px;background:var(--g1);color:var(--g7);display:grid;place-items:center}
 .role h3{font-size:22px}
 .role p{color:var(--muted);font-size:14px;flex:1}
+
+/* faixa de fotos de Tonantins (decorativa, sem legenda) */
+.faixa{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0 6px}
+.faixa img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:14px}
+@media(max-width:620px){.faixa{gap:8px}.faixa img{aspect-ratio:3/4;border-radius:10px}}
 
 /* súmula */
 .sumula{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:start}
@@ -165,7 +170,7 @@ label.chk{display:flex;align-items:flex-start;gap:7px;font-weight:500;padding-bo
 /* sorteio e portal */
 code.hash{display:block;font:12px/1.4 ui-monospace,Consolas,monospace;background:#eef1f7;padding:8px;border-radius:6px;word-break:break-all;margin-bottom:8px}
 .team-chip{padding:9px 12px;margin-top:6px;background:#dfe7f6;border:1px solid #9cb4dd;border-radius:8px;font-weight:600}
-.hero{background:var(--g9);color:#fff;border-radius:16px;padding:20px 22px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.hero{background:linear-gradient(100deg,rgba(13,47,115,.95),rgba(13,47,115,.72) 50%,rgba(13,47,115,.3)),url(img/hero-praca.jpg) center 55%/cover var(--g9);color:#fff;border-radius:16px;padding:20px 22px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .hero h2{font-size:32px;text-transform:uppercase;line-height:1}
 .hero .eyebrow{color:#b3c7ea}
 .next{background:var(--g8);border-radius:12px;padding:10px 14px}
