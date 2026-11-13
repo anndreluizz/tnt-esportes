@@ -175,6 +175,8 @@ function fixtureSections(c, sec) {
 const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div class="why">Motivo: ${esc(l.why)}</div>` : ''}<div class="sub">${esc(l.who)} · ${fdt(l.at)}</div></div></div>`
 
 /* ---------- login ---------- */
+// fotos de Tonantins: ginásio, praça (piso nas cores da bandeira) e orla; só lugares, sem rostos em destaque
+const FAIXA = ['ginasio', 'praca', 'orla'].map(n => `<img src="img/faixa-${n}.jpg" width="720" height="540" alt="" loading="lazy">`).join('')
 function vLogin() {
   if (REAL) return loginReal()
   const card = (r, ic, t, d, btn) => `<div class="role"><div class="ic">${ic}</div><h3>${t}</h3><p>${d}</p><button class="btn" data-act="login" data-role="${r}">${btn}</button></div>`
@@ -187,7 +189,7 @@ function vLogin() {
       <div class="role"><div class="ic">${IC.team}</div><h3>Equipe</h3><p>Inscreve os atletas e acompanha a situação do elenco e os jogos.</p>
         <select id="login-team" aria-label="Equipe">${teams}</select><button class="btn" data-act="login" data-role="equipe">Entrar como equipe</button></div>
       ${card('publico', IC.pub, 'População', 'Tabela, jogos, artilharia e súmulas abertos para todos, sem login.', 'Ver o portal')}
-    </div><p class="note" style="text-align:center;margin:20px 0">Protótipo com dados de exemplo. Na versão real, Secretaria, árbitros e equipes entram com senha.</p></div></div>`
+    </div><div class="faixa">${FAIXA}</div><p class="note" style="text-align:center;margin:20px 0">Protótipo com dados de exemplo. Na versão real, Secretaria, árbitros e equipes entram com senha.</p></div></div>`
 }
 
 /* ---------- Secretaria ---------- */
