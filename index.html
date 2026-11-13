@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
+<a class="skip" href="#app">Pular para o conteúdo</a>
 <header class="top">
   <div class="wrap brand">
     <img class="logo" src="img/marca.svg" alt="" width="44" height="44">
@@ -22,8 +23,9 @@
   </div>
   <nav class="wrap tabs" id="tabs" aria-label="Seções"></nav>
 </header>
-<main id="app" class="wrap"></main>
+<main id="app" tabindex="-1" class="wrap"></main>
 <footer class="wrap foot noprint"><span>Protótipo · times, atletas e resultados são fictícios, criados para demonstração. · <a href="manual.html">Manual de uso</a></span><button class="btn ghost sm" data-act="reset">Restaurar dados de exemplo</button></footer>
+<nav id="bnav" class="bnav noprint" aria-label="Seções"></nav>
 <div id="doc" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="js/etapas.js"></script>

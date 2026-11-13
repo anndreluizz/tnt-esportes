@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
+<a class="skip" href="#app">Pular para o conteúdo</a>
 <header class="top">
   <div class="wrap brand">
     <img class="logo" src="img/marca.svg" alt="" width="44" height="44">
@@ -22,8 +23,9 @@
   </div>
   <nav class="wrap tabs" id="tabs" aria-label="Seções"></nav>
 </header>
-<main id="app" class="wrap"></main>
+<main id="app" tabindex="-1" class="wrap"></main>
 <footer class="wrap foot noprint"><span>Sistema oficial da Secretaria Municipal de Esportes de Tonantins · <a href="manual.html">manual de uso</a> · <a href="index.html">ver o protótipo de demonstração</a></span></footer>
+<nav id="bnav" class="bnav noprint" aria-label="Seções"></nav>
 <div id="doc" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
