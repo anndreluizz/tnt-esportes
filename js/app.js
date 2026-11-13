@@ -33,10 +33,21 @@ const IC = {
 }
 const ROLES = {secretaria: {name: 'Ana Souza', label: 'Secretaria'}, arbitro: {name: 'João Paulo', label: 'Árbitro'}, publico: {name: 'Visitante', label: 'População'}}
 const ROLE_TABS = {
-  secretaria: [['painel','Painel'],['campeonatos','Campeonatos'],['inscricoes','Inscrições'],['jogos','Jogos e tabela'],['sumula','Súmula'],['sorteio','Sorteio'],['relatorios','Relatórios'],['divulgacao','WhatsApp'],['portal','Portal público']],
+  secretaria: [['painel','Painel'],['campeonatos','Campeonatos'],['inscricoes','Inscrições'],['jogos','Jogos e tabela'],['sumula','Súmula'],['sorteio','Sorteio'],['relatorios','Relatórios'],['divulgacao','Divulgação'],['portal','Portal público']],
   arbitro: [['sumula','Minhas partidas'],['portal','Portal público']],
   equipe: [['equipe','Minha equipe'],['portal','Portal público']],
   publico: [['portal','Portal público']],
+}
+// Navegação da Secretaria: 9 telas em 5 grupos (menos escolhas por vez: Hick e Miller).
+// Cada tela mantém a sua chave (ui.tab, links #secretaria/jogos etc.); o grupo só organiza.
+const GRUPOS = [['painel', 'Painel', ['painel']], ['campeonatos', 'Campeonatos', ['campeonatos']], ['jogos', 'Jogos', ['jogos', 'sumula', 'sorteio']],
+  ['equipes', 'Equipes', ['inscricoes']], ['mais', 'Mais', ['relatorios', 'divulgacao', 'portal']]]
+const IC_GRUPO = {
+  painel: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+  campeonatos: IC.trophy,
+  jogos: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+  equipes: IC.team,
+  mais: svg('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>'),
 }
 const TYPES = {gol: 'Gol', amarelo: 'Amarelo', vermelho: 'Vermelho', falta: 'Falta'}
 const EVICON = {gol: '<i class="dot"></i>', amarelo: '<i class="cd y"></i>', vermelho: '<i class="cd r"></i>', falta: ''}
@@ -1179,7 +1190,8 @@ function render() {
   const r = role(), app = $('#app'), doc = $('#doc')
   if (r === 'equipe') { const c = S.champs.find(x => T(x, S.session.teamId)); if (c) S.champId = c.id; else S.session = null }
   if (!role()) {
-    $('#hright').innerHTML = ''; $('#tabs').innerHTML = ''; app.className = ''; app.innerHTML = vLogin(); doc.hidden = true
+    $('#hright').innerHTML = ''; $('#tabs').innerHTML = ''; $('#bnav').innerHTML = ''; document.body.classList.remove('has-bnav'); document.title = 'TNT Esportes'
+    app.className = ''; app.innerHTML = vLogin(); doc.hidden = true
     document.body.classList.remove('doc-open'); return
   }
   const tabs = ROLE_TABS[r]
@@ -1189,9 +1201,20 @@ function render() {
   $('#hright').innerHTML = (r === 'equipe' ? `<span class="who"><span><b>${esc(T(c, S.session.teamId).name)}</b>Equipe</span></span>`
     : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c?.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${esc(S.session.name || ROLES[r].name)}</b>${ROLES[r].label}</span></span>`)
     + '<button class="out" data-act="logout">Trocar perfil</button>'
-  $('#tabs').innerHTML = tabs.map(([k, l]) => `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}" ${ui.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')
-  app.className = 'wrap'; app.innerHTML = c || ['campeonatos', 'relatorios'].includes(ui.tab) ? VIEWS[ui.tab]()
+  const agrupa = r === 'secretaria', rotulo = k => (tabs.find(t => t[0] === k) || [])[1] || ''
+  const tabBtn = (k, l, on, ic = '') => `<button class="${on ? 'on' : ''}" data-act="tab" data-tab="${k}" ${on ? 'aria-current="page"' : ''}>${ic}${l}</button>`
+  ui.ultimo ??= {}   // última tela vista em cada grupo: tocar no grupo volta para ela
+  const grupo = agrupa ? GRUPOS.find(g => g[2].includes(ui.tab)) : null
+  if (grupo) ui.ultimo[grupo[0]] = ui.tab
+  const grupoBtns = ic => GRUPOS.map(([g, l, ks]) => tabBtn(ui.ultimo[g] || ks[0], l, g === grupo?.[0], ic ? IC_GRUPO[g] : '')).join('')
+  $('#tabs').innerHTML = agrupa ? grupoBtns(false) : tabs.map(([k, l]) => tabBtn(k, l, ui.tab === k)).join('')
+  $('#bnav').innerHTML = agrupa ? grupoBtns(true) : ''   // celular: barra de navegação embaixo (Fitts, Jakob)
+  document.body.classList.toggle('has-bnav', agrupa)
+  document.title = (rotulo(ui.tab) ? rotulo(ui.tab) + ' · ' : '') + 'TNT Esportes'
+  const sub = grupo && grupo[2].length > 1 ? `<div class="chips subnav" role="group" aria-label="${grupo[1]}">${grupo[2].map(k => tabBtn(k, rotulo(k), ui.tab === k)).join('')}</div>` : ''
+  const view = c || ['campeonatos', 'relatorios'].includes(ui.tab) ? VIEWS[ui.tab]()
     : `<div class="card empty mt">Nenhum campeonato cadastrado ainda.${r === 'secretaria' ? '<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="campeonatos">Criar o primeiro campeonato</button></div>' : ''}</div>`
+  app.className = 'wrap'; app.innerHTML = `<h1 class="sr">${esc(rotulo(ui.tab))}${c ? ' · ' + esc(c.name) : ''}</h1>` + sub + view
   doc.hidden = !(ui.doc || ui.reg); doc.innerHTML = ui.doc ? vDoc() : ui.reg ? vReg() : ''
   document.body.classList.toggle('doc-open', !!(ui.doc || ui.reg))
   if (ui.tab === 'sumula') hookPads()
