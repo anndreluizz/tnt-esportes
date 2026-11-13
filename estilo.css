@@ -447,3 +447,12 @@ body{background-image:radial-gradient(rgba(13,47,115,.065) 1px,transparent 1.3px
 .tabs button{transition:color .15s,border-color .15s}
 .card.stat{transition:transform .15s,box-shadow .15s}
 @media print{body{background-image:none}.hero::before,.board::before{display:none}}
+
+/* responsividade (Etapa 5): tabelas largas com sombra que avisa que dá para rolar, e células mais justas no celular */
+.scroll{background:linear-gradient(90deg,#fff 30%,rgba(255,255,255,0)) left center/40px 100% no-repeat local,linear-gradient(90deg,rgba(255,255,255,0),#fff 70%) right center/40px 100% no-repeat local,radial-gradient(farthest-side at 0 50%,rgba(13,47,115,.2),transparent) left center/14px 100% no-repeat scroll,radial-gradient(farthest-side at 100% 50%,rgba(13,47,115,.2),transparent) right center/14px 100% no-repeat scroll}
+@media(max-width:620px){
+  .st th,.st td{padding:8px 4px}
+  .st{font-size:13px}
+  .ath{gap:8px}
+  .av{width:30px;height:30px}
+}
