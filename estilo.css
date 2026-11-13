@@ -419,3 +419,31 @@ header.top :focus-visible,.lhero :focus-visible,.hero :focus-visible,.jogo.desta
 /* quem pede menos movimento não recebe animação nem deslocamento */
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
   .match.jogo:hover,.role:hover{transform:none}}
+
+/* fundos e microinterações (Etapa 4): grão, ondas do rio, meio-tom, linhas de contorno, vidro canelado, grade de pontos, papel */
+:root{--grao:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  .35 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");--grao-escuro:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  .09 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");--ondas:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 60' preserveAspectRatio='none'%3E%3Cpath d='M0 22C200 52 380 -4 600 24S1000 54 1200 20S1380 8 1440 24V60H0Z' fill='%23eef2f8' fill-opacity='.45'/%3E%3Cpath d='M0 38C160 18 340 58 560 36S940 12 1120 38S1340 56 1440 36V60H0Z' fill='%23eef2f8'/%3E%3C/svg%3E")}
+body{background-image:radial-gradient(rgba(13,47,115,.065) 1px,transparent 1.3px);background-size:22px 22px}
+/* login: grão sobre a foto, meio-tom no canto e ondas do rio na borda de baixo */
+.lhero{position:relative;isolation:isolate;overflow:hidden;background-image:linear-gradient(90deg,rgba(13,47,115,.95) 0%,rgba(13,47,115,.82) 38%,rgba(13,47,115,.1) 78%),var(--grao),url(img/hero-rio.jpg);background-size:auto,180px 180px,cover;background-position:0 0,0 0,center 50%;background-repeat:no-repeat,repeat,no-repeat}
+.lhero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(rgba(255,255,255,.3) 1.2px,transparent 1.7px) 0 0/11px 11px;-webkit-mask-image:linear-gradient(115deg,transparent 62%,#000 100%);mask-image:linear-gradient(115deg,transparent 62%,#000 100%)}
+.lhero::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:64px;z-index:-1;pointer-events:none;background:var(--ondas) bottom/100% 100% no-repeat}
+.roles{position:relative;z-index:2}
+/* faixas de abertura: linhas de contorno (como as curvas do rio e da quadra) e vidro canelado no próximo jogo */
+.hero,.board{position:relative;overflow:hidden}
+.hero>*,.board>*{position:relative}
+.hero::before,.board::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-radial-gradient(circle at 94% 140%,rgba(255,255,255,.075) 0 1px,transparent 1px 17px)}
+.hero .next{background:repeating-linear-gradient(90deg,rgba(255,255,255,.1) 0 2px,rgba(255,255,255,.02) 2px 6px),rgba(255,255,255,.1);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.24)}
+/* documentos impressos: textura de papel bem leve */
+.paper{background-image:var(--grao-escuro)}
+/* microinterações: só transform, opacidade, cor e sombra; reduced-motion já desliga tudo */
+.btn{transition:background-color .15s,border-color .15s,color .15s,transform .1s,box-shadow .15s}
+.btn:active:not(:disabled){transform:scale(.97)}
+.role{transition:transform .2s,box-shadow .2s}
+.role:hover{transform:translateY(-3px);box-shadow:0 16px 40px rgba(13,47,115,.14)}
+.chips button{transition:background-color .15s,border-color .15s,color .15s,transform .1s}
+.chips button:active{transform:scale(.96)}
+.bnav button{transition:color .15s,transform .1s}
+.bnav button:active{transform:scale(.92)}
+.tabs button{transition:color .15s,border-color .15s}
+.card.stat{transition:transform .15s,box-shadow .15s}
+@media print{body{background-image:none}.hero::before,.board::before{display:none}}
