@@ -380,3 +380,30 @@ main:focus{outline:none}
   body.has-bnav .foot{padding-bottom:96px}
   body.has-bnav #toast{bottom:78px}
 }
+
+/* cartão de jogo (Etapa 2) */
+.match.jogo{background:#f7f9fd;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;transition:transform .15s,box-shadow .15s,border-color .15s}
+.match.jogo:last-child{border:1px solid var(--line)}
+.match.jogo:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(13,47,115,.10);border-color:#c3d0e8}
+.jtop{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:10px}
+.jogo .mline{font-size:16px}
+.jogo .sc{font-size:22px;min-width:68px}
+.jacts{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.jacts>.btn{min-height:42px;padding:9px 18px}
+.mais{position:relative}
+.mais summary{list-style:none;cursor:pointer;user-select:none}
+.mais summary::-webkit-details-marker{display:none}
+.mais summary::after{content:"";width:6px;height:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translate(-1px,-2px);margin-left:4px}
+.mais[open] summary{border-color:var(--g7)}
+.mmenu{position:absolute;right:0;top:calc(100% + 6px);z-index:8;min-width:210px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px rgba(13,47,115,.18);padding:6px;display:grid;gap:4px}
+.mmenu .btn{width:100%;justify-content:flex-start}
+.mmenu label{padding:6px 8px}
+/* próximo jogo em destaque (Von Restorff) */
+.match.jogo.destaque{background:linear-gradient(135deg,var(--g9),var(--g8));border-color:var(--g9);color:#fff}
+.jogo.destaque .jtop{color:#b3c7ea}
+.jogo.destaque .sc,.jogo.destaque .sc.time{background:rgba(255,255,255,.14);color:#fff;font-size:30px;min-width:92px;padding:5px 14px}
+.jogo.destaque .mline{font-size:18px}
+.jogo.destaque .tbd{color:#b3c7ea}
+.jogo.destaque .btn:not(.ghost){background:var(--gold);color:var(--g9)}
+.jogo.destaque .btn:not(.ghost):hover{background:#259a4f}
+@media(max-width:620px){.jogo .mline{gap:6px;font-size:15px}.jogo .sc{min-width:56px;font-size:19px}.jogo.destaque .sc{font-size:24px;min-width:72px}.jacts{justify-content:stretch}.jacts>.btn{flex:1}}

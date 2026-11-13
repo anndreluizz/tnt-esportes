@@ -115,16 +115,21 @@ function phaseNow(c) {
   return nx.phase === 'grupos' ? `Fase de grupos · Rodada ${nx.round}` : PHASES[nx.phase]
 }
 
-function matchRow(c, m, mode) {
+// Cartão de jogo: situação e dados em cima, times e placar no meio, UMA ação principal embaixo
+// (Abrir súmula / Ver súmula) e o resto no menu "Mais" (Hick, Fitts, Proximidade). `destaque`: o próximo jogo.
+function matchRow(c, m, mode, destaque = false) {
   const ready = m.home && m.away, d = isDone(m)
-  let acts = ''
-  if (mode === 'sec' && !d && ready) acts += `<button class="btn sm" data-act="open" data-id="${m.id}">Abrir súmula</button>`
-  if (mode === 'sec' && !d && !m.pendingConfirm && !m.events.length) acts += `<button class="btn ghost sm" data-act="manage" data-id="${m.id}">Alterar / W.O.</button>`
-  if (d) acts += `<button class="btn ghost sm" data-act="doc" data-c="${c.id}" data-id="${m.id}">Súmula</button>`
-  if (mode === 'sec' && ready) acts += `<a class="btn ghost sm" target="_blank" rel="noopener" href="${waLink(c, m)}" title="Mensagem pronta para o grupo">WhatsApp</a>`
-  return `<div class="match"><div class="mline"><span class="r">${side(c, m, 'home')}</span>
+  const principal = mode === 'sec' && !d && ready ? `<button class="btn" data-act="open" data-id="${m.id}">Abrir súmula</button>`
+    : d ? `<button class="btn ghost" data-act="doc" data-c="${c.id}" data-id="${m.id}">Ver súmula</button>` : ''
+  const mais = []
+  if (mode === 'sec' && !d && !m.pendingConfirm && !m.events.length) mais.push(`<button class="btn ghost sm" data-act="manage" data-id="${m.id}">Alterar / W.O.</button>`)
+  if (mode === 'sec' && ready) mais.push(`<a class="btn ghost sm" target="_blank" rel="noopener" href="${waLink(c, m)}" title="Mensagem pronta para o grupo">Avisar no WhatsApp</a>`)
+  if (REAL && mode === 'sec' && !d) mais.push(refSelect(m))
+  const menu = mais.length ? `<details class="mais"><summary class="btn ghost sm">Mais</summary><div class="mmenu">${mais.join('')}</div></details>` : ''
+  return `<div class="match jogo${destaque ? ' destaque' : ''}"><div class="jtop"><span>${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(m.local || c.venue)}</span>${mpill(m)}</div>
+    <div class="mline"><span class="r">${side(c, m, 'home')}</span>
     <span class="sc ${d ? '' : 'time'}">${d ? scoreTxt(m) : m.time}</span><span>${side(c, m, 'away')}</span></div>
-    <div class="meta">${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(m.local || c.venue)} ${mpill(m)} ${acts}${REAL && mode === 'sec' && !d ? refSelect(m) : ''}</div>
+    ${principal || menu ? `<div class="jacts">${principal}${menu}</div>` : ''}
     ${mode === 'sec' && ui.manage === m.id ? manageForm(c, m) : ''}</div>`
 }
 // aviso pronto para o grupo do WhatsApp: resultado ou jogo marcado/remarcado
@@ -177,11 +182,24 @@ function banner(c) {
     <span class="sub" style="color:var(--g9)">${vice ? `Vice: ${esc(T(c, vice).name)}` : ''}${terc ? ` · 3º lugar: ${esc(T(c, terc).name)}` : ''}</span></div></div>`
 }
 // seções da tabela de jogos: rodadas, fases do mata-mata, final
-function fixtureSections(c, sec) {
+// `filtro`: 'r<n>' (uma rodada), 'ko' (mata-mata) ou 'todas'. Sem escolha, vale a fase do próximo jogo (Miller: um bloco por vez).
+function fixtureFiltro(c) {
+  if (ui.rod) return ui.rod
+  const nx = c.matches.filter(m => !isDone(m)).sort(byDate)[0]
+  return !nx ? 'todas' : nx.phase === 'grupos' ? 'r' + nx.round : 'ko'
+}
+function fixtureSections(c, sec, filtro = 'todas') {
   const rounds = [...new Set(c.matches.filter(m => m.phase === 'grupos').map(m => m.round))].sort((a, b) => a - b)
-  return rounds.map(r => sec(`Rodada ${r}`, c.matches.filter(m => m.phase === 'grupos' && m.round === r).sort(byDate))).join('')
-    + ['oitavas', 'quartas', 'semi'].map(f => sec(KO_PLURAL[f], c.matches.filter(m => m.phase === f).sort(byDate))).join('')
+  const grupos = rounds.filter(r => filtro === 'todas' || filtro === 'r' + r).map(r => sec(`Rodada ${r}`, c.matches.filter(m => m.phase === 'grupos' && m.round === r).sort(byDate))).join('')
+  if (filtro !== 'todas' && filtro !== 'ko') return grupos
+  return grupos + ['oitavas', 'quartas', 'semi'].map(f => sec(KO_PLURAL[f], c.matches.filter(m => m.phase === f).sort(byDate))).join('')
     + sec(c.matches.some(m => m.phase === 'terceiro') ? 'Disputa de 3º lugar e final' : 'Final', c.matches.filter(m => m.phase === 'terceiro' || m.phase === 'final').sort(byDate))
+}
+function fixtureChips(c, filtro) {
+  const rounds = [...new Set(c.matches.filter(m => m.phase === 'grupos').map(m => m.round))].sort((a, b) => a - b)
+  const hasKO = c.matches.some(m => m.phase !== 'grupos')
+  const chip = (k, l) => `<button class="${filtro === k ? 'on' : ''}" data-act="rod" data-rod="${k}" aria-pressed="${filtro === k}">${l}</button>`
+  return `<div class="chips" role="group" aria-label="Filtrar jogos">${rounds.map(r => chip('r' + r, `Rodada ${r}`)).join('')}${hasKO ? chip('ko', 'Mata-mata') : ''}${chip('todas', 'Todas')}</div>`
 }
 const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div class="why">Motivo: ${esc(l.why)}</div>` : ''}<div class="sub">${esc(l.who)} · ${fdt(l.at)}</div></div></div>`
 
@@ -231,7 +249,7 @@ function vPainel() {
   const nb = nextBatch(c)
   return head + banner(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes')}${stat(aprov, 'atletas aprovados')}${stat(fin.length + '/' + c.matches.length, 'jogos realizados')}${stat(gols, 'gols marcados', 'gold')}</div>
   <div class="grid side mt">
-    <div class="card"><h3>Próximos jogos <small>${up.length} a realizar</small></h3>${up.slice(0, 6).map(m => matchRow(c, m, r)).join('') || '<p class="empty">Todos os jogos foram realizados.</p>'}</div>
+    <div class="card"><h3>Próximos jogos <small>${up.length} a realizar</small></h3>${up.slice(0, 6).map((m, i) => matchRow(c, m, r, i === 0)).join('') || '<p class="empty">Todos os jogos foram realizados.</p>'}</div>
     <div class="grid" style="align-content:start">
       ${nb && !REAL ? `<div class="card info"><h3>Modo apresentação</h3><p class="sub">Simula ${nb.label} com resultados aleatórios, para mostrar o mata-mata e o campeão sem esperar os jogos reais.</p><button class="btn gold" style="margin-top:8px" data-act="simulate">Simular ${nb.label}</button></div>` : ''}
       <div class="card"><h3>Disciplina <small>calculado automaticamente</small></h3>${disc || '<p class="sub">Nenhum atleta pendurado ou suspenso.</p>'}</div>
@@ -499,7 +517,7 @@ function vJogos() {
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
   return head + (mode === 'sec' ? trocaCampo(c) : '') + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
-  <div class="card mt"><h3>Tabela de jogos</h3>${fixtureSections(c, sec)}</div>`
+  <div class="card mt"><h3>Tabela de jogos</h3>${fixtureChips(c, fixtureFiltro(c))}${fixtureSections(c, sec, fixtureFiltro(c))}</div>`
 }
 
 /* ---------- súmula (celular do árbitro) ---------- */
@@ -710,7 +728,7 @@ function vPortal() {
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
   const up = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 4), last = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 5)
   return chips + hero + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
-  <div class="grid g2 mt"><div class="card"><h3>Próximos jogos</h3>${up.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
+  <div class="grid g2 mt"><div class="card"><h3>Próximos jogos</h3>${up.map((m, i) => matchRow(c, m, 'pub', i === 0)).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
     <div class="card"><h3>Últimos resultados</h3>${last.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo realizado.</p>'}</div></div>
   <div class="grid g2 mt"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
     ${statsCard(c)}</div><div class="mt">${transparency(c)}</div>` + lgpd
@@ -984,6 +1002,7 @@ const A = {
     resetTransient(); ui.tab = ROLE_TABS[d.role][0][0]; scrollTo(0, 0)
   },
   logout: () => { S.session = null; S.offline = false; resetTransient(); ui.doc = null },
+  rod: d => { ui.rod = d.rod },
   tab: d => { ui.tab = d.tab; ui.picker = ui.manage = ui.punish = null; scrollTo(0, 0) },
   champ: d => { S.champId = d.id; resetTransient(); ui.tab = 'painel'; scrollTo(0, 0) },
   pchamp: d => { S.champId = d.id; resetTransient() },
@@ -1222,6 +1241,7 @@ function render() {
     Promise.all([document.fonts.load('700 40px "Barlow Condensed"'), document.fonts.load('600 30px Barlow')]).catch(() => {}).finally(buildCards)
 }
 
+document.addEventListener('click', e => document.querySelectorAll('details.mais[open]').forEach(d => { if (!d.contains(e.target)) d.open = false }))
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return
   if (await A[b.dataset.act](b.dataset) === 'stay') return
