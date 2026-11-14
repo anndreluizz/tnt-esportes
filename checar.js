@@ -8,7 +8,7 @@ const ctx = vm.createContext({
   localStorage: {getItem: () => null, setItem() {}}, navigator: {}, location: {protocol: 'file:', hash: ''},
   document: {querySelector: s => els[s] ??= el(), querySelectorAll: () => [], getElementById: () => null, addEventListener() {},
              body: el(), fonts: {load: () => Promise.resolve()},
-             createElement: () => ({getContext: () => new Proxy({}, {get: (t, k) => k === 'measureText' ? () => ({width: 0}) : () => {}, set: () => true})})},
+             createElement: () => ({getContext: () => new Proxy({}, {get: (t, k) => k === 'measureText' ? () => ({width: 0}) : /Gradient$/.test(k) ? () => ({addColorStop() {}}) : () => {}, set: () => true})})},
 })
 for (const f of ['js/regras.js', 'js/dados.js', 'js/app.js', 'js/api.js']) vm.runInContext(read(f), ctx, {filename: f})
 const run = code => vm.runInContext(code, ctx)

@@ -206,12 +206,14 @@ const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div 
 /* ---------- login ---------- */
 // fotos de Tonantins: ginásio, praça (piso nas cores da bandeira) e orla; só lugares, sem rostos em destaque
 const FAIXA = ['ginasio', 'praca', 'orla'].map(n => `<img src="img/faixa-${n}.jpg" width="720" height="540" alt="" loading="lazy">`).join('')
+// cartão de placar de transmissão: campeonato, rodada, escudos, horário e local
+const placarJogo = (c, m) => `<div class="placar" aria-label="Próximo jogo"><div class="top"><span>${esc(c.name)}</span><b>${esc(mtitle(m))}</b></div>
+  <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${dm(m.date)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
+  <div class="base"><span>${esc(m.local || c.venue)}</span></div></div>`
 // Hero da entrada (3.0): título grande e o próximo jogo de verdade, de qualquer campeonato
 function loginHero() {
   const nx = S.champs.flatMap(c => c.matches.filter(m => !isDone(m) && m.home && m.away).map(m => [c, m])).sort((a, b) => byDate(a[1], b[1]))[0]
-  const placar = nx ? (([c, m]) => `<div class="placar" aria-label="Próximo jogo"><div class="top"><span>${esc(c.name)}</span><b>${esc(mtitle(m))}</b></div>
-    <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${dm(m.date)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
-    <div class="base"><span>${esc(m.local || c.venue)}</span></div></div>`)(nx) : ''
+  const placar = nx ? placarJogo(...nx) : ''
   return `<div class="lhero t3"><div class="wrap lgrid"><div><div class="eyebrow">Tonantins · Amazonas</div><h1>TNT<br><em>Esportes</em></h1>
     <p>Tabelas, súmulas e resultados dos campeonatos da cidade, organizados pela Secretaria Municipal de Esportes.</p>
     <div class="acts"><button class="btn" data-act="login" data-role="publico">Ver o portal</button></div></div>${placar}</div></div>`
@@ -361,15 +363,16 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
 function vCamps() {
   const cards = S.champs.map(c => {
     const done = c.matches.filter(isDone).length, ch = champion(c)
-    return `<div class="card"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px">${clogo(c.logo)}<h3 style="font-size:22px">${esc(c.name)}</h3></div>
+    const foto = /futsal|quadra|salão/i.test(c.sport) ? 'ginasio' : /society|futebol|campo/i.test(c.sport) ? 'orla' : 'praca'
+    return `<div class="card champ"><div class="cimg" style="--f:url(img/faixa-${foto}.jpg)"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
+      <div class="ctit">${clogo(c.logo)}<h3>${esc(c.name)}</h3></div></div><div class="cbody">
       <p class="sub">${ageRange(c)} · início ${dmy(c.start)} · ${esc(c.venue)}</p>
       <p class="sub"><b>${FORMATOS[formato(c)].nome}</b>${formato(c) === 'grupos' ? ` · ${regras(c).grupos} grupo${regras(c).grupos > 1 ? 's' : ''}, passam ${regras(c).classificam}` : ''}</p>
       ${c.responsible ? `<p class="sub">Responsável: ${esc(c.responsible)}${c.responsiblePhone ? ' · ' + esc(c.responsiblePhone) : ''}</p>` : ''}
       <p class="sub">${c.teams.length} equipes · ${c.players.length} atletas · ${c.matches.length ? `${done}/${c.matches.length} jogos` : 'tabela após o sorteio'}${ch ? ` · campeão: <b>${esc(T(c, ch).name)}</b>` : ''}</p>
       ${c.regUntil ? `<p class="sub">Inscrições até ${dmy(c.regUntil)}</p>` : ''}${sponsorsBar(c)}
       <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button>
-        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}<button class="btn ghost sm" data-act="reg" data-id="${c.id}">Regulamento</button></div></div>`
+        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}<button class="btn ghost sm" data-act="reg" data-id="${c.id}">Regulamento</button></div></div></div>`
   }).join('')
   const editing = S.champs.find(c => c.id === ui.editChamp)
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
@@ -687,6 +690,7 @@ function vRelatorios() {
   return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages)}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros)}</div></div>
+  <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5)) || ''}</div>
   <div class="card mt"><h3>Por campeonato</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Campeonato</th><th class="l">Modalidade</th><th>Categoria</th><th>Situação</th><th>Equipes</th><th>Atletas</th><th>Jogos</th><th>Gols</th></tr></thead><tbody>
     ${S.champs.map(c => { const d = c.matches.filter(isDone); return `<tr><td class="l"><b>${esc(c.name)}</b></td><td class="l">${esc(c.sport)}</td><td>${esc(c.category)}</td><td>${cpill(c)}</td><td>${c.teams.length}</td><td>${c.players.filter(p => insc(c, p)[0] === 'aprovado').length}</td><td>${d.length}/${c.matches.length}</td><td>${d.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)}</td></tr>` }).join('')}
   </tbody></table></div></div>
@@ -728,9 +732,8 @@ function vPortal() {
   const c = C()
   const chips = role() === 'equipe' ? '' : `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`
   const nx = c.matches.filter(m => !isDone(m) && m.home && m.away).sort(byDate)[0]
-  const hero = `<div class="hero"><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<div><div class="eyebrow">Portal público · sem login</div><h2>${esc(c.name)}</h2>
-    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</div></div></div>
-    ${nx ? `<div class="next"><div class="eyebrow">Próximo jogo · ${dm(nx.date)} · ${nx.time}</div><b class="cond" style="font-size:20px">${esc(label(c, nx))}</b></div>` : ''}</div>`
+  const hero = `<div class="phero"><div><div class="eyebrow">Portal público · sem login</div><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<h2>${esc(c.name)}</h2></div>
+    <p>${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</p></div>${nx ? placarJogo(c, nx) : ''}</div>`
   const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD). <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>'
   if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
     ${c.teams.map(t => `<div class="row"><span>${crest(t)} <b>${esc(t.name)}</b></span><span class="sub">${esc([t.colors, t.bairro].filter(Boolean).join(' · '))}</span></div>`).join('')}
@@ -839,12 +842,16 @@ function vDiv() {
 function canvasCard(c, title, body) {
   const cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1350
   const x = cv.getContext('2d'), F = {C: '"Barlow Condensed", sans-serif', B: 'Barlow, sans-serif'}
-  x.fillStyle = '#0d2f73'; x.fillRect(0, 0, 1080, 1350)
-  x.fillStyle = '#1d55b8'; x.fillRect(0, 0, 1080, 190); x.fillRect(0, 1270, 1080, 80)
+  // fundo de transmissão: azul-marinho com brilho azul e verde, cabeçalho em degradê com filete verde
+  x.fillStyle = '#071426'; x.fillRect(0, 0, 1080, 1350)
+  let g = x.createRadialGradient(1000, 120, 0, 1000, 120, 760); g.addColorStop(0, 'rgba(23,105,255,.45)'); g.addColorStop(1, 'rgba(23,105,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 1080, 1350)
+  g = x.createRadialGradient(0, 1350, 0, 0, 1350, 700); g.addColorStop(0, 'rgba(0,230,118,.22)'); g.addColorStop(1, 'rgba(0,230,118,0)'); x.fillStyle = g; x.fillRect(0, 0, 1080, 1350)
+  g = x.createLinearGradient(0, 0, 1080, 0); g.addColorStop(0, '#102F68'); g.addColorStop(1, '#071426'); x.fillStyle = g; x.fillRect(0, 0, 1080, 190)
+  x.fillStyle = '#00E676'; x.fillRect(0, 186, 1080, 6); x.fillStyle = '#102F68'; x.fillRect(0, 1270, 1080, 80)
   desenharMarca(x, 110, 95, 58)
   x.textAlign = 'left'; x.fillStyle = '#fff'; x.font = `700 64px ${F.C}`; x.fillText('TNT ESPORTES', 190, 88)
   x.fillStyle = '#d6e2f7'; x.font = `400 30px ${F.B}`; x.fillText(c.name, 190, 134)
-  x.fillStyle = '#2db35d'; x.font = `700 54px ${F.C}`; x.fillText(title, 60, 275)
+  x.fillStyle = '#00E676'; x.font = `700 54px ${F.C}`; x.fillText(title, 60, 275)
   const mk = ui.marcas?.id === c.id ? ui.marcas : null, box = (im, X, Y, W, H) => { const k = Math.min(W / im.width, H / im.height); x.drawImage(im, X + (W - im.width * k) / 2, Y + (H - im.height * k) / 2, im.width * k, im.height * k) }
   if (mk?.logo) box(mk.logo, 920, 35, 120, 120)
   body(x, F)
@@ -864,9 +871,9 @@ function canvasCard(c, title, body) {
 function desenharMarca(x, cx, cy, r) {
   const k = r / 29, X = v => cx + (v - 32) * k, Y = v => cy + (v - 32) * k
   const poli = (pts, fill) => { x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(X(a), Y(b)) : x.moveTo(X(a), Y(b))); x.closePath(); fill ? x.fill() : x.stroke() }
-  x.fillStyle = '#2db35d'; poli([[32, 3], [57.1, 17.5], [57.1, 46.5], [32, 61], [6.9, 46.5], [6.9, 17.5]], true)
+  x.fillStyle = '#00E676'; poli([[32, 3], [57.1, 17.5], [57.1, 46.5], [32, 61], [6.9, 46.5], [6.9, 17.5]], true)
   x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 1.5 * k; poli([[32, 7], [53.65, 19.5], [53.65, 44.5], [32, 57], [10.35, 44.5], [10.35, 19.5]], false)
-  x.fillStyle = '#0d2f73'
+  x.fillStyle = '#071426'
   ;[[14.5, 23, 8.5, 3.4], [17.05, 23, 3.4, 18], [25, 23, 3.4, 18], [35.6, 23, 3.4, 18], [41, 23, 8.5, 3.4], [43.55, 23, 3.4, 18]].forEach(([a, b, w, h]) => x.fillRect(X(a), Y(b), w * k, h * k))
   poli([[25, 23], [29, 23], [39, 41], [35, 41]], true)
 }
@@ -885,8 +892,8 @@ async function buildCards() {
     formato(c) === 'mata' ? canvasCard(c, 'MATA-MATA', (x, F) => {
       let y = 330
       for (const m of c.matches.filter(m => m.phase !== 'terceiro').sort(byDate).slice(-8 + pat)) {
-        x.fillStyle = '#16408f'; x.fillRect(48, y, 984, 104)
-        x.textAlign = 'left'; x.fillStyle = '#2db35d'; x.font = `700 26px ${F.C}`; x.fillText(`${m.title.toUpperCase()} · ${dm(m.date)}`, 76, y + 36)
+        x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 104)
+        x.textAlign = 'left'; x.fillStyle = '#00E676'; x.font = `700 26px ${F.C}`; x.fillText(`${m.title.toUpperCase()} · ${dm(m.date)}`, 76, y + 36)
         x.fillStyle = '#fff'; fit(x, `${tname(c, m, 'home')} ${isDone(m) ? score(m).join(' × ') : '×'} ${tname(c, m, 'away')}`.toUpperCase(), 76, y + 82, 930, 700, 38, F.C); y += 120
       }
     }) : canvasCard(c, allDone(c) || (formato(c) === 'grupos' && groupsOf(c).every(g => groupDone(c, g))) ? 'CLASSIFICAÇÃO FINAL' : `CLASSIFICAÇÃO · APÓS A RODADA ${lastRound}`, (x, F) => {
@@ -898,8 +905,8 @@ async function buildCards() {
         x.textAlign = 'right'; [['P', 820], ['J', 910], ['SG', 1010]].forEach(([l, px]) => x.fillText(l, px, y))
         y += Math.round(lh * .28)
         standings(c, g).forEach((r, i) => { y += lh
-          if (i < q) { x.fillStyle = 'rgba(45,179,93,.14)'; x.fillRect(48, y - lh * .66, 984, lh * .9) }
-          x.textAlign = 'left'; x.fillStyle = i < q ? '#2db35d' : '#a9bfe6'; x.font = `700 ${fs}px ${F.C}`; x.fillText(i + 1, 70, y)
+          if (i < q) { x.fillStyle = 'rgba(0,230,118,.14)'; x.fillRect(48, y - lh * .66, 984, lh * .9) }
+          x.textAlign = 'left'; x.fillStyle = i < q ? '#00E676' : '#a9bfe6'; x.font = `700 ${fs}px ${F.C}`; x.fillText(i + 1, 70, y)
           x.fillStyle = '#fff'; fit(x, r.t.name, 120, y, 620, 600, fs, F.B)
           x.textAlign = 'right'; x.font = `700 ${fs}px ${F.C}`; x.fillText(r.P, 820, y); x.fillText(r.J, 910, y); x.fillText((r.SG > 0 ? '+' : '') + r.SG, 1010, y) })
         y += Math.round(lh * 1.3)
@@ -908,24 +915,24 @@ async function buildCards() {
     canvasCard(c, 'PRÓXIMOS JOGOS', (x, F) => {
       const ms = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 6 - pat); let y = 320
       if (!ms.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Todos os jogos foram realizados.', 60, 400) }
-      ms.forEach(m => { x.fillStyle = '#16408f'; x.fillRect(48, y, 984, 132)
-        x.fillStyle = '#2db35d'; x.font = `700 28px ${F.C}`; x.fillText(`${dm(m.date)} · ${m.time.toUpperCase()} · ${mtitle(m).toUpperCase()}`, 76, y + 42)
+      ms.forEach(m => { x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 132)
+        x.fillStyle = '#00E676'; x.font = `700 28px ${F.C}`; x.fillText(`${dm(m.date)} · ${m.time.toUpperCase()} · ${mtitle(m).toUpperCase()}`, 76, y + 42)
         x.fillStyle = '#fff'; fit(x, label(c, m).toUpperCase(), 76, y + 90, 930, 700, 44, F.C)
         x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(m.local || c.venue, 76, y + 120); y += 152 })
     }),
     canvasCard(c, 'ARTILHARIA', (x, F) => {
       let y = 380
       scorers(c).slice(0, 8 - pat).forEach((s, i) => {
-        x.textAlign = 'left'; x.fillStyle = i ? '#a9bfe6' : '#2db35d'; x.font = `700 40px ${F.C}`; x.fillText(i + 1, 70, y)
+        x.textAlign = 'left'; x.fillStyle = i ? '#a9bfe6' : '#00E676'; x.font = `700 40px ${F.C}`; x.fillText(i + 1, 70, y)
         x.fillStyle = '#fff'; x.font = `600 38px ${F.B}`; x.fillText(s.p.name, 130, y)
         x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(T(c, s.p.team).name, 130, y + 34)
-        x.textAlign = 'right'; x.fillStyle = i ? '#fff' : '#2db35d'; x.font = `700 44px ${F.C}`; x.fillText(`${s.n} gol${s.n > 1 ? 's' : ''}`, 1010, y + 10); y += 110 })
+        x.textAlign = 'right'; x.fillStyle = i ? '#fff' : '#00E676'; x.font = `700 44px ${F.C}`; x.fillText(`${s.n} gol${s.n > 1 ? 's' : ''}`, 1010, y + 10); y += 110 })
     }),
     canvasCard(c, ch ? 'CAMPEÃO' : 'ÚLTIMOS RESULTADOS', (x, F) => {
       if (ch) {
         const fin = c.matches.find(m => m.phase === 'final'), [, vice, terc] = podium(c)
-        x.textAlign = 'center'; x.fillStyle = '#2db35d'; x.beginPath(); x.arc(540, 560, 170, 0, 7); x.fill()
-        x.fillStyle = '#0d2f73'; x.font = `700 120px ${F.C}`; x.fillText('1º', 540, 605)
+        x.textAlign = 'center'; x.fillStyle = '#00E676'; x.beginPath(); x.arc(540, 560, 170, 0, 7); x.fill()
+        x.fillStyle = '#071426'; x.font = `700 120px ${F.C}`; x.fillText('1º', 540, 605)
         x.fillStyle = '#fff'; fit(x, T(c, ch).name.toUpperCase(), 540, 860, 960, 700, 88, F.C)
         x.fillStyle = '#d6e2f7'; x.font = `500 34px ${F.B}`
         x.fillText(fin ? `Final: ${label(c, fin)} · ${score(fin).join(' × ')}${fin.pen ? ` (pên. ${fin.pen[0]}×${fin.pen[1]})` : ''}` : `Campeão por pontos corridos · ${standings(c, 'A')[0].P} pontos`, 540, 940)
@@ -935,11 +942,11 @@ async function buildCards() {
       let y = 330
       c.matches.filter(isDone).sort(byDate).reverse().slice(0, 7 - pat).forEach(m => {
         const [h, a] = score(m)
-        x.fillStyle = '#16408f'; x.fillRect(48, y, 984, 112)
+        x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 112)
         x.fillStyle = '#a9bfe6'; x.font = `600 22px ${F.B}`; x.textAlign = 'left'; x.fillText(`${dm(m.date)} · ${mtitle(m).toUpperCase()}`, 76, y + 34)
         x.fillStyle = '#fff'; x.font = `700 38px ${F.C}`; x.textAlign = 'right'; x.fillText(T(c, m.home).name.toUpperCase(), 450, y + 84)
         x.textAlign = 'left'; x.fillText(T(c, m.away).name.toUpperCase(), 630, y + 84)
-        x.textAlign = 'center'; x.fillStyle = '#2db35d'; x.font = `700 48px ${F.C}`; x.fillText(`${h} × ${a}`, 540, y + 86); y += 128 })
+        x.textAlign = 'center'; x.fillStyle = '#00E676'; x.font = `700 48px ${F.C}`; x.fillText(`${h} × ${a}`, 540, y + 86); y += 128 })
     }),
   ]
   ui.cards.forEach((cv, i) => { const el = document.getElementById('cv' + i); if (el) el.replaceChildren(cv) })
