@@ -170,5 +170,6 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
     ok(v.includes('jogos') === (perfil === 'secretaria' || perfil === 'arbitro'), `tabela jogos só para a Secretaria e o árbitro (${perfil})`)
   }
   run(`S.session = null`)
+  ok(read('sw.js').includes("fetch(e.request, {cache: 'no-cache'})"), 'service worker confere com o servidor a cada abertura (sem cópia velha do HTML/JS)')
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()
