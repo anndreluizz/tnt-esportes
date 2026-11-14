@@ -935,7 +935,7 @@ async function buildCards() {
       let y = 380
       scorers(c).slice(0, 8 - pat).forEach((s, i) => {
         x.textAlign = 'left'; x.fillStyle = i ? '#a9bfe6' : '#00E676'; x.font = `700 40px ${F.C}`; x.fillText(i + 1, 70, y)
-        x.fillStyle = '#fff'; x.font = `600 38px ${F.B}`; x.fillText(s.p.name, 130, y)
+        x.fillStyle = '#fff'; x.font = `600 38px ${F.B}`; x.fillText(nomePublico(c, s.p), 130, y)   // arte pública: menores só com a inicial do sobrenome
         x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(T(c, s.p.team).name, 130, y + 34)
         x.textAlign = 'right'; x.fillStyle = i ? '#fff' : '#00E676'; x.font = `700 44px ${F.C}`; x.fillText(`${s.n} gol${s.n > 1 ? 's' : ''}`, 1010, y + 10); y += 110 })
     }),

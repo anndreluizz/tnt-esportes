@@ -166,5 +166,9 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
     ok(v.includes('jogos') === (perfil === 'secretaria' || perfil === 'arbitro'), `tabela jogos só para a Secretaria e o árbitro (${perfil})`)
   }
   run(`S.session = null`)
+  // menores: nome abreviado nas artes públicas
+  ok(run(`abrevNome('Maria Clara Souza Lima')`) === 'Maria L.' && run(`abrevNome('  joao   pedro ')`) === 'joao P.' && run(`abrevNome('Cacau')`) === 'Cacau' && run(`abrevNome('Ágatha Évora')`) === 'Ágatha É.', 'abrevNome: primeiro nome + inicial do último sobrenome')
+  ok(run(`(() => { const c = seed().champs[0], men = {name: 'Pedro Alves Souza', birth: c.start.slice(0, 4) - 16 + '-06-01'}, mai = {name: 'Pedro Alves Souza', birth: c.start.slice(0, 4) - 30 + '-06-01'}
+    return nomePublico(c, men) === 'Pedro S.' && nomePublico(c, mai) === 'Pedro Alves Souza' && nomePublico(c, {name: 'Sem Data'}) === 'Sem Data' })()`), 'nomePublico: menor abreviado, maior completo')
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()
