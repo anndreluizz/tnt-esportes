@@ -835,7 +835,7 @@ function vDoc() {
     <h4>Cartões</h4>${evTable([...evs('amarelo'), ...evs('vermelho')].sort((a, b) => a.min - b.min), true)}
     <h4>Faltas acumuladas</h4><table><tr><th>Equipe</th><th>1º tempo</th><th>2º tempo</th></tr>${[m.home, m.away].map(t => `<tr><td>${nm(t)}</td><td>${fouls(t, 1)}</td><td>${fouls(t, 2)}</td></tr>`).join('')}</table>
     ${pub ? '' : `<h4>Observações do árbitro</h4><p>${esc(m.notes) || 'Sem observações.'}</p>`}
-    ${m.history.length ? `<h4>Histórico da partida</h4>${m.history.map(x => `<p class="sub">${fdt(x.at)} · ${esc(x.who)}: ${esc(x.what)}${x.why ? ` · motivo: ${esc(x.why)}` : ''}</p>`).join('')}` : ''}
+    ${m.history.length ? `<h4>Histórico da partida</h4>${m.history.map(x => `<p class="sub">${fdt(x.at)} · ${x.who ? esc(x.who) + ': ' : ''}${esc(x.what)}${x.why ? ` · motivo: ${esc(x.why)}` : ''}</p>`).join('')}` : ''}
     <h4>Assinaturas</h4>${sigs}
     ${sponsorsBar(c)}
     <div class="auth"><div><div class="sub">Código de autenticidade</div><b>${fmtCode(m.hash) || '—'}</b></div><div class="sub" style="max-width:380px">Confira este código no Portal público, em “Conferir uma súmula”. Se qualquer dado da súmula for alterado, o código deixa de bater.</div></div>
