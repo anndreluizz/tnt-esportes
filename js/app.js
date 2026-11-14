@@ -1288,10 +1288,10 @@ function vAuditoria() {
   const a = ui.aud ??= audNovo(), f = a.f, paginas = Math.max(1, Math.ceil(a.total / AUD_POR_PAGINA))
   const opt = (v, t, sel) => `<option value="${esc(v)}" ${String(sel) === String(v) ? 'selected' : ''}>${esc(t)}</option>`
   const quem = (S.perfis || []).map(p => opt(p.id, `${p.nome} (${p.papel})`, f.usuario)).join('')
-  const filtros = `<form class="f" data-form="auditoria" style="margin-bottom:12px">
-    <label>Campeonato<select name="camp">${opt('', 'Todos', f.camp)}${S.champs.map(c => opt(c.id, c.name, f.camp)).join('')}</select></label>
-    <label>Usuário<select name="usuario">${opt('', 'Todos', f.usuario)}${opt('sem', 'Sem usuário (administrador, rotina ou visitante)', f.usuario)}${quem}</select></label>
-    <label>Tabela<select name="tabela">${opt('', 'Todas', f.tabela)}${Object.entries(AUD_TABELAS).map(([k, t]) => opt(k, t, f.tabela)).join('')}</select></label>
+  const filtros = `<form class="f" data-form="auditoria" data-etapas="nao" style="margin-bottom:12px">
+    <label>Campeonato<select name="camp" data-et-chips>${opt('', 'Todos', f.camp)}${S.champs.map(c => opt(c.id, c.name, f.camp)).join('')}</select></label>
+    <label>Usuário<select name="usuario" data-et-chips>${opt('', 'Todos', f.usuario)}${opt('sem', 'Sem usuário (administrador, rotina ou visitante)', f.usuario)}${quem}</select></label>
+    <label>Tabela<select name="tabela" data-et-chips>${opt('', 'Todas', f.tabela)}${Object.entries(AUD_TABELAS).map(([k, t]) => opt(k, t, f.tabela)).join('')}</select></label>
     <label>De<input type="date" name="de" value="${esc(f.de)}"></label><label>Até<input type="date" name="ate" value="${esc(f.ate)}"></label>
     <div class="btns"><button class="btn">Filtrar</button><button class="btn ghost" type="button" data-act="audlimpa">Limpar filtros</button></div></form>`
   let corpo

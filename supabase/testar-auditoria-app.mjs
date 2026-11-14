@@ -166,6 +166,8 @@ ok(/Patrocinadores<\/b>: \[\{&quot;nome&quot;:&quot;Padaria Boa&quot;,&quot;logo
 ok(/Telefone<\/b>|telefone<\/b>: alterado <span class="sub">\(valor não exibido/.test(H) || /<b>telefone<\/b>: alterado/.test(H), 'campo pessoal alterado aparece só como "alterado (valor não exibido: dado pessoal)"')
 ok(/Aprovado<\/b>: não → sim/.test(H), 'aprovação aparece como "Aprovado: não → sim"')
 ok(/Árbitro<\/b>:/.test(H) && /Jogo \(árbitro\)/.test(H), 'a troca de árbitro aparece com a tabela "Jogo (árbitro)"')
+ok(/<form[^>]*data-form="auditoria"[^>]*data-etapas="nao"/.test(H), 'o formulário de filtros não é dividido em etapas pelo assistente do app (etapas.js dividiria um formulário com mais de 2 campos em "Etapa 1 de 3 / Próximo")')
+ok(['camp', 'usuario', 'tabela'].every(n => new RegExp('<select name="' + n + '" data-et-chips>').test(H)), 'os seletores de filtro ficam como lista (o assistente de etapas não os troca por botões que escondem a opção "Todas")')
 // nenhuma ação de editar ou excluir na tela
 const acoes = [...new Set([...H.matchAll(/data-act="([a-z]+)"/g)].map(m => m[1]))].sort().join()
 ok(acoes === 'audlimpa,audpag,tab', `as únicas ações são paginar, limpar filtros e navegar entre abas (encontradas: ${acoes})`)
