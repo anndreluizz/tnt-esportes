@@ -22,4 +22,6 @@ jobs:
           npm test
       - name: Volume local, 16 equipes, 300 atletas, 120 jogos e mais de 1.200 eventos (supabase/testar-volume*.mjs)
         working-directory: supabase
+        env:
+          LIMITE_ESTRITO: 1   # o app não pode perder registros nem errar resultados com o limite de 1.000 linhas do Supabase
         run: npm run test:volume

@@ -14,7 +14,7 @@ npm run test:volume
 ```
 - `volume.mjs` gera, sempre igual, 16 equipes, 300 atletas (15 menores), 120 jogos de pontos corridos e mais de 1.200 eventos, pelos mesmos caminhos do app (as regras do banco rodam na carga).
 - `testar-volume.mjs` confere as regras do banco com esse volume (classificação, súmula, W.O., suspensão, sorteio, mata-mata, portal e perfis) contra um cálculo independente.
-- `testar-volume-app.mjs` roda o app de verdade sobre esses dados e compara com o banco, sem e com o limite de 1.000 linhas por consulta do Supabase (`LIMITE_LINHAS=n` muda o limite; `LIMITE_ESTRITO=1` faz o teste falhar quando o app perde dados).
+- `testar-volume-app.mjs` roda o app de verdade sobre esses dados e compara com o banco (classificação, placares, artilharia e suspensões), sem limite e com limites de 1.000, 500 e 250 linhas por consulta, e confere que uma leitura incompleta é detectada e avisada. `LIMITE_LINHAS=n` muda o limite principal; `LIMITE_ESTRITO=0` só mostra o resultado, sem falhar (o padrão é falhar).
 - Não toca na produção: o banco é um PGlite em memória e nenhuma URL nem chave é usada.
 
 ## Colocar no ar

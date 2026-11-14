@@ -63,22 +63,46 @@ async function toState(r) {
   return camps
 }
 
+/* ---------- leitura completa ----------
+   O Supabase corta cada consulta em 1.000 linhas ("Max rows") sem avisar. Aqui a leitura é em páginas, com ordem fixa, e o total é conferido:
+   se faltar linha, a tela mostra um aviso (S.incompleto) e a cópia de segurança se recusa a ser gerada (estrito). */
+const PAGINA = 1000, LEITURAS_INCOMPLETAS = new Set(), POR_ID = [['id', true]]
+async function lerTudo(consulta, nome, estrito) {
+  let out = [], total = null
+  for (let tentativa = 0; tentativa < 2; tentativa++) {   // 2ª tentativa: alguém pode ter gravado no meio da leitura
+    out = []; total = null
+    for (let pg = 0; pg < 2000; pg++) {
+      const r = await consulta().range(out.length, out.length + PAGINA - 1)
+      if (r.error) throw Object.assign(new Error(ERR[r.error.code] || r.error.message), {code: r.error.code})
+      if (total == null && r.count != null) total = r.count
+      out.push(...r.data)
+      if (!r.data.length || (total != null ? out.length >= total : r.data.length < PAGINA)) break
+    }
+    if (total == null || out.length === total) return out
+  }
+  if (estrito) throw new Error(`Leitura incompleta de ${nome}: ${out.length} de ${total} registros`)
+  LEITURAS_INCOMPLETAS.add(nome); return out
+}
+const ler = (tabela, ordem, cols = '*', filtro, estrito) => lerTudo(() => {
+  let c = sb.from(tabela).select(cols, {count: 'exact'}); if (filtro) c = filtro(c)
+  for (const [k, asc] of ordem) c = c.order(k, {ascending: asc})
+  return c }, tabela, estrito)
+
 async function loadAll() {
-  const sec = role() === 'secretaria', arb = role() === 'arbitro', eq = role() === 'equipe', all = t => q(sb.from(t).select('*'))
-  let r
+  const sec = role() === 'secretaria', arb = role() === 'arbitro', eq = role() === 'equipe', all = (t, ordem = POR_ID) => ler(t, ordem)
+  let r; LEITURAS_INCOMPLETAS.clear()
   try {
-    // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
     const [campeonatos, equipes, pub, jogos, eventos, sorteios, historico, suspensoes, perfis, meus, cancelados, minha] = await Promise.all([
       // o público lê as views (sem telefone do responsável, sem observações e assinaturas das súmulas); a Secretaria lê as tabelas
-      q(sb.from(sec ? 'campeonatos' : 'campeonatos_publico').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
-      all(sec ? 'atletas' : 'atletas_publico'), all(sec ? 'jogos' : 'jogos_publico'), all('eventos'), all('sorteios_publico'),
-      q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)),
-      sec || arb || eq ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : [],
+      ler(sec ? 'campeonatos' : 'campeonatos_publico', [['criado_em', true], ['id', true]]), ler(sec ? 'equipes' : 'equipes_publico', [['nome', true], ['id', true]]),
+      all(sec ? 'atletas' : 'atletas_publico'), all(sec ? 'jogos' : 'jogos_publico'), all('eventos'), all('sorteios_publico', [['campeonato_id', true]]),
+      sec ? ler('historico', [['em', false], ['id', true]]) : ler('historico_publico', [['em', false], ['jogo_id', true], ['o_que', true]]),
+      sec || arb || eq ? all('suspensoes') : [], sec ? ler('perfis', [['nome', true], ['id', true]], 'id, nome, papel') : [],
       // equipe: o próprio elenco completo (com pendências); árbitro: fotos dos atletas dos seus jogos (o banco filtra)
-      eq ? q(sb.from('atletas').select('*').eq('equipe_id', S.session.teamId)) : arb ? q(sb.from('atletas').select('id, foto_path')) : [],
-      all('sorteios_cancelados'), eq ? q(sb.from('equipes').select('id, link_token').eq('id', S.session.teamId)) : []])
+      eq ? ler('atletas', POR_ID, '*', c => c.eq('equipe_id', S.session.teamId)) : arb ? ler('atletas', POR_ID, 'id, foto_path') : [],
+      all('sorteios_cancelados'), eq ? ler('equipes', POR_ID, 'id, link_token', c => c.eq('id', S.session.teamId)) : []])
     for (const x of minha) Object.assign(equipes.find(t => t.id === x.id) || {}, x)   // representante vê o link da própria equipe
-    if (arb) for (const x of await q(sb.from('jogos').select('id, observacoes, assinaturas'))) Object.assign(jogos.find(j => j.id === x.id) || {}, x)   // árbitro: observações e assinaturas só dos próprios jogos (o banco filtra)
+    if (arb) for (const x of await ler('jogos', POR_ID, 'id, observacoes, assinaturas')) Object.assign(jogos.find(j => j.id === x.id) || {}, x)   // árbitro: observações e assinaturas só dos próprios jogos (o banco filtra)
     const foto = Object.fromEntries(meus.map(a => [a.id, a.foto_path]))
     const atletas = eq ? [...pub.filter(a => a.equipe_id !== S.session.teamId), ...meus] : pub.map(a => ({...a, foto_path: a.foto_path ?? foto[a.id]}))
     const paths = atletas.map(a => a.foto_path).filter(Boolean)
@@ -94,6 +118,8 @@ async function loadAll() {
     S.offline = true
   }
   S.champs = await toState(r)
+  S.incompleto = [...LEITURAS_INCOMPLETAS]
+  if (S.incompleto.length) toast('Atenção: a leitura de ' + S.incompleto.join(', ') + ' veio incompleta. Os números podem estar errados. Recarregue a página.')
   if (!S.champs.some(c => c.id === S.champId)) S.champId = S.champs[0]?.id ?? null
   if (sec) limparDocumentos(r).catch(() => {})   // não trava a tela
   if (sec) reprocessaPendencias().catch(() => {})   // imagens antigas que não puderam ser apagadas antes (conferindo de novo que não estão em uso)
@@ -247,7 +273,7 @@ function escolheParaApagar(candidatos, referenciados, pasta) {
 }
 // o que o banco referencia AGORA, lido do banco (não da tela)
 async function caminhosReferenciados() {
-  const [camps, eqs] = await Promise.all([q(sb.from('campeonatos').select('logo_path, patrocinadores')), q(sb.from('equipes').select('escudo_path'))])
+  const [camps, eqs] = await Promise.all([ler('campeonatos', POR_ID, 'logo_path, patrocinadores', null, true), ler('equipes', POR_ID, 'escudo_path', null, true)])   // leitura incompleta = erro: nada é apagado
   return [...camps.flatMap(c => [c.logo_path, ...(c.patrocinadores || []).map(x => x.logo_path)]), ...eqs.map(e => e.escudo_path)]
 }
 function registraPendencia(paths, pasta, motivo) {
@@ -367,7 +393,7 @@ const REAL_A = {
   backup: async () => {   // tudo o que está no banco, num arquivo (fotos e documentos ficam fora)
     try {
       const tabelas = ['campeonatos', 'equipes', 'atletas', 'jogos', 'eventos', 'suspensoes', 'sorteios', 'historico', 'perfis'], dados = {}
-      for (const t of tabelas) dados[t] = await q(sb.from(t === 'sorteios' ? 'sorteios_publico' : t).select('*').limit(100000))
+      for (const t of tabelas) dados[t] = t === 'sorteios' ? await ler('sorteios_publico', [['campeonato_id', true]], '*', null, true) : await ler(t, t === 'historico' ? [['id', true]] : POR_ID, '*', null, true)   // cópia incompleta = erro, nunca arquivo pela metade
       const blob = new Blob([JSON.stringify({sistema: 'TNT Esportes', gerado_em: new Date().toISOString(), ...dados}, null, 1)], {type: 'application/json'})
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tnt-esportes-copia-${new Date().toISOString().slice(0, 10)}.json`; a.click()
       toast(`Cópia baixada: ${tabelas.map(t => dados[t].length).reduce((x, y) => x + y)} registros. Guarde em lugar seguro (tem dados pessoais).`)

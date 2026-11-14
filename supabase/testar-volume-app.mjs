@@ -2,16 +2,15 @@
 // Camada 2: roda o app de verdade (js/regras.js, dados.js, app.js, api.js → loadAll, classificação, artilharia, disciplina) sobre os dados de volume
 // e compara com o que o BANCO calcula. 100% local: PGlite + um cliente Supabase de mentira que devolve as linhas.
 //
-// Duas execuções:
-//  1) SEM limite de linhas: o app tem que bater exatamente com o banco (valida a lógica do app).
-//  2) COM o limite de 1.000 linhas por consulta (o "Max rows" padrão do Supabase/PostgREST; mude com LIMITE_LINHAS=n): mede se o app erra.
-//     Hoje o app não pagina, então este caso mostra um ACHADO. Ele só derruba o teste com LIMITE_ESTRITO=1 (para usar quando houver a correção).
+// O app lê o banco em páginas (api.js: lerTudo) e confere o total. Este teste prova que, mesmo com o limite de 1.000 linhas por consulta
+// (o "Max rows" padrão do Supabase; LIMITE_LINHAS=n muda), e com limites menores, o app mostra exatamente o que o banco calcula, e que uma
+// leitura incompleta é detectada e informada. LIMITE_ESTRITO=0 só mostra o resultado sem falhar (o padrão agora é falhar).
 import { readFileSync } from 'node:fs'
 import { createHash, webcrypto } from 'node:crypto'
 import vm from 'node:vm'
 import { criaBanco, semeia, como, dono, q as qq, SEC, CAMP } from './volume.mjs'
 
-const LIMITE = +(process.env.LIMITE_LINHAS || 1000), ESTRITO = !!process.env.LIMITE_ESTRITO
+const LIMITE = +(process.env.LIMITE_LINHAS || 1000), ESTRITO = process.env.LIMITE_ESTRITO !== '0'
 let total = 0, falhas = 0
 const ok = (cond, msg) => { total++; if (!cond) { falhas++; console.error('  FALHOU:', msg) } }
 const db = await criaBanco(), q = (s, p) => qq(db, s, p)
@@ -48,23 +47,31 @@ const ctx = vm.createContext({ crypto: webcrypto, TextEncoder, console, setInter
 for (const f of ['js/regras.js', 'js/dados.js', 'js/app.js', 'js/api.js']) vm.runInContext(read(f), ctx, { filename: f })
 const run = code => vm.runInContext(code, ctx)
 
-// cliente Supabase de mentira: as consultas do loadAll devolvem as linhas, cortadas em `cap` (como o PostgREST)
-const sbFalso = (tabelas, cap) => ({
+// cliente Supabase de mentira, como o PostgREST: ordem pedida, range, contagem exata e teto de linhas por resposta (cap).
+// modo: 'normal' | 'semContagem' (sem count) | 'ignoraRange' (devolve sempre as primeiras linhas) | 'cortaSempre' (nunca passa de cap linhas no total)
+const sbFalso = (tabelas, cap, modo = 'normal') => ({
   from: t => {
     if (!tabelas[t]) throw new Error('o app consultou uma fonte inesperada: ' + t)
-    const st = { rows: [...tabelas[t]], lim: cap }
+    const st = { filtros: [], ordens: [], de: 0, ate: Infinity, contar: false }
     const ch = {
-      select: () => ch, eq: (c, v) => { st.rows = st.rows.filter(r => r[c] === v); return ch },
-      order: (c, o) => { const s = o?.ascending === false ? -1 : 1; st.rows.sort((a, b) => (a[c] > b[c] ? 1 : a[c] < b[c] ? -1 : 0) * s); return ch },
-      limit: n => { st.lim = Math.min(n, cap); return ch },
-      then: (f, g) => Promise.resolve({ data: st.rows.slice(0, st.lim), error: null }).then(f, g) }
+      select: (c, o) => { st.contar = o?.count === 'exact'; return ch }, eq: (c, v) => { st.filtros.push([c, v]); return ch },
+      order: (c, o) => { st.ordens.push([c, o?.ascending === false ? -1 : 1]); return ch },
+      limit: n => { st.ate = Math.min(st.ate, st.de + n - 1); return ch }, range: (a, b) => { st.de = a; st.ate = b; return ch },
+      then: (f, g) => {
+        let rows = tabelas[t].filter(r => st.filtros.every(([c, v]) => r[c] === v))
+        if (st.ordens.length) rows = [...rows].sort((a, b) => { for (const [c, s] of st.ordens) { if (a[c] !== b[c]) return (a[c] > b[c] ? 1 : -1) * s } return 0 })
+        const total = rows.length
+        const de = modo === 'ignoraRange' ? 0 : st.de, ate = modo === 'ignoraRange' ? cap - 1 : st.ate
+        let fatia = rows.slice(de, ate + 1).slice(0, cap)
+        if (modo === 'cortaSempre') fatia = rows.slice(0, cap).slice(de, ate + 1)
+        return Promise.resolve({ data: fatia, error: null, count: st.contar && modo !== 'semContagem' ? total : null }).then(f, g)
+      } }
     return ch
   },
   storage: { from: () => ({ createSignedUrls: async () => ({ data: [] }), list: async () => ({ data: [], error: null }), remove: async () => ({ data: [], error: null }) }) } })
-globalThis.__tab = TAB
 
-const mede = async (perfil, cap) => {
-  ctx.__sb = sbFalso(TAB[perfil], cap)
+const mede = async (perfil, cap, modo) => {
+  ctx.__sb = sbFalso(TAB[perfil], cap, modo)
   run(`sb = __sb; S.session = ${perfil === 'secretaria' ? `{role: 'secretaria', uid: '${SEC}', name: 'Secretaria'}` : `{role: 'publico'}`}`)
   await run('loadAll()')
   const r = JSON.parse(run(`JSON.stringify((() => { const c = S.champs.find(x => x.id === '${CAMP}'), d = discipline(c)
@@ -74,32 +81,43 @@ const mede = async (perfil, cap) => {
       placar: Object.fromEntries(c.matches.filter(isDone).map(m => [m.id, score(m)])),
       gols: Object.fromEntries(scorers(c).map(s => [s.p.id, s.n])),
       susp: ${JSON.stringify(verdade.suspensos)}.map(s => !!(d.susp[s.jogo] && d.susp[s.jogo][s.atleta])),
-      jogos: c.matches.length, atletas: c.players.length } })())`))
+      jogos: c.matches.length, atletas: c.players.length, incompleto: S.incompleto, aviso: avisoLeitura() } })())`))
   const difTabela = r.tabela.filter((x, i) => JSON.stringify(x) !== JSON.stringify(verdade.classificacao[i])).length
   const difPlacar = Object.keys(verdade.placar).filter(j => JSON.stringify(r.placar[j]) !== JSON.stringify(verdade.placar[j])).length
   const ids = new Set([...Object.keys(verdade.gols), ...Object.keys(r.gols)])
   const difGols = [...ids].filter(a => (r.gols[a] ?? 0) !== (verdade.gols[a] ?? 0)).length
   return { ...r, difTabela, difPlacar, difGols, suspOk: r.susp.filter(Boolean).length }
 }
+const resumo = r => `eventos ${r.eventos}/${verdade.eventos}, classificação errada ${r.difTabela}/16, placares errados ${r.difPlacar}/${Object.keys(verdade.placar).length}, gols errados ${r.difGols}, suspensos ${r.suspOk}/3`
+const igualAoBanco = r => r.eventos === verdade.eventos && r.jogos === 120 && r.atletas === 300 && r.difTabela === 0 && r.difPlacar === 0 && r.difGols === 0 && r.suspOk === 3
 
 console.log(`Eventos no banco: ${verdade.eventos}. Jogos: ${M.jogos.length}. Atletas: ${M.total.atletas}. Limite de linhas simulado: ${LIMITE}.`)
 for (const perfil of ['publico', 'secretaria']) {
-  console.log(`\nApp como ${perfil}`)
-  const livre = await mede(perfil, Infinity)
-  ok(livre.eventos === verdade.eventos && livre.jogos === 120 && livre.atletas === 300, `sem limite: o app carrega todos os ${verdade.eventos} eventos, 120 jogos e 300 atletas`)
-  ok(livre.difTabela === 0, 'sem limite: classificação do app (16 equipes) igual à view do banco')
-  ok(livre.difPlacar === 0, 'sem limite: os 112 placares do app iguais ao do banco')
-  ok(livre.difGols === 0, 'sem limite: artilharia do app (gols por atleta) igual à do banco')
-  ok(livre.suspOk === 3, 'sem limite: o app mostra os 3 suspensos por cartão vermelho na rodada seguinte')
-
-  const cort = await mede(perfil, LIMITE)
-  const perdidos = verdade.eventos - cort.eventos
-  console.log(`  Com limite de ${LIMITE} linhas: o app recebeu ${cort.eventos} de ${verdade.eventos} eventos (${perdidos} perdidos, sem aviso).`)
-  console.log(`  → linhas da classificação erradas: ${cort.difTabela} de 16 · placares errados: ${cort.difPlacar} de ${Object.keys(verdade.placar).length} · atletas com gols errados: ${cort.difGols} · suspensos por vermelho que o app mostra: ${cort.suspOk} de 3`)
-  const erra = perdidos > 0 && (cort.difTabela + cort.difPlacar + cort.difGols > 0 || cort.suspOk < 3)
-  if (ESTRITO) ok(!erra && perdidos === 0, `com limite: o app não pode perder eventos nem errar resultados`)
-  else if (erra) console.log('  ACHADO: com mais eventos que o limite, o app mostra classificação, placares, artilharia ou suspensões diferentes do banco. (Não falha o teste; use LIMITE_ESTRITO=1 para falhar.)')
-  else ok(perdidos === 0, 'com limite: nada foi perdido')
+  console.log(`
+App como ${perfil}`)
+  for (const cap of [Infinity, LIMITE, 500, 250]) {
+    const r = await mede(perfil, cap)
+    const nome = cap === Infinity ? 'sem limite' : `limite de ${cap} linhas`
+    console.log(`  ${nome}: ${resumo(r)}`)
+    ok(igualAoBanco(r), `${nome}: eventos, classificação (16), placares (112), artilharia e suspensões (3) iguais aos do banco`)
+    ok((r.incompleto ?? []).length === 0 && r.aviso === '', `${nome}: leitura completa, sem aviso falso`)
+  }
+  // servidor sem contagem exata: o app ainda lê tudo (para quando a página vem curta)
+  ok(igualAoBanco(await mede(perfil, LIMITE, 'semContagem')), 'sem contagem exata do servidor: o app ainda lê tudo e bate com o banco')
+  // leitura incompleta: o app tem que perceber e avisar, não mostrar números errados em silêncio
+  for (const modo of ['cortaSempre', 'ignoraRange']) {
+    const r = await mede(perfil, LIMITE, modo)
+    ok((r.incompleto ?? []).includes('eventos') && /Leitura incompleta do banco/.test(r.aviso) && r.aviso.includes('eventos'), `servidor que corta (${modo}): o app detecta a leitura incompleta de eventos e mostra o aviso`)
+  }
 }
-console.log(falhas ? `\n${falhas} de ${total} verificações do app falharam` : `\nok: ${total} verificações do app sobre o volume (o ACHADO acima, se houver, não conta como falha)`)
-process.exit(falhas ? 1 : 0)
+// cópia de segurança e verificação de imagens usam leitura estrita: incompleta = erro, nunca arquivo pela metade
+ctx.__sb = sbFalso(TAB.secretaria, LIMITE, 'cortaSempre'); run('sb = __sb')
+let negou = null; try { await run("ler('eventos', POR_ID, '*', null, true)") } catch (e) { negou = e.message }
+ok(/Leitura incompleta de eventos/.test(negou || ''), `leitura estrita incompleta é recusada (${negou})`)
+ctx.__sb = sbFalso(TAB.secretaria, LIMITE); run('sb = __sb')
+ok((await run("ler('eventos', POR_ID, '*', null, true)")).length === verdade.eventos, 'leitura estrita completa devolve todos os eventos (cópia de segurança)')
+ok((await run("ler('eventos', POR_ID)")).map(e => e.id).filter((x, i, a) => a.indexOf(x) !== i).length === 0, 'a leitura em páginas não repete nem pula linhas')
+console.log(falhas ? `
+${falhas} de ${total} verificações do app falharam` : `
+ok: ${total} verificações do app sobre o volume`)
+process.exit(falhas && ESTRITO ? 1 : 0)

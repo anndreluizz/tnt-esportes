@@ -1231,6 +1231,11 @@ const F = {
 }
 
 /* ---------- desenho da página ---------- */
+// leitura do banco que veio incompleta (api.js confere o total de cada tabela): números na tela podem estar errados
+function avisoLeitura() {
+  return S.incompleto?.length ? `<div class="card mt" role="alert"><h3>Leitura incompleta do banco <span class="pill amber">atenção</span></h3>
+    <p class="sub">Não foi possível ler todos os registros de: ${S.incompleto.map(esc).join(', ')}. Classificação, placares e artilharia podem estar errados. Recarregue a página; se continuar, avise o suporte.</p></div>` : ''
+}
 // aviso da Central: imagens antigas do bucket "marcas" que ainda não puderam ser apagadas (só no modo oficial; a lista fica no aparelho)
 function avisoMarcas() {
   if (typeof pendentesMarcas !== 'function') return ''
@@ -1268,7 +1273,7 @@ function render() {
   const sub = grupo && grupo[2].length > 1 ? `<div class="chips subnav" role="group" aria-label="${grupo[1]}">${grupo[2].map(k => tabBtn(k, rotulo(k), ui.tab === k)).join('')}</div>` : ''
   const view = c || ['campeonatos', 'relatorios'].includes(ui.tab) ? VIEWS[ui.tab]()
     : `<div class="card empty mt">Nenhum campeonato cadastrado ainda.${r === 'secretaria' ? '<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="campeonatos">Criar o primeiro campeonato</button></div>' : ''}</div>`
-  app.className = 'wrap'; app.innerHTML = `<h1 class="sr">${esc(rotulo(ui.tab))}${c ? ' · ' + esc(c.name) : ''}</h1>` + sub + view
+  app.className = 'wrap'; app.innerHTML = `<h1 class="sr">${esc(rotulo(ui.tab))}${c ? ' · ' + esc(c.name) : ''}</h1>` + sub + avisoLeitura() + view
   doc.hidden = !(ui.doc || ui.reg); doc.innerHTML = ui.doc ? vDoc() : ui.reg ? vReg() : ''
   document.body.classList.toggle('doc-open', !!(ui.doc || ui.reg))
   if (ui.tab === 'sumula') hookPads()

@@ -158,7 +158,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   ok(els['#doc'].innerHTML.includes('OBSERVACAO INTERNA'), 'a Secretaria continua vendo as observações da súmula')
   run(`ui.doc = null; render()`)
   // carga do banco (loadAll de verdade, com um banco de mentira): roda sem erro em todos os perfis e só a Secretaria lê as tabelas sensíveis
-  run(`globalThis.__vistas = []; sb = {from: t => { __vistas.push(t); const r = {data: [], error: null}, ch = {select: () => ch, order: () => ch, limit: () => ch, eq: () => ch, then: (f, g) => Promise.resolve(r).then(f, g)}; return ch },
+  run(`globalThis.__vistas = []; sb = {from: t => { __vistas.push(t); const r = {data: [], error: null}, ch = {select: () => ch, order: () => ch, limit: () => ch, range: () => ch, eq: () => ch, then: (f, g) => Promise.resolve(r).then(f, g)}; return ch },
     storage: {from: () => ({createSignedUrls: async () => ({data: []})})}}`)
   for (const [perfil, sessao] of [['publico', "{role: 'publico'}"], ['arbitro', "{role: 'arbitro', uid: 'u1'}"], ['equipe', "{role: 'equipe', teamId: 't1'}"], ['secretaria', "{role: 'secretaria', uid: 'u2'}"]]) {
     run(`S.session = ${sessao}; __vistas = []`)
@@ -182,7 +182,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
     st.foto = {campeonatos: JSON.parse(JSON.stringify(st.camp)), equipes: JSON.parse(JSON.stringify(st.eq))}
     const tabela = t => t === 'campeonatos' ? st.camp : st.eq
     st.from = t => { let filtro = null, mudanca = null
-      const b = {select: () => b, eq: (k, v) => (filtro = [k, v], b), update: o => (mudanca = o, b),
+      const b = {select: () => b, order: () => b, range: () => b, eq: (k, v) => (filtro = [k, v], b), update: o => (mudanca = o, b),
         then: (res, rej) => Promise.resolve().then(() => {
           const linhas = tabela(t).filter(r => !filtro || r[filtro[0]] === filtro[1])
           if (mudanca) { st.ordem.push('update:' + t); if (cfg.falhaUpdate) return {data: null, error: {message: 'falhou ao gravar'}}; linhas.forEach(r => Object.assign(r, mudanca)); st.atualizou = true; return {data: null, error: null} }
