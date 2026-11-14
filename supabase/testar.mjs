@@ -12,6 +12,9 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create role anon nologin; create role authenticated nologin;
   grant usage on schema public, auth to anon, authenticated; grant execute on function auth.uid() to anon, authenticated;`)
+// o Supabase concede privilégios automáticos a objetos NOVOS do esquema public (visto em produção: SELECT, REFERENCES, TRIGGER, TRUNCATE).
+// Simulamos isso aqui: assim o teste de privilégios (mais abaixo) acusa qualquer migration que esqueça o revoke.
+await db.exec(`alter default privileges in schema public grant select, references, trigger, truncate on tables to anon, authenticated`)
 for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.includes('_storage')))
   await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8'))
 
@@ -287,6 +290,17 @@ const [ja2] = await q(`select data::text, hora, local, adiado from jogos where i
 ok(ja2.hora === '18h30' && ja2.local === 'Ginásio do Bairro Novo' && ja2.adiado === true, 'Secretaria altera data, hora e local do jogo')
 ok((await q(`select motivo from historico where jogo_id = $1 order by em desc limit 1`, [ja1.id]))[0].motivo === 'quadra em reforma', 'alteração do jogo fica no histórico com motivo')
 await como(ARB); await erro(`select alterar_jogo($1, '2027-09-11', '18h30', '', 'quero mudar')`, [ja1.id], 'Secretaria', 'árbitro não altera jogo')
+
+console.log("Privilégios mínimos (como o Supabase concede automaticamente em objetos novos)")
+await db.exec('reset role')
+const excesso = await q(`select table_name || '/' || grantee || '=' || string_agg(privilege_type, ',' order by privilege_type) x from information_schema.role_table_grants
+  where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type in ('TRUNCATE', 'REFERENCES', 'TRIGGER') group by table_name, grantee`)
+ok(excesso.length === 0, 'ninguém (anon ou authenticated) tem TRUNCATE, REFERENCES ou TRIGGER em tabela ou view do esquema public' + (excesso.length ? ': ' + excesso.map(r => r.x).join('; ') : ''))
+const escritaView = await q(`select table_name || '/' || grantee x from information_schema.role_table_grants g join pg_views v on v.viewname = g.table_name and v.schemaname = 'public'
+  where g.table_schema = 'public' and g.grantee in ('anon', 'authenticated') and g.privilege_type in ('INSERT', 'UPDATE', 'DELETE')`)
+ok(escritaView.length === 0, 'nenhuma view pública permite INSERT, UPDATE ou DELETE' + (escritaView.length ? ': ' + escritaView.map(r => r.x).join('; ') : ''))
+const anonEscreve = await q(`select table_name x from information_schema.role_table_grants where table_schema = 'public' and grantee = 'anon' and privilege_type in ('INSERT', 'UPDATE', 'DELETE')`)
+ok(anonEscreve.length === 0, 'visitante (anon) não tem INSERT, UPDATE nem DELETE em nada' + (anonEscreve.length ? ': ' + anonEscreve.map(r => r.x).join('; ') : ''))
 
 console.log('Dados da equipe')
 await como(SEC)
