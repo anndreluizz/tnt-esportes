@@ -145,6 +145,10 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   run(`ui.doc = null; ui.reg = 'g4'; render()`); ok(els['#doc'].innerHTML.includes('REGULAMENTO') && els['#doc'].innerHTML.includes('4 grupos') && els['#doc'].innerHTML.includes('quartas de final'), 'regulamento gerado com o formato')
   run(`ui.reg = 'pc'; render()`); ok(els['#doc'].innerHTML.includes('turno e returno') && els['#doc'].innerHTML.includes('Vitória vale 2 pontos'), 'regulamento com as regras escolhidas')
   run(`ui.reg = null; render()`)
+  // histórico da partida: o público não recebe quem alterou nem o motivo (a view do banco não tem essas colunas): a linha sai só com data e texto
+  run(`S = seed(); S.champs.forEach(resolveKO); S.session = {role: 'publico'}; const mh = C().matches.find(isDone); mh.history = [{at: '2026-11-14T12:00:00Z', what: 'Súmula confirmada: A 1 × 0 B'}]; ui.reg = null; ui.doc = {c: C().id, id: mh.id}; render()`)
+  ok(els['#doc'].innerHTML.includes('Súmula confirmada: A 1 × 0 B') && !els['#doc'].innerHTML.includes('undefined') && !els['#doc'].innerHTML.includes(': Súmula'), 'histórico público: só data e texto, sem autor nem motivo')
+  run(`ui.doc = null; S.session = null`)
   // privacidade: o documento público não mostra telefone do responsável nem observações internas da súmula
   run(`S.session = {role: 'publico'}; const cp = C(); cp.responsible = 'Fulano'; cp.responsiblePhone = '97999990000'; ui.doc = null; ui.reg = cp.id; render()`)
   ok(els['#doc'].innerHTML.includes('Fulano') && !els['#doc'].innerHTML.includes('97999990000'), 'regulamento público não mostra o telefone do responsável')
