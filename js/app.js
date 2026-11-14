@@ -13,7 +13,7 @@ const ui = {tab: null, matchId: null, team: null, picker: null, manage: null, pu
 const C = () => S.champs.find(c => c.id === S.champId) || S.champs[0]
 const role = () => S.session?.role
 const cur = () => findMatch(C(), ui.matchId)
-function resetTransient() { Object.assign(ui, {matchId: null, team: null, picker: null, manage: null, punish: null, signing: null, draw: null, verify: null, sumCheck: null, highlight: [], clock: {}}) }
+function resetTransient() { Object.assign(ui, {matchId: null, rod: null, team: null, picker: null, manage: null, punish: null, signing: null, draw: null, verify: null, sumCheck: null, highlight: [], clock: {}}) }
 
 function log(c, who, what, why, m) {
   const e = {at: new Date().toISOString(), who, what, ...(why ? {why} : {})}
