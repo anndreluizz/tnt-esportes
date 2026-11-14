@@ -1217,7 +1217,6 @@ const VIEWS = {painel: vPainel, campeonatos: vCamps, inscricoes: vInscricoes, jo
                relatorios: vRelatorios, divulgacao: vDiv, portal: vPortal, equipe: vEquipe}
 function render() {
   const r = role(), app = $('#app'), doc = $('#doc')
-  document.body.classList.toggle('escuro', !r || r === 'publico')   // 3.0: entrada e portal público no tema escuro
   if (r === 'equipe') { const c = S.champs.find(x => T(x, S.session.teamId)); if (c) S.champId = c.id; else S.session = null }
   if (!role()) {
     $('#hright').innerHTML = ''; $('#tabs').innerHTML = ''; $('#bnav').innerHTML = ''; document.body.classList.remove('has-bnav'); document.title = 'TNT Esportes'
