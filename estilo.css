@@ -566,3 +566,13 @@ body.escuro .et-chip[aria-checked=true]{background:#00E676;border-color:#00E676;
 body.escuro .et-invalido>input,body.escuro .et-invalido>select,body.escuro .et-invalido>textarea,body.escuro .et-invalido input:invalid{background:var(--redbg)!important}
 .cimg{background:linear-gradient(180deg,rgba(7,20,38,.65),rgba(7,20,38,.25) 40%,rgba(7,20,38,.92)),var(--f) center/cover}
 body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--ink)}
+
+/* TNT 3.0, etapa 4: hero do portal público no estilo do protótipo */
+.phero{position:relative;overflow:hidden;isolation:isolate;border-radius:18px;padding:44px 36px;margin-bottom:16px;display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:end;color:#fff;
+  background:linear-gradient(90deg,rgba(7,20,38,.94),rgba(7,20,38,.55) 60%,rgba(23,105,255,.25)),linear-gradient(180deg,rgba(7,20,38,.2),rgba(7,20,38,.8)),var(--grao),url(img/hero-rio.jpg);background-size:auto,auto,180px 180px,cover;background-position:0 0,0 0,0 0,center 45%}
+.phero .eyebrow{display:inline-flex;gap:10px;align-items:center;color:#00E676;letter-spacing:.18em}
+.phero .eyebrow::before{content:"";width:28px;height:3px;background:#00E676}
+.phero h2{font-size:clamp(40px,6vw,84px);line-height:.92;text-transform:uppercase;margin:10px 0 12px;text-shadow:0 6px 30px rgba(0,0,0,.5)}
+.phero p{color:#d5e0f5;font-size:17px}
+.phero .placar{box-shadow:0 20px 60px rgba(0,0,0,.4)}
+@media(max-width:860px){.phero{grid-template-columns:1fr;padding:28px 18px}}
