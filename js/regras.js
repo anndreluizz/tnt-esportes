@@ -64,6 +64,13 @@ function podium(c) {
 }
 
 /* ---------- inscrição ---------- */
+// Menores de 18 anos aparecem só com o primeiro nome e a inicial do último sobrenome ("Maria Clara Souza Lima" -> "Maria L.").
+// Mesma regra da view atletas_publico no banco. A idade vale na data de início do campeonato.
+function abrevNome(nome) {
+  const p = String(nome ?? '').trim().split(/\s+/).filter(Boolean)
+  return p.length < 2 ? p[0] || '' : p[0] + ' ' + p[p.length - 1][0].toUpperCase() + '.'
+}
+const nomePublico = (c, p) => p.birth && ageAt(p.birth, c.start) < 18 ? abrevNome(p.name) : p.name   // para artes e textos que saem da Secretaria para o público
 function ageAt(birth, ref) {
   const [y, mo, d] = birth.split('-').map(Number), [ry, rm, rd] = ref.split('-').map(Number)
   return ry - y - (rm < mo || (rm === mo && rd < d) ? 1 : 0)

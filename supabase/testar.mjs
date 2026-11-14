@@ -12,6 +12,9 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create role anon nologin; create role authenticated nologin;
   grant usage on schema public, auth to anon, authenticated; grant execute on function auth.uid() to anon, authenticated;`)
+// o Supabase concede privilégios automáticos a objetos NOVOS do esquema public (visto em produção: SELECT, REFERENCES, TRIGGER, TRUNCATE).
+// Simulamos isso aqui: assim o teste de privilégios (mais abaixo) acusa qualquer migration que esqueça o revoke.
+await db.exec(`alter default privileges in schema public grant select, references, trigger, truncate on tables to anon, authenticated`)
 for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.includes('_storage')))
   await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8'))
 
@@ -288,6 +291,17 @@ ok(ja2.hora === '18h30' && ja2.local === 'Ginásio do Bairro Novo' && ja2.adiado
 ok((await q(`select motivo from historico where jogo_id = $1 order by em desc limit 1`, [ja1.id]))[0].motivo === 'quadra em reforma', 'alteração do jogo fica no histórico com motivo')
 await como(ARB); await erro(`select alterar_jogo($1, '2027-09-11', '18h30', '', 'quero mudar')`, [ja1.id], 'Secretaria', 'árbitro não altera jogo')
 
+console.log("Privilégios mínimos (como o Supabase concede automaticamente em objetos novos)")
+await db.exec('reset role')
+const excesso = await q(`select table_name || '/' || grantee || '=' || string_agg(privilege_type, ',' order by privilege_type) x from information_schema.role_table_grants
+  where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type in ('TRUNCATE', 'REFERENCES', 'TRIGGER') group by table_name, grantee`)
+ok(excesso.length === 0, 'ninguém (anon ou authenticated) tem TRUNCATE, REFERENCES ou TRIGGER em tabela ou view do esquema public' + (excesso.length ? ': ' + excesso.map(r => r.x).join('; ') : ''))
+const escritaView = await q(`select table_name || '/' || grantee x from information_schema.role_table_grants g join pg_views v on v.viewname = g.table_name and v.schemaname = 'public'
+  where g.table_schema = 'public' and g.grantee in ('anon', 'authenticated') and g.privilege_type in ('INSERT', 'UPDATE', 'DELETE')`)
+ok(escritaView.length === 0, 'nenhuma view pública permite INSERT, UPDATE ou DELETE' + (escritaView.length ? ': ' + escritaView.map(r => r.x).join('; ') : ''))
+const anonEscreve = await q(`select table_name x from information_schema.role_table_grants where table_schema = 'public' and grantee = 'anon' and privilege_type in ('INSERT', 'UPDATE', 'DELETE')`)
+ok(anonEscreve.length === 0, 'visitante (anon) não tem INSERT, UPDATE nem DELETE em nada' + (anonEscreve.length ? ': ' + anonEscreve.map(r => r.x).join('; ') : ''))
+
 console.log('Dados da equipe')
 await como(SEC)
 const [eqd] = await q(`insert into equipes (campeonato_id, nome, escudo_path, responsavel, responsavel_telefone, cores) values ($1, 'Sem Bairro FC', 'x/escudo.png', 'Técnico João', '97 98888-1111', 'verde e branco') returning id, bairro`, [CS])
@@ -386,6 +400,26 @@ await como(OUTRO)
 ok((await q(`select count(*)::int n from campeonatos`))[0].n === 0 && (await q(`select count(*)::int n from jogos`))[0].n === 0, 'usuário logado sem perfil não lê as tabelas de campeonatos e jogos')
 await como(SEC)
 ok((await q(`select count(*)::int n from jogos`))[0].n === todos && (await q(`select responsavel_telefone t from campeonatos where id = $1`, [C]))[0].t === '97999990000', 'Secretaria continua vendo tudo, inclusive o telefone')
+
+console.log("Menores de idade no portal público")
+await como(SEC)
+const mk = async (nome, nasc, num, aprovado = true) => (await q(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, autorizacao, aprovado, consentimento) values ($1, $2, $3, $4, 'Centro', true, $5, true) returning id`, [T.a1.id, nome, num, nasc, aprovado]))[0].id
+const idMenor = await mk('Joao Pedro Silva Santos', '2010-05-01', 61), idUnico = await mk('Cacau', '2011-02-02', 62), idAcento = await mk('Ágatha Maria Évora', '2010-09-09', 63), idAdulto = await mk('Carlos Eduardo Pereira', '1995-03-03', 64)
+const idPendente = (await q(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, autorizacao, aprovado, consentimento) values ($1, 'Menor Em Analise', 65, '2010-01-01', 'Centro', true, false, true) returning id`, [T.a1.id]))[0].id
+await como(null)
+const pubNome = async id => (await q(`select nome from atletas_publico where id = $1`, [id]))[0]?.nome
+ok(await pubNome(idMenor) === 'Joao S.', 'menor aparece só com o primeiro nome e a inicial do último sobrenome')
+ok(await pubNome(idUnico) === 'Cacau', 'menor com nome único continua com o nome')
+ok(await pubNome(idAcento) === 'Ágatha É.', 'inicial com acento fica maiúscula')
+ok(await pubNome(idAdulto) === 'Carlos Eduardo Pereira', 'maior de 18 anos mantém o nome completo')
+ok(await pubNome(idPendente) === undefined, 'menor ainda não aprovado nem aparece')
+const colunasView = Object.keys((await q(`select * from atletas_publico limit 1`))[0]).join()
+ok(colunasView === 'id,equipe_id,nome,numero', 'a view pública continua sem data de nascimento, documentos ou contatos')
+ok(!JSON.stringify(await q(`select nome from atletas_publico`)).includes('Silva Santos'), 'o sobrenome completo do menor não aparece em nenhuma linha pública')
+await como(SEC)
+ok((await q(`select nome from atletas where id = $1`, [idMenor]))[0].nome === 'Joao Pedro Silva Santos', 'Secretaria continua vendo o nome completo do menor')
+await como(REP)
+ok((await q(`select nome from atletas where id = $1`, [idMenor]))[0].nome === 'Joao Pedro Silva Santos', 'representante da própria equipe vê o nome completo dos seus atletas')
 
 console.log(falhas ? `\n${falhas} de ${total} verificações falharam` : `\nok: ${total} verificações`)
 process.exit(falhas ? 1 : 0)
