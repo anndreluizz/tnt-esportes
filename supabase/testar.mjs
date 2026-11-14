@@ -12,10 +12,21 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create role anon nologin; create role authenticated nologin;
   grant usage on schema public, auth to anon, authenticated; grant execute on function auth.uid() to anon, authenticated;`)
+// esquema "storage" simulado, com o que existe em produção: tabelas buckets e objects, RLS ligada em objects,
+// storage.foldername(), e SELECT/INSERT/UPDATE/DELETE em objects para anon e authenticated (as políticas é que decidem)
+await db.exec(`
+  create schema storage;
+  create table storage.buckets (id text primary key, name text not null, owner uuid, public boolean default false, file_size_limit bigint, allowed_mime_types text[], created_at timestamptz default now(), updated_at timestamptz default now());
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text, owner uuid, metadata jsonb, created_at timestamptz default now(), updated_at timestamptz default now(), unique (bucket_id, name));
+  alter table storage.objects enable row level security;
+  create function storage.foldername(name text) returns text[] language plpgsql as $$ declare partes text[]; begin partes := string_to_array(name, '/'); return partes[1:array_length(partes, 1) - 1]; end $$;
+  grant usage on schema storage to anon, authenticated;
+  grant select on storage.buckets to anon, authenticated;
+  grant select, insert, update, delete on storage.objects to anon, authenticated;`)
 // o Supabase concede privilégios automáticos a objetos NOVOS do esquema public (visto em produção, lendo o catálogo bruto: TRUNCATE, REFERENCES, TRIGGER e MAINTAIN).
 // Simulamos isso aqui: assim o teste de privilégios (mais abaixo) acusa qualquer migration que esqueça o revoke.
 await db.exec(`alter default privileges for role postgres in schema public grant truncate, references, trigger, maintain on tables to anon, authenticated`)
-for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.includes('_storage')))
+for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.includes('_storage_limpeza')))
   await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8'))
 
 let falhas = 0, total = 0
@@ -290,6 +301,110 @@ const [ja2] = await q(`select data::text, hora, local, adiado from jogos where i
 ok(ja2.hora === '18h30' && ja2.local === 'Ginásio do Bairro Novo' && ja2.adiado === true, 'Secretaria altera data, hora e local do jogo')
 ok((await q(`select motivo from historico where jogo_id = $1 order by em desc limit 1`, [ja1.id]))[0].motivo === 'quadra em reforma', 'alteração do jogo fica no histórico com motivo')
 await como(ARB); await erro(`select alterar_jogo($1, '2027-09-11', '18h30', '', 'quero mudar')`, [ja1.id], 'Secretaria', 'árbitro não altera jogo')
+
+console.log("Armazenamento: políticas dos buckets (SELECT, INSERT, UPDATE e DELETE por perfil)")
+// Esquema "storage" simulado (o PGlite não tem o do Supabase). Limite: aqui só se testam as POLÍTICAS (RLS) de storage.objects.
+// A leitura pública do bucket "marcas" pelo endereço público não passa por política: é uma rota do Supabase para buckets públicos.
+await db.exec('reset role')
+const seq = { n: 0 }
+const obj = (b, nome) => db.query(`insert into storage.objects (bucket_id, name) values ($1, $2)`, [b, nome])   // como superusuário: ignora a RLS
+const conta = async (b, nome) => (await db.query(`select count(*)::int n from storage.objects where bucket_id = $1 and name = $2`, [b, nome])).rows[0].n
+const dono = async () => { await db.exec('reset role') }
+const [{ link_token: TOKEN }] = await q(`select link_token from equipes where id = $1`, [T.a1.id])
+const [{ id: EFORA }] = await q(`insert into equipes (campeonato_id, nome, bairro, pote) values ($1, 'Equipe Sem Jogos', 'Centro', 1) returning id`, [C])
+const [{ id: JG }] = await q(`select id from jogos where status = 'agendado' and mandante_id is not null and visitante_id is not null limit 1`)
+const [{ id: JOUTRO }] = await q(`select id from jogos where id <> $1 limit 1`, [JG])
+await db.query(`update jogos set arbitro_id = $1 where id = $2`, [ARB, JG]); await db.query(`update jogos set arbitro_id = null where id = $1`, [JOUTRO])
+const [{ mandante_id: TJOGO }] = await q(`select mandante_id from jogos where id = $1`, [JG])
+const F = {
+  marca: `${C}/logo-existente.png`, foto: `${TJOGO}/atleta-a.jpg`, fotoFora: `${EFORA}/atleta-b.jpg`, doc: `${T.a1.id}/${TOKEN}/rg-frente.jpg`, assin: `${JG}/arbitro.png`, assinOutro: `${JOUTRO}/arbitro.png` }
+await obj('marcas', F.marca); await obj('fotos', F.foto); await obj('fotos', F.fotoFora); await obj('documentos', F.doc); await obj('assinaturas', F.assin); await obj('assinaturas', F.assinOutro)
+const tenta = async (sql, p) => { try { const r = await db.query(sql, p); return { ok: true, linhas: r.affectedRows ?? r.rows.length } } catch (e) { return { ok: false, msg: e.message } } }
+const bloqueado = r => !r.ok && /row-level security/.test(r.msg)
+
+// ---- marcas (logos públicas): só a Secretaria escreve e lista; os demais não fazem nada ----
+await como(SEC)
+ok((await q(`select name from storage.objects where bucket_id = 'marcas'`)).length === 1, 'marcas: Secretaria lista os arquivos (SELECT)')
+ok((await tenta(`insert into storage.objects (bucket_id, name) values ('marcas', $1)`, [`${C}/logo-nova.png`])).ok, 'marcas: Secretaria envia (INSERT)')
+ok((await tenta(`update storage.objects set metadata = '{"x":1}' where bucket_id = 'marcas' and name = $1`, [`${C}/logo-nova.png`])).linhas === 1, 'marcas: Secretaria substitui (UPDATE)')
+ok((await tenta(`delete from storage.objects where bucket_id = 'marcas' and name = $1`, [`${C}/logo-nova.png`])).linhas === 1, 'marcas: Secretaria exclui (DELETE)')
+for (const [rotulo, uid] of [['visitante', null], ['representante de equipe', REP], ['árbitro', ARB], ['usuário logado sem perfil', OUTRO]]) {
+  await como(uid)
+  ok((await q(`select name from storage.objects where bucket_id = 'marcas'`)).length === 0, `marcas: ${rotulo} não lista os arquivos (SELECT)`)
+  ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('marcas', $1)`, [`${C}/intruso.png`])), `marcas: ${rotulo} não envia (INSERT)`)
+  ok((await tenta(`update storage.objects set name = $1 where bucket_id = 'marcas'`, [`${C}/trocado.png`])).linhas === 0, `marcas: ${rotulo} não substitui (UPDATE não alcança nenhuma linha)`)
+  ok((await tenta(`delete from storage.objects where bucket_id = 'marcas'`)).linhas === 0, `marcas: ${rotulo} não exclui (DELETE não alcança nenhuma linha)`)
+}
+await dono()
+ok(await conta('marcas', F.marca) === 1, 'marcas: o arquivo existente continua lá depois das tentativas indevidas')
+ok((await q(`select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects' and (qual like '%marcas%' or with_check like '%marcas%')`)).map(r => r.policyname).join() === 'marcas_secretaria', 'marcas: existe uma única política (marcas_secretaria); a leitura pública não depende de política')
+
+// ---- fotos (privado): Secretaria tudo; equipe só a pasta da própria equipe; árbitro lê só as equipes dos seus jogos; link envia ----
+await como(SEC)
+ok((await q(`select name from storage.objects where bucket_id = 'fotos'`)).length === 2, 'fotos: Secretaria lista tudo')
+await como(REP)
+ok((await q(`select name from storage.objects where bucket_id = 'fotos'`)).every(r => r.name.startsWith(T.a1.id + '/')), 'fotos: representante só lê a pasta da própria equipe')
+ok((await tenta(`insert into storage.objects (bucket_id, name) values ('fotos', $1)`, [`${T.a1.id}/novo.jpg`])).ok, 'fotos: representante envia para a pasta da própria equipe')
+ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('fotos', $1)`, [`${T.b1.id}/invasor.jpg`])), 'fotos: representante não envia para a pasta de outra equipe')
+ok((await tenta(`delete from storage.objects where bucket_id = 'fotos'`)).linhas === 0 && (await tenta(`update storage.objects set name = name where bucket_id = 'fotos'`)).linhas === 0, 'fotos: representante não exclui nem substitui')
+await como(ARB)
+const fotosArb = (await q(`select name from storage.objects where bucket_id = 'fotos'`)).map(r => r.name)
+ok(fotosArb.includes(F.foto) && !fotosArb.includes(F.fotoFora), 'fotos: árbitro lê as equipes dos seus jogos e não lê equipe sem jogo dele')
+ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('fotos', $1)`, [`${TJOGO}/arbitro.jpg`])) && (await tenta(`delete from storage.objects where bucket_id = 'fotos'`)).linhas === 0, 'fotos: árbitro não envia nem exclui')
+await como(null)
+ok((await q(`select name from storage.objects where bucket_id = 'fotos'`)).length === 0, 'fotos: visitante não lista')
+ok((await tenta(`insert into storage.objects (bucket_id, name) values ('fotos', $1)`, [`${T.a1.id}/${TOKEN}/via-link.jpg`])).ok, 'fotos: visitante envia com o link da equipe (token válido)')
+ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('fotos', $1)`, [`${T.a1.id}/${randomUUID()}/falso.jpg`])), 'fotos: visitante não envia com token falso')
+ok((await tenta(`delete from storage.objects where bucket_id = 'fotos'`)).linhas === 0 && (await tenta(`update storage.objects set name = name where bucket_id = 'fotos'`)).linhas === 0, 'fotos: visitante não exclui nem substitui')
+
+// ---- documentos (RG, LGPD): link envia; SÓ a Secretaria lê, substitui e exclui ----
+await como(null)
+ok((await tenta(`insert into storage.objects (bucket_id, name) values ('documentos', $1)`, [`${T.a1.id}/${TOKEN}/rg-verso.jpg`])).ok, 'documentos: visitante envia com o link da equipe')
+ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('documentos', $1)`, [`${T.a1.id}/${randomUUID()}/falso.jpg`])), 'documentos: visitante não envia com token falso')
+ok((await q(`select name from storage.objects where bucket_id = 'documentos'`)).length === 0, 'documentos: visitante não lê')
+for (const [rotulo, uid] of [['representante de equipe', REP], ['árbitro', ARB]]) {
+  await como(uid)
+  ok((await q(`select name from storage.objects where bucket_id = 'documentos'`)).length === 0, `documentos: ${rotulo} não lê (LGPD)`)
+  ok((await tenta(`delete from storage.objects where bucket_id = 'documentos'`)).linhas === 0, `documentos: ${rotulo} não exclui`)
+}
+await como(SEC)
+ok((await q(`select name from storage.objects where bucket_id = 'documentos'`)).length >= 2, 'documentos: Secretaria lê')
+ok((await tenta(`delete from storage.objects where bucket_id = 'documentos' and name = $1`, [`${T.a1.id}/${TOKEN}/rg-verso.jpg`])).linhas === 1, 'documentos: Secretaria exclui')
+
+// ---- assinaturas (privado): quem apita grava a do próprio jogo; Secretaria e o árbitro do jogo leem ----
+await como(ARB)
+ok((await tenta(`insert into storage.objects (bucket_id, name) values ('assinaturas', $1)`, [`${JG}/mandante.png`])).ok, 'assinaturas: árbitro do jogo grava a assinatura do próprio jogo')
+ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('assinaturas', $1)`, [`${JOUTRO}/mandante.png`])), 'assinaturas: árbitro não grava em jogo que não é dele')
+ok((await q(`select name from storage.objects where bucket_id = 'assinaturas'`)).every(r => r.name.startsWith(JG + '/')), 'assinaturas: árbitro só lê as do próprio jogo')
+ok((await tenta(`delete from storage.objects where bucket_id = 'assinaturas'`)).linhas === 0, 'assinaturas: árbitro não exclui')
+for (const [rotulo, uid] of [['visitante', null], ['representante de equipe', REP]]) {
+  await como(uid)
+  ok((await q(`select name from storage.objects where bucket_id = 'assinaturas'`)).length === 0, `assinaturas: ${rotulo} não lê`)
+  ok(bloqueado(await tenta(`insert into storage.objects (bucket_id, name) values ('assinaturas', $1)`, [`${JG}/falsa.png`])), `assinaturas: ${rotulo} não grava`)
+}
+await como(SEC)
+ok((await q(`select name from storage.objects where bucket_id = 'assinaturas'`)).length >= 2, 'assinaturas: Secretaria lê as de todos os jogos')
+
+// ---- migrations de armazenamento: configuração dos buckets e repetição ----
+await dono()
+const buckets = Object.fromEntries((await q(`select id, public, file_size_limit, allowed_mime_types from storage.buckets`)).map(b => [b.id, b]))
+const IMG = 'image/jpeg,image/png,image/webp'
+ok(buckets.marcas.public === true && Number(buckets.marcas.file_size_limit) === 1048576 && buckets.marcas.allowed_mime_types.join() === IMG, 'bucket marcas: público, 1 MiB, JPEG/PNG/WebP (igual ao de produção)')
+ok(['fotos', 'documentos', 'assinaturas'].every(b => buckets[b].public === false), 'buckets fotos, documentos e assinaturas: privados')
+ok(Number(buckets.fotos.file_size_limit) === 2097152 && Number(buckets.documentos.file_size_limit) === 3145728 && Number(buckets.assinaturas.file_size_limit) === 524288 && buckets.assinaturas.allowed_mime_types.join() === 'image/png', 'limites e tipos dos buckets privados iguais aos de produção')
+const retrato = async () => JSON.stringify([
+  (await q(`select policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname = 'storage' and tablename = 'objects' order by policyname`)),
+  (await q(`select id, public, file_size_limit, allowed_mime_types::text from storage.buckets order by id`)),
+  (await q(`select p.proname, p.proacl::text from pg_proc p where p.proname = 'pasta_do_link'`))])
+const antesRepetir = await retrato()
+let erroRepetir = null
+try { for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => f.includes('_storage') && !f.includes('limpeza'))) await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8')) } catch (e) { erroRepetir = e.message }
+ok(erroRepetir === null, 'repetir as migrations de armazenamento não dá erro' + (erroRepetir ? ': ' + erroRepetir : ''))
+ok(await retrato() === antesRepetir, 'repetir as migrations deixa políticas, buckets e permissões exatamente iguais')
+await db.exec(`drop policy marcas_secretaria on storage.objects; create policy marcas_secretaria on storage.objects for select to anon using (bucket_id = 'marcas')`)   // simula uma mudança manual indevida
+for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => f.includes('_storage_link'))) await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8'))
+ok(await retrato() === antesRepetir, 'repetir a migration desfaz uma mudança manual e volta à definição do repositório')
+ok(readFileSync(new URL('migrations/20261116000000_storage_limpeza.sql', import.meta.url), 'utf8').includes('create or replace function public.limpar_documentos_encerrados'), 'limpeza de documentos: a função é "create or replace" (não roda no teste local: precisa de pg_cron, pg_net e Vault)')
 
 console.log("Privilégios mínimos (como o Supabase concede automaticamente em objetos novos)")
 await db.exec('reset role')
