@@ -372,5 +372,25 @@ ok((await q(`select count(*)::int n from campeonatos`))[0].n === 0 && (await q(`
 await como(SEC)
 ok((await q(`select count(*)::int n from jogos`))[0].n === todos && (await q(`select responsavel_telefone t from campeonatos where id = $1`, [C]))[0].t === '97999990000', 'Secretaria continua vendo tudo, inclusive o telefone')
 
+console.log("Menores de idade no portal público")
+await como(SEC)
+const mk = async (nome, nasc, num, aprovado = true) => (await q(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, autorizacao, aprovado, consentimento) values ($1, $2, $3, $4, 'Centro', true, $5, true) returning id`, [T.a1.id, nome, num, nasc, aprovado]))[0].id
+const idMenor = await mk('Joao Pedro Silva Santos', '2010-05-01', 61), idUnico = await mk('Cacau', '2011-02-02', 62), idAcento = await mk('Ágatha Maria Évora', '2010-09-09', 63), idAdulto = await mk('Carlos Eduardo Pereira', '1995-03-03', 64)
+const idPendente = (await q(`insert into atletas (equipe_id, nome, numero, nascimento, bairro, autorizacao, aprovado, consentimento) values ($1, 'Menor Em Analise', 65, '2010-01-01', 'Centro', true, false, true) returning id`, [T.a1.id]))[0].id
+await como(null)
+const pubNome = async id => (await q(`select nome from atletas_publico where id = $1`, [id]))[0]?.nome
+ok(await pubNome(idMenor) === 'Joao S.', 'menor aparece só com o primeiro nome e a inicial do último sobrenome')
+ok(await pubNome(idUnico) === 'Cacau', 'menor com nome único continua com o nome')
+ok(await pubNome(idAcento) === 'Ágatha É.', 'inicial com acento fica maiúscula')
+ok(await pubNome(idAdulto) === 'Carlos Eduardo Pereira', 'maior de 18 anos mantém o nome completo')
+ok(await pubNome(idPendente) === undefined, 'menor ainda não aprovado nem aparece')
+const colunasView = Object.keys((await q(`select * from atletas_publico limit 1`))[0]).join()
+ok(colunasView === 'id,equipe_id,nome,numero', 'a view pública continua sem data de nascimento, documentos ou contatos')
+ok(!JSON.stringify(await q(`select nome from atletas_publico`)).includes('Silva Santos'), 'o sobrenome completo do menor não aparece em nenhuma linha pública')
+await como(SEC)
+ok((await q(`select nome from atletas where id = $1`, [idMenor]))[0].nome === 'Joao Pedro Silva Santos', 'Secretaria continua vendo o nome completo do menor')
+await como(REP)
+ok((await q(`select nome from atletas where id = $1`, [idMenor]))[0].nome === 'Joao Pedro Silva Santos', 'representante da própria equipe vê o nome completo dos seus atletas')
+
 console.log(falhas ? `\n${falhas} de ${total} verificações falharam` : `\nok: ${total} verificações`)
 process.exit(falhas ? 1 : 0)
