@@ -175,5 +175,124 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   ok(run(`(() => { const c = seed().champs[0], men = {name: 'Pedro Alves Souza', birth: c.start.slice(0, 4) - 16 + '-06-01'}, mai = {name: 'Pedro Alves Souza', birth: c.start.slice(0, 4) - 30 + '-06-01'}
     return nomePublico(c, men) === 'Pedro S.' && nomePublico(c, mai) === 'Pedro Alves Souza' && nomePublico(c, {name: 'Sem Data'}) === 'Sem Data' })()`), 'nomePublico: menor abreviado, maior completo')
   ok(read('sw.js').includes("fetch(e.request, {cache: 'no-cache'})"), 'service worker confere com o servidor a cada abertura (sem cópia velha do HTML/JS)')
+  // exclusão controlada das imagens antigas (bucket "marcas"): banco e armazenamento simulados, cada falha pode ser forçada
+  const novoBanco = (cfg = {}) => {
+    const st = {camp: [{id: 'c1', logo_path: 'c1/logo-1.png', patrocinadores: [{nome: 'Gadita', logo_path: 'c1/patrocinio-0-1.png'}, {nome: 'Lia', logo_path: 'c1/patrocinio-1-1.png'}]}],
+      eq: [{id: 't1', escudo_path: 'c1/equipe-t1-1.png'}], ordem: [], removidos: [], pend: [], atualizou: false}
+    st.foto = {campeonatos: JSON.parse(JSON.stringify(st.camp)), equipes: JSON.parse(JSON.stringify(st.eq))}
+    const tabela = t => t === 'campeonatos' ? st.camp : st.eq
+    st.from = t => { let filtro = null, mudanca = null
+      const b = {select: () => b, eq: (k, v) => (filtro = [k, v], b), update: o => (mudanca = o, b),
+        then: (res, rej) => Promise.resolve().then(() => {
+          const linhas = tabela(t).filter(r => !filtro || r[filtro[0]] === filtro[1])
+          if (mudanca) { st.ordem.push('update:' + t); if (cfg.falhaUpdate) return {data: null, error: {message: 'falhou ao gravar'}}; linhas.forEach(r => Object.assign(r, mudanca)); st.atualizou = true; return {data: null, error: null} }
+          st.ordem.push('select:' + t)
+          const fonte = cfg.releituraAntiga && st.atualizou ? st.foto[t].filter(r => !filtro || r[filtro[0]] === filtro[1]) : linhas
+          return {data: JSON.parse(JSON.stringify(fonte)), error: null} }).then(res, rej) }
+      return b }
+    st.storage = {from: () => ({
+      upload: async path => { st.ordem.push('upload:' + path); return cfg.falhaUpload ? {error: {message: 'sem espaço'}} : {error: null} },
+      remove: async paths => { st.ordem.push('remove:' + paths.join())
+        if (cfg.falhaRemove === 'erro') return {data: null, error: {message: 'rede caiu'}}
+        if (cfg.falhaRemove === 'silencioso') return {data: [], error: null}   // o Storage sem permissão não apaga e não avisa
+        paths.forEach(p => st.removidos.push(p)); return {data: paths.map(name => ({name})), error: null} }})}
+    return st
+  }
+  const usa = st => { ctx.__st = st; run(`sb = {from: __st.from, storage: __st.storage}; fitImage = async f => f ? {tipo: 'blob'} : null; leePendentes = () => __st.pend.slice(); guardaPendentes = l => { __st.pend = l.slice() }`) }
+  const tenta = async codigo => { try { await run(codigo); return null } catch (e) { return e.message } }
+  const SP = {sp0: 'Gadita', spp0: 'c1/patrocinio-0-1.png', sp1: 'Lia', spp1: 'c1/patrocinio-1-1.png'}   // o formulário de edição devolve os patrocinadores que já existem
+  const dc = d => JSON.stringify(d)
+  const idx = (st, prefixo) => st.ordem.findIndex(x => x.startsWith(prefixo))
+
+  ok(run(`JSON.stringify(escolheParaApagar(['c1/a.png', 'c1/b.png', 'c9/de-outro-campeonato.png', null, 'c1/a.png', 'c1/em-uso.png'], ['c1/em-uso.png'], 'c1'))`) === '["c1/a.png","c1/b.png"]', 'escolheParaApagar: só da pasta do campeonato, sem repetir, e nunca o que ainda está em uso')
+  // 1) trocar a logo: o antigo só sai DEPOIS de gravar e conferir
+  let b = novoBanco(); usa(b)
+  ok(await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`) === null, 'trocar a logo: roda sem erro')
+  ok(b.removidos.join() === 'c1/logo-1.png' && b.camp[0].logo_path !== 'c1/logo-1.png' && b.camp[0].logo_path.startsWith('c1/logo-'), 'trocar a logo: o arquivo antigo é apagado e a logo nova fica no registro')
+  ok(idx(b, 'upload:') < idx(b, 'update:campeonatos') && idx(b, 'update:campeonatos') < idx(b, 'remove:'), 'trocar a logo: a ordem é enviar, gravar no banco e só então apagar o antigo')
+  ok(b.ordem.slice(idx(b, 'update:campeonatos'), idx(b, 'remove:')).includes('select:campeonatos'), 'trocar a logo: o registro é lido de volta antes de apagar')
+  ok(b.camp[0].patrocinadores.map(p => p.logo_path).join() === 'c1/patrocinio-0-1.png,c1/patrocinio-1-1.png', 'trocar a logo: os patrocinadores continuam como estavam')
+  // 2) a gravação falha: nada é apagado
+  b = novoBanco({falhaUpdate: true}); usa(b)
+  ok(await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`) !== null && b.removidos.length === 0 && !b.ordem.some(x => x.startsWith('remove:')), 'se a gravação no banco falha, nenhum arquivo é apagado')
+  // 3) o banco não confirma (leitura de volta diferente): nada é apagado
+  b = novoBanco({releituraAntiga: true}); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
+  ok(b.removidos.length === 0 && !b.ordem.some(x => x.startsWith('remove:')), 'se o registro lido de volta não é o pretendido, nada é apagado')
+  // 4) o arquivo antigo ainda é usado por outro registro: nunca apaga
+  b = novoBanco(); b.eq[0].escudo_path = 'c1/logo-1.png'; usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
+  ok(b.removidos.length === 0, 'um arquivo que ainda está referenciado por outro registro nunca é apagado')
+  // 5) a exclusão falha com erro: vira pendência; depois é refeita
+  b = novoBanco({falhaRemove: 'erro'}); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
+  ok(b.pend.length === 1 && b.pend[0].path === 'c1/logo-1.png' && b.camp[0].logo_path !== 'c1/logo-1.png', 'exclusão com erro: o registro fica salvo e a pendência é registrada')
+  b.removidos.length = 0; const cfg5 = b; usa(Object.assign(b, {}))
+  run(`sb = {from: __st.from, storage: {from: () => ({remove: async paths => { __st.ordem.push('remove:' + paths.join()); __st.removidos.push(...paths); return {data: paths.map(name => ({name})), error: null} }})}}`)
+  await run('reprocessaPendencias()')
+  ok(b.removidos.join() === 'c1/logo-1.png' && b.pend.length === 0, 'a pendência é tentada de novo, apaga o arquivo e sai da lista')
+  // 6) o Storage "não apaga e não avisa" (sem erro, lista vazia): também vira pendência
+  b = novoBanco({falhaRemove: 'silencioso'}); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
+  ok(b.pend.length === 1 && b.pend[0].path === 'c1/logo-1.png', 'se o Storage não apaga e não avisa, vira pendência (não é dado como apagado)')
+  // 6b) limite de tentativas automáticas: a pendência fica registrada e visível, sem novas tentativas
+  b = novoBanco({falhaRemove: 'erro'}); b.pend = [{path: 'c1/velho.png', pasta: 'c1', motivo: 'x', em: '2026-01-01', tentativas: 0}]; usa(b)
+  b.renders = 0; run('render = () => { __st.renders++ }')
+  let chamadas = 0;
+  for (let i = 0; i < 8; i++) { const antes = b.ordem.filter(x => x.startsWith('remove:')).length; await run('reprocessaPendencias()'); chamadas += b.ordem.filter(x => x.startsWith('remove:')).length - antes }
+  ok(chamadas === 5, 'a exclusão que sempre falha é tentada no máximo 5 vezes (foram ' + chamadas + ' em 8 aberturas da Central)')
+  ok(b.pend.length === 1 && b.pend[0].path === 'c1/velho.png' && b.pend[0].tentativas === 5 && b.removidos.length === 0, 'ao atingir o limite a pendência continua registrada e nada é apagado')
+  ok(JSON.stringify(await run('pendentesMarcas()')) === '{"total":1,"esgotadas":1}', 'a contagem para a Central mostra 1 pendente e 1 sem novas tentativas')
+  ok(b.renders >= 1, 'cada tentativa que falha atualiza a tela da Central')
+  // depois do limite, mesmo com o Storage funcionando de novo, não há exclusão automática
+  run(`sb = {from: __st.from, storage: {from: () => ({remove: async paths => { __st.removidos.push(...paths); return {data: paths.map(name => ({name})), error: null} }})}}`)
+  await run('reprocessaPendencias()')
+  ok(b.removidos.length === 0 && b.pend.length === 1, 'esgotadas as tentativas, não há nova exclusão automática (a pendência segue registrada)')
+  // aviso da Central
+  const aviso = await run('avisoMarcas()')
+  ok(/Imagens antigas pendentes de exclusão/.test(aviso) && />1</.test(aviso) && /limite de tentativas/.test(aviso), 'a Central mostra a quantidade de imagens pendentes e o limite de tentativas')
+  b = novoBanco(); usa(b); ok(!(await run('avisoMarcas()')), 'sem pendências, a Central não mostra o aviso')
+  // 7) falha ao enviar a imagem nova: não apaga nada e o registro não muda
+  b = novoBanco({falhaUpload: true}); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
+  ok(b.removidos.length === 0 && b.camp[0].logo_path === 'c1/logo-1.png' && b.pend.length === 0, 'se o envio da imagem nova falha, nada é apagado e a logo antiga continua no registro')
+  // 8) tirar um patrocinador: só a imagem dele sai; a do outro e a logo ficam
+  b = novoBanco(); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({sp0: 'Gadita', spp0: 'c1/patrocinio-0-1.png'})}, true)`)
+  ok(b.removidos.join() === 'c1/patrocinio-1-1.png' && b.camp[0].patrocinadores.length === 1 && b.camp[0].logo_path === 'c1/logo-1.png', 'tirar um patrocinador apaga só a imagem dele; a do outro e a logo ficam')
+  // 9) trocar a logo de um patrocinador
+  b = novoBanco(); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({...SP, spl0: 'ARQ'})}, true)`)
+  ok(b.removidos.join() === 'c1/patrocinio-0-1.png' && b.camp[0].patrocinadores[0].logo_path.startsWith('c1/patrocinio-0-') && b.camp[0].patrocinadores[0].logo_path !== 'c1/patrocinio-0-1.png', 'trocar a logo de um patrocinador apaga só a anterior dele')
+  // 10) um patrocinador ficaria sem a imagem que tinha: não apaga nada
+  b = novoBanco(); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({sp0: 'Gadita', sp1: 'Lia', spp1: 'c1/patrocinio-1-1.png'})}, true)`)
+  ok(b.removidos.length === 0 && !b.ordem.some(x => x.startsWith('remove:')), 'se uma operação deixaria um patrocinador sem a imagem que tinha, nada é apagado')
+  // 11) salvar sem mexer em imagens: nada é apagado e os patrocinadores são preservados
+  b = novoBanco(); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({...SP})}, true)`)
+  ok(b.removidos.length === 0 && b.camp[0].patrocinadores.map(p => p.nome).join() === 'Gadita,Lia' && b.camp[0].logo_path === 'c1/logo-1.png', 'salvar o campeonato sem trocar imagens não apaga nada e preserva logo e patrocinadores')
+  // 12) criação de campeonato: não há nada antigo para apagar
+  b = novoBanco(); usa(b)
+  await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, false)`)
+  ok(b.removidos.length === 0 && !b.ordem.some(x => x.startsWith('remove:')), 'criar o campeonato não apaga nada')
+  // 13) pendência cujo arquivo voltou a ser usado: descartada sem apagar
+  b = novoBanco(); b.pend = [{path: 'c1/logo-1.png', pasta: 'c1', motivo: 'x', tentativas: 0}]; usa(b)
+  await run('reprocessaPendencias()')
+  ok(b.removidos.length === 0 && b.pend.length === 0, 'pendência cujo arquivo voltou a ser usado é descartada sem apagar')
+  // 14) escudo da equipe: troca confirmada apaga o antigo; falha ou releitura diferente não
+  b = novoBanco(); usa(b)
+  await tenta(`enviaEscudo({id: 'c1'}, 't1', {tipo: 'blob'})`)
+  ok(b.removidos.join() === 'c1/equipe-t1-1.png' && b.eq[0].escudo_path.startsWith('c1/equipe-t1-') && idx(b, 'update:equipes') < idx(b, 'remove:'), 'trocar o escudo: grava, lê de volta e só então apaga o antigo')
+  b = novoBanco({falhaUpdate: true}); usa(b)
+  await tenta(`enviaEscudo({id: 'c1'}, 't1', {tipo: 'blob'})`)
+  ok(b.removidos.length === 0, 'trocar o escudo com falha na gravação não apaga o antigo')
+  b = novoBanco({releituraAntiga: true}); usa(b)
+  await tenta(`enviaEscudo({id: 'c1'}, 't1', {tipo: 'blob'})`)
+  ok(b.removidos.length === 0, 'trocar o escudo sem confirmação do banco não apaga o antigo')
+  b = novoBanco({falhaRemove: 'silencioso'}); usa(b)
+  await tenta(`enviaEscudo({id: 'c1'}, 't1', {tipo: 'blob'})`)
+  ok(b.pend.length === 1 && b.pend[0].path === 'c1/equipe-t1-1.png', 'escudo: exclusão que o Storage não fez vira pendência')
+  run(`sb = null; leePendentes = () => []; guardaPendentes = () => {}`)
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()
