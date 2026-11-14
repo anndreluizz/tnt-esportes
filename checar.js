@@ -153,5 +153,18 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   run(`S.session = {role: 'secretaria'}; render()`)
   ok(els['#doc'].innerHTML.includes('OBSERVACAO INTERNA'), 'a Secretaria continua vendo as observações da súmula')
   run(`ui.doc = null; render()`)
+  // carga do banco (loadAll de verdade, com um banco de mentira): roda sem erro em todos os perfis e só a Secretaria lê as tabelas sensíveis
+  run(`globalThis.__vistas = []; sb = {from: t => { __vistas.push(t); const r = {data: [], error: null}, ch = {select: () => ch, order: () => ch, limit: () => ch, eq: () => ch, then: (f, g) => Promise.resolve(r).then(f, g)}; return ch },
+    storage: {from: () => ({createSignedUrls: async () => ({data: []})})}}`)
+  for (const [perfil, sessao] of [['publico', "{role: 'publico'}"], ['arbitro', "{role: 'arbitro', uid: 'u1'}"], ['equipe', "{role: 'equipe', teamId: 't1'}"], ['secretaria', "{role: 'secretaria', uid: 'u2'}"]]) {
+    run(`S.session = ${sessao}; __vistas = []`)
+    let erro = null; try { await run('loadAll()') } catch (e) { erro = e.message }
+    ok(!erro, `loadAll roda sem erro como ${perfil}: ${erro}`)
+    const v = run('__vistas.slice()')
+    ok(v.includes('equipes_publico') === (perfil !== 'secretaria') && v.includes('sorteios_publico'), `loadAll como ${perfil} consulta todas as fontes esperadas`)
+    ok(v.includes('campeonatos') === (perfil === 'secretaria'), `só a Secretaria lê a tabela campeonatos (${perfil})`)
+    ok(v.includes('jogos') === (perfil === 'secretaria' || perfil === 'arbitro'), `tabela jogos só para a Secretaria e o árbitro (${perfil})`)
+  }
+  run(`S.session = null`)
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()
