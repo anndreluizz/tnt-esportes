@@ -777,7 +777,7 @@ function vReg() {
   <div class="paper reg">
     <div class="dhead"><div style="display:flex;gap:12px;align-items:center"><img class="logo" src="img/marca.svg" alt="" width="44" height="44"><div><b>Secretaria Municipal de Esportes de Tonantins</b><div class="sub">TNT Esportes</div></div></div>
       <div style="text-align:right;display:flex;gap:10px;align-items:center"><div><h1>REGULAMENTO</h1><div class="sub">${esc(c.name)}</div></div>${clogo(c.logo, 48)}</div></div>
-    <h4>1. Do campeonato</h4>${li([`O(A) <b>${esc(c.name)}</b> é organizado(a) pela Secretaria Municipal de Esportes de Tonantins/AM${c.responsible ? `, sob a responsabilidade de ${esc(c.responsible)}${c.responsiblePhone ? ` (${esc(c.responsiblePhone)})` : ''}` : ''}.`,
+    <h4>1. Do campeonato</h4>${li([`O(A) <b>${esc(c.name)}</b> é organizado(a) pela Secretaria Municipal de Esportes de Tonantins/AM${c.responsible ? `, sob a responsabilidade de ${esc(c.responsible)}` : ''}.`,
       `Modalidade: ${esc(c.sport)} · categoria ${esc(c.category)} · faixa etária ${ageRange(c)} (idade conferida na data de início).`,
       `Início em ${dmy(c.start)}, em ${esc(c.venue)}. Datas e horários de cada jogo ficam no portal público.`])}
     <h4>2. Das inscrições</h4>${li([c.maxPlayers ? `Cada equipe inscreve até ${c.maxPlayers} atletas.` : '', c.regUntil ? `As inscrições vão até ${dmy(c.regUntil)}.` : '',
@@ -834,7 +834,7 @@ function vDoc() {
     <h4>Gols</h4>${evTable(evs('gol'))}
     <h4>Cartões</h4>${evTable([...evs('amarelo'), ...evs('vermelho')].sort((a, b) => a.min - b.min), true)}
     <h4>Faltas acumuladas</h4><table><tr><th>Equipe</th><th>1º tempo</th><th>2º tempo</th></tr>${[m.home, m.away].map(t => `<tr><td>${nm(t)}</td><td>${fouls(t, 1)}</td><td>${fouls(t, 2)}</td></tr>`).join('')}</table>
-    <h4>Observações do árbitro</h4><p>${esc(m.notes) || 'Sem observações.'}</p>
+    ${pub ? '' : `<h4>Observações do árbitro</h4><p>${esc(m.notes) || 'Sem observações.'}</p>`}
     ${m.history.length ? `<h4>Histórico da partida</h4>${m.history.map(x => `<p class="sub">${fdt(x.at)} · ${esc(x.who)}: ${esc(x.what)}${x.why ? ` · motivo: ${esc(x.why)}` : ''}</p>`).join('')}` : ''}
     <h4>Assinaturas</h4>${sigs}
     ${sponsorsBar(c)}
