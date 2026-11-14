@@ -136,8 +136,7 @@ function loginReal() {
         `${ui.signupDone ? `<div class="info">Conta criada para <b>${esc(ui.signupDone)}</b>. Se chegar um e-mail de confirmação, abra o link e depois entre aqui.</div>` : ''}
         <form class="f" data-form="signin">${email}${senha('Senha', 'current-password')}<div class="span2"><button class="btn">Entrar</button></div></form>
         <p class="sub" style="margin-top:10px">Primeira vez? <button class="link" data-act="signupmode" data-tipo="equipe">Criar conta da equipe</button> · <button class="link" data-act="signupmode" data-tipo="arbitro">Criar conta de árbitro</button></p>`)
-  return `<div class="login"><div class="lhero"><div class="wrap"><div class="eyebrow">Secretaria Municipal de Esportes · Tonantins/AM</div>
-    <h1>TNT ESPORTES</h1><p>Organizando o esporte. Conectando pessoas.</p></div></div>
+  return `<div class="login">${loginHero()}
     <div class="wrap"><div class="roles">${main}
       ${card(IC.pub, 'População', 'Tabela, jogos, artilharia e súmulas abertos para todos, sem login.', '<button class="btn" data-act="login" data-role="publico">Ver o portal</button>')}
     </div><div class="faixa">${FAIXA}</div><p class="note" style="text-align:center;margin:20px 0">Sistema oficial, com dados reais. · <a href="manual.html">Manual de uso</a></p></div></div>`

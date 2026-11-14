@@ -206,12 +206,21 @@ const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div 
 /* ---------- login ---------- */
 // fotos de Tonantins: ginásio, praça (piso nas cores da bandeira) e orla; só lugares, sem rostos em destaque
 const FAIXA = ['ginasio', 'praca', 'orla'].map(n => `<img src="img/faixa-${n}.jpg" width="720" height="540" alt="" loading="lazy">`).join('')
+// Hero da entrada (3.0): título grande e o próximo jogo de verdade, de qualquer campeonato
+function loginHero() {
+  const nx = S.champs.flatMap(c => c.matches.filter(m => !isDone(m) && m.home && m.away).map(m => [c, m])).sort((a, b) => byDate(a[1], b[1]))[0]
+  const placar = nx ? (([c, m]) => `<div class="placar" aria-label="Próximo jogo"><div class="top"><span>${esc(c.name)}</span><b>${esc(mtitle(m))}</b></div>
+    <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${dm(m.date)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
+    <div class="base"><span>${esc(m.local || c.venue)}</span></div></div>`)(nx) : ''
+  return `<div class="lhero t3"><div class="wrap lgrid"><div><div class="eyebrow">Tonantins · Amazonas</div><h1>TNT<br><em>Esportes</em></h1>
+    <p>Tabelas, súmulas e resultados dos campeonatos da cidade, organizados pela Secretaria Municipal de Esportes.</p>
+    <div class="acts"><button class="btn" data-act="login" data-role="publico">Ver o portal</button></div></div>${placar}</div></div>`
+}
 function vLogin() {
   if (REAL) return loginReal()
   const card = (r, ic, t, d, btn) => `<div class="role"><div class="ic">${ic}</div><h3>${t}</h3><p>${d}</p><button class="btn" data-act="login" data-role="${r}">${btn}</button></div>`
   const teams = S.champs.map(c => `<optgroup label="${esc(c.name)}">${c.teams.map(t => `<option value="${c.id}|${t.id}">${esc(t.name)}</option>`).join('')}</optgroup>`).join('')
-  return `<div class="login"><div class="lhero"><div class="wrap"><div class="eyebrow">Secretaria Municipal de Esportes · Tonantins/AM</div>
-    <h1>TNT ESPORTES</h1><p>Organizando o esporte. Conectando pessoas.</p></div></div>
+  return `<div class="login">${loginHero()}
     <div class="wrap"><div class="roles">
       ${card('secretaria', IC.sec, 'Secretaria', 'Campeonatos, inscrições, sorteios, súmulas e relatórios em um só lugar.', 'Entrar como Secretaria')}
       ${card('arbitro', IC.ref, 'Árbitro', 'Súmula digital no celular. Funciona mesmo sem internet.', 'Entrar como árbitro')}
@@ -1208,6 +1217,7 @@ const VIEWS = {painel: vPainel, campeonatos: vCamps, inscricoes: vInscricoes, jo
                relatorios: vRelatorios, divulgacao: vDiv, portal: vPortal, equipe: vEquipe}
 function render() {
   const r = role(), app = $('#app'), doc = $('#doc')
+  document.body.classList.toggle('escuro', !r || r === 'publico')   // 3.0: entrada e portal público no tema escuro
   if (r === 'equipe') { const c = S.champs.find(x => T(x, S.session.teamId)); if (c) S.champId = c.id; else S.session = null }
   if (!role()) {
     $('#hright').innerHTML = ''; $('#tabs').innerHTML = ''; $('#bnav').innerHTML = ''; document.body.classList.remove('has-bnav'); document.title = 'TNT Esportes'
