@@ -1,0 +1,22 @@
+# Roda os testes a cada envio e a cada pull request. Não toca no Supabase de produção:
+# o banco dos testes é um Postgres local (PGlite) criado na hora.
+name: Testes
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Telas e regras (checar.js)
+        run: node checar.js
+      - name: Banco, privacidade e políticas de armazenamento (supabase/testar.mjs)
+        working-directory: supabase
+        run: |
+          npm ci
+          npm test

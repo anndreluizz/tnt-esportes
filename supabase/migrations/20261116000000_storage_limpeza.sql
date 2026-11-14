@@ -9,7 +9,7 @@
 create extension if not exists pg_net;
 create extension if not exists pg_cron;
 
-create function public.limpar_documentos_encerrados() returns integer
+create or replace function public.limpar_documentos_encerrados() returns integer
 language plpgsql security definer set search_path = public as $$
 declare
   chave text := (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key');
