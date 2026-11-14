@@ -608,3 +608,4 @@ body.escuro .paper .pill.green{background:#dcefe2;color:#18753f}body.escuro .pap
 body.escuro .paper .box,body.escuro .paper .info,body.escuro .paper .codebox,body.escuro .paper code.hash{background:#eef3fb;color:#142036;border-color:#d3dff2}
 body.escuro .paper a{color:#1d55b8}
 body.escuro .paper .dscore{background:#f3f5fa;color:#142036;border-color:#dbe3ef}
+.aud-det{margin:6px 0 4px 18px;padding:0;font-size:13px;line-height:1.5}.aud-reg details summary{cursor:pointer;color:inherit;text-decoration:underline;opacity:.85;font-size:13px;margin-top:4px}
