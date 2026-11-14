@@ -4,7 +4,8 @@
   "description": "Banco de dados do TNT Esportes (Supabase)",
   "main": "index.js",
   "scripts": {
-    "test": "node testar.mjs"
+    "test": "node testar.mjs",
+    "test:volume": "node testar-volume.mjs && node testar-volume-app.mjs"
   },
   "keywords": [],
   "author": "",
