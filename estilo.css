@@ -591,3 +591,11 @@ body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--i
 .tf-forma i{font:700 13px "Barlow Condensed";font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#071426}
 .tf-forma .fV{background:#00E676}.tf-forma .fE{background:#ffc266}.tf-forma .fD{background:#ff8794}
 @media(max-width:560px){.tficha{grid-template-columns:1fr}.tf-num{grid-template-columns:repeat(3,1fr)}}
+
+/* TNT 3.0: telas largas (ou navegador com zoom abaixo de 100%) não deixam a interface pequena no meio da tela.
+   O conteúdo passa a 1240px (como no protótipo) e a interface escala por faixa de largura. */
+.wrap{max-width:1240px}
+@media(min-width:1700px){body{zoom:1.2}}
+@media(min-width:2000px){body{zoom:1.4}}
+@media(min-width:2400px){body{zoom:1.7}}
+@media print{body{zoom:1}}
