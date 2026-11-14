@@ -8,6 +8,15 @@ npm test
 ```
 Roda o banco num Postgres de verdade (PGlite) e tenta o uso certo e o indevido com cada perfil.
 
+### Teste de volume (100% local, sem Supabase na nuvem)
+```
+npm run test:volume
+```
+- `volume.mjs` gera, sempre igual, 16 equipes, 300 atletas (15 menores), 120 jogos de pontos corridos e mais de 1.200 eventos, pelos mesmos caminhos do app (as regras do banco rodam na carga).
+- `testar-volume.mjs` confere as regras do banco com esse volume (classificação, súmula, W.O., suspensão, sorteio, mata-mata, portal e perfis) contra um cálculo independente.
+- `testar-volume-app.mjs` roda o app de verdade sobre esses dados e compara com o banco, sem e com o limite de 1.000 linhas por consulta do Supabase (`LIMITE_LINHAS=n` muda o limite; `LIMITE_ESTRITO=1` faz o teste falhar quando o app perde dados).
+- Não toca na produção: o banco é um PGlite em memória e nenhuma URL nem chave é usada.
+
 ## Colocar no ar
 1. Crie um projeto em https://supabase.com, região **São Paulo (sa-east-1)**.
 2. No painel, abra **SQL Editor** e rode, nesta ordem:
