@@ -16,8 +16,11 @@ create view historico_publico as
   where jogo_id is not null
     and o_que ~ '^(Súmula confirmada|Correção confirmada|Jogo adiado|Jogo alterado|W\.O\.)';
 grant select on historico_publico to anon, authenticated;
+-- A view recriada ganha de novo os privilégios automáticos do Supabase (REFERENCES, TRIGGER, TRUNCATE); o público só deve ter SELECT.
+revoke references, trigger, truncate on historico_publico from anon, authenticated;
 
 -- COMO DESFAZER:
 --   drop view historico_publico;
 --   create view historico_publico as select jogo_id, quem, o_que, motivo, em from historico where jogo_id is not null;
 --   grant select on historico_publico to anon, authenticated;
+--   revoke references, trigger, truncate on historico_publico from anon, authenticated;
