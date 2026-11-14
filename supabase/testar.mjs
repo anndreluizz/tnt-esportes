@@ -12,9 +12,9 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create role anon nologin; create role authenticated nologin;
   grant usage on schema public, auth to anon, authenticated; grant execute on function auth.uid() to anon, authenticated;`)
-// o Supabase concede privilégios automáticos a objetos NOVOS do esquema public (visto em produção: SELECT, REFERENCES, TRIGGER, TRUNCATE).
+// o Supabase concede privilégios automáticos a objetos NOVOS do esquema public (visto em produção, lendo o catálogo bruto: TRUNCATE, REFERENCES, TRIGGER e MAINTAIN).
 // Simulamos isso aqui: assim o teste de privilégios (mais abaixo) acusa qualquer migration que esqueça o revoke.
-await db.exec(`alter default privileges in schema public grant select, references, trigger, truncate on tables to anon, authenticated`)
+await db.exec(`alter default privileges for role postgres in schema public grant truncate, references, trigger, maintain on tables to anon, authenticated`)
 for (const f of readdirSync(new URL('migrations', import.meta.url)).sort().filter(f => !f.includes('_storage')))
   await db.exec(readFileSync(new URL('migrations/' + f, import.meta.url), 'utf8'))
 
@@ -293,14 +293,22 @@ await como(ARB); await erro(`select alterar_jogo($1, '2027-09-11', '18h30', '', 
 
 console.log("Privilégios mínimos (como o Supabase concede automaticamente em objetos novos)")
 await db.exec('reset role')
-const excesso = await q(`select table_name || '/' || grantee || '=' || string_agg(privilege_type, ',' order by privilege_type) x from information_schema.role_table_grants
-  where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type in ('TRUNCATE', 'REFERENCES', 'TRIGGER') group by table_name, grantee`)
-ok(excesso.length === 0, 'ninguém (anon ou authenticated) tem TRUNCATE, REFERENCES ou TRIGGER em tabela ou view do esquema public' + (excesso.length ? ': ' + excesso.map(r => r.x).join('; ') : ''))
-const escritaView = await q(`select table_name || '/' || grantee x from information_schema.role_table_grants g join pg_views v on v.viewname = g.table_name and v.schemaname = 'public'
-  where g.table_schema = 'public' and g.grantee in ('anon', 'authenticated') and g.privilege_type in ('INSERT', 'UPDATE', 'DELETE')`)
-ok(escritaView.length === 0, 'nenhuma view pública permite INSERT, UPDATE ou DELETE' + (escritaView.length ? ': ' + escritaView.map(r => r.x).join('; ') : ''))
-const anonEscreve = await q(`select table_name x from information_schema.role_table_grants where table_schema = 'public' and grantee = 'anon' and privilege_type in ('INSERT', 'UPDATE', 'DELETE')`)
-ok(anonEscreve.length === 0, 'visitante (anon) não tem INSERT, UPDATE nem DELETE em nada' + (anonEscreve.length ? ': ' + anonEscreve.map(r => r.x).join('; ') : ''))
+// catálogo bruto: lista TODOS os privilégios, inclusive MAINTAIN (que information_schema.role_table_grants não mostra)
+const privs = await q(`select c.relname || '[' || c.relkind::text || ']/' || r.rolname || '=' || a.privilege_type x, a.privilege_type p, r.rolname papel, c.relkind::text k, c.relname t
+  from pg_class c, aclexplode(c.relacl) a join pg_roles r on r.oid = a.grantee
+  where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v') and r.rolname in ('anon', 'authenticated')`)
+const dos = (p) => privs.filter(r => p.includes(r.p))
+const lista = (l) => l.length ? ': ' + l.map(r => r.x).join('; ') : ''
+ok(dos(['TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']).length === 0, 'ninguém (anon ou authenticated) tem TRUNCATE, REFERENCES, TRIGGER nem MAINTAIN em tabela ou view do esquema public' + lista(dos(['TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN'])))
+ok(privs.filter(r => r.k === 'v' && ['INSERT', 'UPDATE', 'DELETE'].includes(r.p)).length === 0, 'nenhuma view pública permite INSERT, UPDATE ou DELETE')
+ok(privs.filter(r => r.papel === 'anon' && ['INSERT', 'UPDATE', 'DELETE'].includes(r.p)).length === 0, 'visitante (anon) não tem INSERT, UPDATE nem DELETE em nada')
+const viewsPublicas = ['atletas_publico', 'campeonatos_publico', 'classificacao', 'equipes_publico', 'historico_publico', 'jogos_publico', 'placar', 'sorteios_publico']
+ok(viewsPublicas.every(v => ['anon', 'authenticated'].every(papel => { const l = privs.filter(r => r.t === v && r.papel === papel).map(r => r.p); return l.length === 1 && l[0] === 'SELECT' })), 'cada view pública dá ao visitante e ao usuário logado somente SELECT')
+// objeto criado DEPOIS da migration, pelo mesmo usuário: não nasce com privilégios para o público (privilégios automáticos fechados)
+await db.exec(`create table _novo_depois_das_migrations (id int)`)
+const novoObj = await q(`select r.rolname || '=' || a.privilege_type x from pg_class c, aclexplode(c.relacl) a join pg_roles r on r.oid = a.grantee where c.relname = '_novo_depois_das_migrations' and r.rolname in ('anon', 'authenticated')`)
+ok(novoObj.length === 0, 'tabela criada depois das migrations NÃO nasce com nenhum privilégio para anon e authenticated' + (novoObj.length ? ': ' + novoObj.map(r => r.x).join('; ') : ''))
+await db.exec(`drop table _novo_depois_das_migrations`)
 
 console.log('Dados da equipe')
 await como(SEC)
