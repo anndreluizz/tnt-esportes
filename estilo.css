@@ -576,3 +576,18 @@ body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--i
 .phero p{color:#d5e0f5;font-size:17px}
 .phero .placar{box-shadow:0 20px 60px rgba(0,0,0,.4)}
 @media(max-width:860px){.phero{grid-template-columns:1fr;padding:28px 18px}}
+
+/* TNT 3.0, etapa 5: ficha da equipe */
+.tficha{position:relative;overflow:hidden;isolation:isolate;display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:center;padding:20px;border-radius:14px;margin-bottom:14px;color:#fff;
+  background:linear-gradient(135deg,rgba(16,47,104,.96),rgba(7,20,38,.9)),url(img/faixa-ginasio.jpg) center/cover;border:1px solid rgba(23,105,255,.45)}
+.tficha .crest{box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.tf-id h3{font-size:clamp(28px,4vw,42px);line-height:.95;text-transform:uppercase}
+.tf-id .eyebrow{color:#00E676}
+.tf-num{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px}
+.tf-num div{background:rgba(255,255,255,.08);border-radius:10px;padding:8px 4px;text-align:center}
+.tf-num b{display:block;font:700 28px/1 "Barlow Condensed"}
+.tf-num span{font:600 12px "Barlow Condensed";letter-spacing:.14em;color:#9bb0d1}
+.tf-forma{grid-column:1/-1;display:flex;gap:6px}
+.tf-forma i{font:700 13px "Barlow Condensed";font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#071426}
+.tf-forma .fV{background:#00E676}.tf-forma .fE{background:#ffc266}.tf-forma .fD{background:#ff8794}
+@media(max-width:560px){.tficha{grid-template-columns:1fr}.tf-num{grid-template-columns:repeat(3,1fr)}}
