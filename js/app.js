@@ -361,15 +361,16 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
 function vCamps() {
   const cards = S.champs.map(c => {
     const done = c.matches.filter(isDone).length, ch = champion(c)
-    return `<div class="card"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px">${clogo(c.logo)}<h3 style="font-size:22px">${esc(c.name)}</h3></div>
+    const foto = /futsal|quadra|salão/i.test(c.sport) ? 'ginasio' : /society|futebol|campo/i.test(c.sport) ? 'orla' : 'praca'
+    return `<div class="card champ"><div class="cimg" style="--f:url(img/faixa-${foto}.jpg)"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
+      <div class="ctit">${clogo(c.logo)}<h3>${esc(c.name)}</h3></div></div><div class="cbody">
       <p class="sub">${ageRange(c)} · início ${dmy(c.start)} · ${esc(c.venue)}</p>
       <p class="sub"><b>${FORMATOS[formato(c)].nome}</b>${formato(c) === 'grupos' ? ` · ${regras(c).grupos} grupo${regras(c).grupos > 1 ? 's' : ''}, passam ${regras(c).classificam}` : ''}</p>
       ${c.responsible ? `<p class="sub">Responsável: ${esc(c.responsible)}${c.responsiblePhone ? ' · ' + esc(c.responsiblePhone) : ''}</p>` : ''}
       <p class="sub">${c.teams.length} equipes · ${c.players.length} atletas · ${c.matches.length ? `${done}/${c.matches.length} jogos` : 'tabela após o sorteio'}${ch ? ` · campeão: <b>${esc(T(c, ch).name)}</b>` : ''}</p>
       ${c.regUntil ? `<p class="sub">Inscrições até ${dmy(c.regUntil)}</p>` : ''}${sponsorsBar(c)}
       <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button>
-        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}<button class="btn ghost sm" data-act="reg" data-id="${c.id}">Regulamento</button></div></div>`
+        ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}<button class="btn ghost sm" data-act="reg" data-id="${c.id}">Regulamento</button></div></div></div>`
   }).join('')
   const editing = S.champs.find(c => c.id === ui.editChamp)
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
@@ -687,6 +688,7 @@ function vRelatorios() {
   return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages)}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros)}</div></div>
+  <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5)) || ''}</div>
   <div class="card mt"><h3>Por campeonato</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Campeonato</th><th class="l">Modalidade</th><th>Categoria</th><th>Situação</th><th>Equipes</th><th>Atletas</th><th>Jogos</th><th>Gols</th></tr></thead><tbody>
     ${S.champs.map(c => { const d = c.matches.filter(isDone); return `<tr><td class="l"><b>${esc(c.name)}</b></td><td class="l">${esc(c.sport)}</td><td>${esc(c.category)}</td><td>${cpill(c)}</td><td>${c.teams.length}</td><td>${c.players.filter(p => insc(c, p)[0] === 'aprovado').length}</td><td>${d.length}/${c.matches.length}</td><td>${d.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)}</td></tr>` }).join('')}
   </tbody></table></div></div>

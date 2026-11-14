@@ -544,3 +544,25 @@ body.escuro .match.jogo.destaque{background:linear-gradient(135deg,rgba(16,47,10
   body.has-bnav main.wrap,body.has-bnav .foot{margin-left:240px;max-width:none;padding-left:32px;padding-right:32px}
   body.has-bnav main.wrap>*{max-width:1100px}
 }
+
+/* TNT 3.0, etapa 3: campeonatos com imagem, relatórios com barras de destaque, impressão em papel claro */
+.card.champ{padding:0;overflow:hidden;display:grid;grid-template-rows:auto 1fr;transition:transform .2s,border-color .2s}
+.card.champ:hover{transform:translateY(-3px);border-color:#00E676}
+.cimg{position:relative;min-height:170px;padding:14px 16px;display:grid;align-content:space-between;gap:36px;isolation:isolate;background:linear-gradient(180deg,rgba(7,20,38,.15),rgba(7,20,38,.9)),var(--f) center/cover}
+.cimg .ctit{display:flex;gap:10px;align-items:center}
+.cimg h3{font-size:30px;line-height:.95;text-transform:uppercase;color:#fff}
+.cbody{padding:14px 16px 16px}
+.bar i{background:linear-gradient(90deg,#1769FF,#00E676)}
+.bars .bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media print{body.escuro{--bg:#fff;--card:#fff;--line:#dbe3ef;--ink:#142036;--muted:#5b6680;--g7:#1d55b8;--gold:#2db35d;--goldink:#157a3a;--red:#b3261e;--redbg:#fbe3e1;--amber:#8a5a00;--amberbg:#fbefd2;color-scheme:light;background-image:none}
+  body.escuro .card,body.escuro .info,body.escuro .box{background:#fff;color:#142036}
+  body.escuro .pill{background:#e8ebf2;color:#454f63}body.escuro .st th,body.escuro .st td{color:#142036}
+  .card.stat::after{display:none}}
+body.escuro form input:not([type=checkbox]):not([type=radio]):not([type=file]),body.escuro form select,body.escuro form textarea{background:#0e2547;color:var(--ink);border-color:var(--campo);box-shadow:none}
+body.escuro form input:focus,body.escuro form select:focus,body.escuro form textarea:focus{background:#0e2547}
+body.escuro ::placeholder{color:#7f93b6;opacity:1}
+body.escuro .et-topo b{color:var(--ink)}
+body.escuro .et-chip[aria-checked=true]{background:#00E676;border-color:#00E676;color:#071426}
+body.escuro .et-invalido>input,body.escuro .et-invalido>select,body.escuro .et-invalido>textarea,body.escuro .et-invalido input:invalid{background:var(--redbg)!important}
+.cimg{background:linear-gradient(180deg,rgba(7,20,38,.65),rgba(7,20,38,.25) 40%,rgba(7,20,38,.92)),var(--f) center/cover}
+body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--ink)}
