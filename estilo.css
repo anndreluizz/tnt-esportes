@@ -599,3 +599,12 @@ body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--i
 @media(min-width:2000px){body{zoom:1.4}}
 @media(min-width:2400px){body{zoom:1.7}}
 @media print{body{zoom:1}}
+
+/* Documentos em papel (súmula, regulamento) no tema escuro: o papel é branco, então o texto e as cores internas voltam a ser as do tema claro.
+   Sem isto o texto herdava o branco do tema escuro e ficava invisível sobre o papel. */
+body.escuro .paper{color:#142036;--ink:#142036;--muted:#5b6680;--line:#dbe3ef;--g1:#e6eefb;--g7:#1d55b8;--g9:#0d2f73;--gold:#2db35d;--goldink:#157a3a;--card:#fff;--bg:#fff;--red:#b3261e;--redbg:#fbe3e1;--amber:#8a5a00;--amberbg:#fbefd2;color-scheme:light}
+body.escuro .paper .pill{background:#e8ebf2;color:#454f63}
+body.escuro .paper .pill.green{background:#dcefe2;color:#18753f}body.escuro .paper .pill.amber{background:#fbefd2;color:#8a5a00}body.escuro .paper .pill.red{background:#fbe3e1;color:#b3261e}
+body.escuro .paper .box,body.escuro .paper .info,body.escuro .paper .codebox,body.escuro .paper code.hash{background:#eef3fb;color:#142036;border-color:#d3dff2}
+body.escuro .paper a{color:#1d55b8}
+body.escuro .paper .dscore{background:#f3f5fa;color:#142036;border-color:#dbe3ef}
