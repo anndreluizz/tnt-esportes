@@ -34,7 +34,7 @@ export async function criaBanco() {
   return db
 }
 export const como = (db, uid) => db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ''}', false); set role ${uid ? 'authenticated' : 'anon'};`)
-export const dono = db => db.exec('reset role')
+export const dono = db => db.exec("reset role; select set_config('request.jwt.claim.sub', '', false)")   // como o editor SQL: sem usuário logado
 export const q = async (db, sql, p) => (await db.query(sql, p)).rows
 
 const NOMES = ['Joao', 'Pedro', 'Lucas', 'Mateus', 'Rafael', 'Gabriel', 'Daniel', 'Carlos', 'Paulo', 'Andre', 'Diego', 'Felipe', 'Bruno', 'Thiago', 'Marcos', 'Igor', 'Caio', 'Davi', 'Samuel', 'Enzo']

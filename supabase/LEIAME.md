@@ -8,6 +8,9 @@ npm test
 ```
 Roda o banco num Postgres de verdade (PGlite) e tenta o uso certo e o indevido com cada perfil.
 
+### Auditoria de alterações
+`migrations/20261120000000_auditoria.sql` cria a tabela `auditoria` (só acréscimo, lida só pela Secretaria, sem vínculo que a apague) e gatilhos em campeonatos, equipes, atletas, perfis e na troca de árbitro dos jogos. Guarda quem (id, nome e papel), quando, o quê e o antes/depois **só de colunas que não são dados pessoais** (lista em `auditoria_colunas`; coluna nova nunca é guardada até entrar na lista). `npm run test:auditoria` confere tudo isso. Ao criar uma função nova que já grava em `historico` e mexe nessas tabelas, ou ao refazer (`create or replace`) uma das 5 funções marcadas com `tnt.ja_registrado`, repita a marca (o teste avisa se ela sumir).
+
 ### Teste de volume (100% local, sem Supabase na nuvem)
 ```
 npm run test:volume

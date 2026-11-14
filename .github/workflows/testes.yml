@@ -20,6 +20,9 @@ jobs:
         run: |
           npm ci
           npm test
+      - name: Auditoria de alterações (supabase/testar-auditoria.mjs)
+        working-directory: supabase
+        run: npm run test:auditoria
       - name: Volume local, 16 equipes, 300 atletas, 120 jogos e mais de 1.200 eventos (supabase/testar-volume*.mjs)
         working-directory: supabase
         env:
