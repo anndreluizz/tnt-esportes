@@ -69,8 +69,9 @@ async function loadAll() {
   try {
     // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
     const [campeonatos, equipes, pub, jogos, eventos, sorteios, historico, suspensoes, perfis, meus, cancelados, minha] = await Promise.all([
-      q(sb.from(sec ? 'campeonatos' : 'campeonatos_publico').select('*').order('criado_em')),   // o público não lê o telefone do responsável q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
-      all(sec ? 'atletas' : 'atletas_publico'), all(sec ? 'jogos' : 'jogos_publico'), all('eventos'),   // jogos sem observações nem assinaturas, exceto para a Secretaria all('sorteios_publico'),
+      // o público lê as views (sem telefone do responsável, sem observações e assinaturas das súmulas); a Secretaria lê as tabelas
+      q(sb.from(sec ? 'campeonatos' : 'campeonatos_publico').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
+      all(sec ? 'atletas' : 'atletas_publico'), all(sec ? 'jogos' : 'jogos_publico'), all('eventos'), all('sorteios_publico'),
       q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)),
       sec || arb || eq ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : [],
       // equipe: o próprio elenco completo (com pendências); árbitro: fotos dos atletas dos seus jogos (o banco filtra)
