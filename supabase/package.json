@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node testar.mjs",
-    "test:volume": "node testar-volume.mjs && node testar-volume-app.mjs"
+    "test:volume": "node testar-volume.mjs && node testar-volume-app.mjs",
+    "test:auditoria": "node testar-auditoria.mjs"
   },
   "keywords": [],
   "author": "",
