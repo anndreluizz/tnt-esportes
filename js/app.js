@@ -13,7 +13,7 @@ const ui = {tab: null, matchId: null, team: null, picker: null, manage: null, pu
 const C = () => S.champs.find(c => c.id === S.champId) || S.champs[0]
 const role = () => S.session?.role
 const cur = () => findMatch(C(), ui.matchId)
-function resetTransient() { Object.assign(ui, {matchId: null, rod: null, team: null, picker: null, manage: null, punish: null, signing: null, draw: null, verify: null, sumCheck: null, highlight: [], clock: {}}) }
+function resetTransient() { Object.assign(ui, {matchId: null, rod: null, team: null, picker: null, manage: null, punish: null, signing: null, draw: null, verify: null, sumCheck: null, highlight: [], clock: {}, aud: null}) }
 
 function log(c, who, what, why, m) {
   const e = {at: new Date().toISOString(), who, what, ...(why ? {why} : {})}
@@ -33,7 +33,7 @@ const IC = {
 }
 const ROLES = {secretaria: {name: 'Ana Souza', label: 'Secretaria'}, arbitro: {name: 'João Paulo', label: 'Árbitro'}, publico: {name: 'Visitante', label: 'População'}}
 const ROLE_TABS = {
-  secretaria: [['painel','Painel'],['campeonatos','Campeonatos'],['inscricoes','Inscrições'],['jogos','Jogos e tabela'],['sumula','Súmula'],['sorteio','Sorteio'],['relatorios','Relatórios'],['divulgacao','Divulgação'],['portal','Portal público']],
+  secretaria: [['painel','Painel'],['campeonatos','Campeonatos'],['inscricoes','Inscrições'],['jogos','Jogos e tabela'],['sumula','Súmula'],['sorteio','Sorteio'],['relatorios','Relatórios'],['divulgacao','Divulgação'],['portal','Portal público'], ...(REAL ? [['auditoria','Auditoria']] : [])],
   arbitro: [['sumula','Minhas partidas'],['portal','Portal público']],
   equipe: [['equipe','Minha equipe'],['portal','Portal público']],
   publico: [['portal','Portal público']],
@@ -41,7 +41,7 @@ const ROLE_TABS = {
 // Navegação da Secretaria: 9 telas em 5 grupos (menos escolhas por vez: Hick e Miller).
 // Cada tela mantém a sua chave (ui.tab, links #secretaria/jogos etc.); o grupo só organiza.
 const GRUPOS = [['painel', 'Painel', ['painel']], ['campeonatos', 'Campeonatos', ['campeonatos']], ['jogos', 'Jogos', ['jogos', 'sumula', 'sorteio']],
-  ['equipes', 'Equipes', ['inscricoes']], ['mais', 'Mais', ['relatorios', 'divulgacao', 'portal']]]
+  ['equipes', 'Equipes', ['inscricoes']], ['mais', 'Mais', ['relatorios', 'divulgacao', 'portal', ...(REAL ? ['auditoria'] : [])]]]
 const IC_GRUPO = {
   painel: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
   campeonatos: IC.trophy,
@@ -1030,7 +1030,9 @@ const A = {
   },
   logout: () => { S.session = null; S.offline = false; resetTransient(); ui.doc = null },
   rod: d => { ui.rod = d.rod },
-  tab: d => { ui.tab = d.tab; ui.picker = ui.manage = ui.punish = null; scrollTo(0, 0) },
+  tab: d => { ui.tab = d.tab; ui.picker = ui.manage = ui.punish = null; if (d.tab === 'auditoria' && ui.aud) ui.aud.linhas = null; scrollTo(0, 0) },
+  audpag: d => { const a = ui.aud ??= audNovo(); a.pg = Math.max(0, a.pg + +d.d); a.linhas = null },
+  audlimpa: () => { ui.aud = audNovo() },
   champ: d => { S.champId = d.id; resetTransient(); ui.tab = 'painel'; scrollTo(0, 0) },
   pchamp: d => { S.champId = d.id; resetTransient() },
   open: d => { ui.matchId = d.id; ui.tab = 'sumula'; ui.picker = ui.signing = null; scrollTo(0, 0) },
@@ -1126,6 +1128,10 @@ function lerAtleta(c, p, d) {
   return {name, num, birth: d.birth, nick: t(d.nick), pos: d.pos || null, phone: t(d.phone), address: t(d.endereco), bairro: t(d.bairro), city: t(d.municipio), resp: t(d.resp), respPhone: t(d.respPhone)}
 }
 const F = {
+  auditoria: d => {
+    if (d.de && d.ate && d.de > d.ate) return toast('A data inicial não pode ser depois da final.')
+    ui.aud = {...audNovo(), f: {camp: d.camp || '', usuario: d.usuario || '', tabela: d.tabela || '', de: d.de || '', ate: d.ate || ''}}
+  },
   swap: d => {
     const c = C(), jogos = jogosPorCampo(c)[d.chave], novo = d.novo.trim(), why = d.why.trim(), [date, antigo] = d.chave.split('|')
     if (!jogos?.length) return toast('Nenhum jogo nesse dia e campo.')
@@ -1243,7 +1249,69 @@ function avisoMarcas() {
   return `<div class="card mt"><h3>Imagens antigas pendentes de exclusão <span class="pill amber">${total}</span></h3>
     <p class="sub">${total === 1 ? 'Uma imagem substituída ainda não foi apagada' : total + ' imagens substituídas ainda não foram apagadas'} do armazenamento. Nenhuma imagem em uso é apagada.${esgotadas ? ' ' + (esgotadas === 1 ? 'Uma já' : esgotadas + ' já') + ' atingiu o limite de tentativas automáticas e continua registrada, sem novas tentativas.' : ' O sistema tenta de novo sozinho ao abrir a Central.'}</p></div>`
 }
-const VIEWS = {painel: () => avisoMarcas() + vPainel(), campeonatos: vCamps, inscricoes: vInscricoes, jogos: vJogos, sumula: vSumula, sorteio: vSorteio,
+/* ---------- Auditoria (só a Secretaria; só leitura; só no modo oficial) ----------
+   Lê a tabela "auditoria" por páginas, com filtros no servidor. Nada aqui edita ou exclui registro: o banco nem permite.
+   A tela só mostra valores de colunas que não são dados pessoais (AUD_VALORES, o mesmo critério do banco): se um dia o banco guardar outra coisa, ela não aparece. */
+const AUD_POR_PAGINA = 25
+const AUD_TABELAS = {campeonatos: 'Campeonato', equipes: 'Equipe', atletas: 'Atleta', perfis: 'Acesso', jogos: 'Jogo (árbitro)'}
+const AUD_OPERACAO = {INSERT: 'Criou', UPDATE: 'Alterou', DELETE: 'Excluiu'}
+const AUD_ORIGEM = {administrador: 'Administrador do banco', sistema: 'Rotina automática', visitante: 'Visitante'}
+const AUD_CAMPOS = {nome: 'Nome', modalidade: 'Modalidade', categoria: 'Categoria', idade_min: 'Idade mínima', idade_max: 'Idade máxima', inicio: 'Início', local: 'Local', status: 'Status', formato: 'Formato',
+  regras: 'Regras', inscricao_ate: 'Inscrições até', max_atletas: 'Máximo de atletas', patrocinadores: 'Patrocinadores', logo_path: 'Logo', campeonato_id: 'Campeonato', bairro: 'Bairro', pote: 'Pote',
+  grupo: 'Grupo', cores: 'Cores', escudo_path: 'Escudo', equipe_id: 'Equipe', numero: 'Camisa', aprovado: 'Aprovado', autorizacao: 'Autorização do responsável', papel: 'Papel', arbitro_id: 'Árbitro'}
+// só estas colunas, em cada tabela, mostram valor (as mesmas que o banco guarda: auditoria_colunas); qualquer outra aparece só como "alterado"
+// ponytail: lista repetida do banco; se o banco ganhar coluna auditada, acrescentar aqui (o teste testar-auditoria-app.mjs confere as duas listas)
+const AUD_VALORES = {
+  campeonatos: new Set(['nome', 'modalidade', 'categoria', 'idade_min', 'idade_max', 'inicio', 'local', 'status', 'formato', 'regras', 'inscricao_ate', 'max_atletas', 'patrocinadores', 'logo_path']),
+  equipes: new Set(['campeonato_id', 'nome', 'bairro', 'pote', 'grupo', 'cores', 'escudo_path']), atletas: new Set(['equipe_id', 'numero', 'aprovado', 'autorizacao']),
+  perfis: new Set(['papel', 'equipe_id']), jogos: new Set(['arbitro_id'])}
+const audNovo = () => ({f: {camp: '', usuario: '', tabela: '', de: '', ate: ''}, pg: 0, linhas: null, total: 0, carregando: false, erro: null, naoAtivada: false, seq: 0})
+const audData = iso => { try { return new Date(iso).toLocaleString('pt-BR', {timeZone: 'America/Manaus', dateStyle: 'short', timeStyle: 'short'}) } catch { return String(iso) } }
+function audValor(v) {
+  if (v === null || v === undefined) return '—'
+  if (typeof v === 'boolean') return v ? 'sim' : 'não'
+  const t = typeof v === 'object' ? JSON.stringify(v) : String(v)
+  return t.length > 300 ? t.slice(0, 300) + '…' : t
+}
+function audDetalhe(r) {
+  const campos = r.operacao === 'UPDATE' ? (r.alteradas || []) : [...new Set([...Object.keys(r.antes || {}), ...Object.keys(r.depois || {})])]
+  const linhas = campos.map(k => {
+    const rot = esc(AUD_CAMPOS[k] || k)
+    if (!AUD_VALORES[r.tabela]?.has(k)) return `<li><b>${rot}</b>: alterado <span class="sub">(valor não exibido: dado pessoal)</span></li>`
+    const a = r.antes && k in r.antes ? esc(audValor(r.antes[k])) : null, d = r.depois && k in r.depois ? esc(audValor(r.depois[k])) : null
+    return `<li><b>${rot}</b>: ${a !== null && d !== null ? `${a} → ${d}` : a !== null ? `${a} (antes)` : d !== null ? d : 'alterado'}</li>`
+  })
+  return linhas.length ? `<ul class="aud-det">${linhas.join('')}</ul>` : '<p class="sub">Sem detalhes de campos.</p>'
+}
+function vAuditoria() {
+  if (role() !== 'secretaria') return ''
+  const a = ui.aud ??= audNovo(), f = a.f, paginas = Math.max(1, Math.ceil(a.total / AUD_POR_PAGINA))
+  const opt = (v, t, sel) => `<option value="${esc(v)}" ${String(sel) === String(v) ? 'selected' : ''}>${esc(t)}</option>`
+  const quem = (S.perfis || []).map(p => opt(p.id, `${p.nome} (${p.papel})`, f.usuario)).join('')
+  const filtros = `<form class="f" data-form="auditoria" style="margin-bottom:12px">
+    <label>Campeonato<select name="camp">${opt('', 'Todos', f.camp)}${S.champs.map(c => opt(c.id, c.name, f.camp)).join('')}</select></label>
+    <label>Usuário<select name="usuario">${opt('', 'Todos', f.usuario)}${opt('sem', 'Sem usuário (administrador, rotina ou visitante)', f.usuario)}${quem}</select></label>
+    <label>Tabela<select name="tabela">${opt('', 'Todas', f.tabela)}${Object.entries(AUD_TABELAS).map(([k, t]) => opt(k, t, f.tabela)).join('')}</select></label>
+    <label>De<input type="date" name="de" value="${esc(f.de)}"></label><label>Até<input type="date" name="ate" value="${esc(f.ate)}"></label>
+    <div class="btns"><button class="btn">Filtrar</button><button class="btn ghost" type="button" data-act="audlimpa">Limpar filtros</button></div></form>`
+  let corpo
+  if (a.naoAtivada) corpo = '<div class="card empty">A auditoria ainda não foi ativada no banco de dados. Assim que for ativada, os registros aparecem aqui.</div>'
+  else if (a.erro) corpo = `<div class="card empty" role="alert">Não foi possível ler a auditoria: ${esc(a.erro)}</div>`
+  else if (a.linhas === null) corpo = '<div class="card empty">Carregando…</div>'
+  else if (!a.linhas.length) corpo = '<div class="card empty">Nenhum registro encontrado com estes filtros.</div>'
+  else corpo = `<div class="card">${a.linhas.map(r => {
+    const quemFez = r.usuario_nome ? `${esc(r.usuario_nome)}${r.usuario_papel ? ' (' + esc(r.usuario_papel) + ')' : ''}` : esc(AUD_ORIGEM[r.origem] || 'Sistema')
+    return `<div class="row aud-reg"><div><b>${esc(r.resumo)}</b>
+      <div class="sub">${esc(audData(r.em))} · ${quemFez} · ${esc(AUD_OPERACAO[r.operacao] || r.operacao)} · ${esc(AUD_TABELAS[r.tabela] || r.tabela)}</div>
+      <details><summary>Detalhes</summary>${audDetalhe(r)}</details></div></div>`}).join('')}</div>`
+  const pager = a.linhas?.length || a.pg > 0 ? `<div class="btns" style="margin-top:12px;align-items:center">
+    <button class="btn ghost" data-act="audpag" data-d="-1" ${a.pg <= 0 || a.carregando ? 'disabled' : ''}>← Anterior</button>
+    <span class="sub">Página ${a.pg + 1} de ${paginas} · ${a.total} registro${a.total === 1 ? '' : 's'}</span>
+    <button class="btn ghost" data-act="audpag" data-d="1" ${a.pg + 1 >= paginas || a.carregando ? 'disabled' : ''}>Próxima →</button></div>` : ''
+  return `<div class="head"><div><div class="eyebrow">Somente leitura</div><h2>Auditoria de alterações</h2>
+    <p class="sub">Quem alterou o quê e quando. Os registros não podem ser editados nem excluídos. Dados pessoais (nome de atleta, nascimento, telefone, endereço, documentos) não são guardados aqui.</p></div></div>` + filtros + corpo + pager
+}
+const VIEWS = {auditoria: vAuditoria, painel: () => avisoMarcas() + vPainel(), campeonatos: vCamps, inscricoes: vInscricoes, jogos: vJogos, sumula: vSumula, sorteio: vSorteio,
                relatorios: vRelatorios, divulgacao: vDiv, portal: vPortal, equipe: vEquipe}
 function render() {
   const r = role(), app = $('#app'), doc = $('#doc')
@@ -1271,9 +1339,10 @@ function render() {
   document.body.classList.toggle('has-bnav', agrupa)
   document.title = (rotulo(ui.tab) ? rotulo(ui.tab) + ' · ' : '') + 'TNT Esportes'
   const sub = grupo && grupo[2].length > 1 ? `<div class="chips subnav" role="group" aria-label="${grupo[1]}">${grupo[2].map(k => tabBtn(k, rotulo(k), ui.tab === k)).join('')}</div>` : ''
-  const view = c || ['campeonatos', 'relatorios'].includes(ui.tab) ? VIEWS[ui.tab]()
+  const view = c || ['campeonatos', 'relatorios', 'auditoria'].includes(ui.tab) ? VIEWS[ui.tab]()
     : `<div class="card empty mt">Nenhum campeonato cadastrado ainda.${r === 'secretaria' ? '<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="campeonatos">Criar o primeiro campeonato</button></div>' : ''}</div>`
   app.className = 'wrap'; app.innerHTML = `<h1 class="sr">${esc(rotulo(ui.tab))}${c ? ' · ' + esc(c.name) : ''}</h1>` + sub + avisoLeitura() + view
+  if (REAL && ui.tab === 'auditoria' && role() === 'secretaria' && ui.aud && ui.aud.linhas === null && !ui.aud.carregando && typeof carregaAuditoria === 'function') carregaAuditoria()
   doc.hidden = !(ui.doc || ui.reg); doc.innerHTML = ui.doc ? vDoc() : ui.reg ? vReg() : ''
   document.body.classList.toggle('doc-open', !!(ui.doc || ui.reg))
   if (ui.tab === 'sumula') hookPads()

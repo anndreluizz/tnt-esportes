@@ -88,6 +88,33 @@ const ler = (tabela, ordem, cols = '*', filtro, estrito) => lerTudo(() => {
   for (const [k, asc] of ordem) c = c.order(k, {ascending: asc})
   return c }, tabela, estrito)
 
+/* ---------- Auditoria: leitura por páginas, com filtros no servidor (a tela está em app.js) ---------- */
+async function carregaAuditoria() {
+  const a = ui.aud ??= audNovo(), f = a.f, seq = ++a.seq
+  a.carregando = true; a.erro = null; a.naoAtivada = false
+  try {
+    let c = sb.from('auditoria').select('*', {count: 'exact'})
+    if (f.camp) c = c.eq('campeonato_id', f.camp)
+    if (f.usuario === 'sem') c = c.is('usuario_id', null); else if (f.usuario) c = c.eq('usuario_id', f.usuario)
+    if (f.tabela) c = c.eq('tabela', f.tabela)
+    if (f.de) c = c.gte('em', f.de + 'T00:00:00-04:00')                  // dias na hora de Manaus (UTC-4, sem horário de verão)
+    if (f.ate) c = c.lt('em', addDays(f.ate, 1) + 'T00:00:00-04:00')
+    const r = await c.order('em', {ascending: false}).order('id', {ascending: false}).range(a.pg * AUD_POR_PAGINA, (a.pg + 1) * AUD_POR_PAGINA - 1)
+    if (seq !== a.seq) return   // chegou uma resposta mais velha que outro pedido: ignora
+    if (r.error) throw Object.assign(new Error(r.error.message), {code: r.error.code})
+    a.total = r.count ?? r.data.length
+    const ultima = Math.max(0, Math.ceil(a.total / AUD_POR_PAGINA) - 1)
+    if (!r.data.length && a.pg > ultima) { a.pg = ultima; a.carregando = false; return carregaAuditoria() }   // página que deixou de existir
+    a.linhas = r.data
+  } catch (e) {
+    if (seq !== a.seq) return
+    a.linhas = []; a.total = 0
+    if (e.code === '42P01' || e.code === 'PGRST205' || /schema cache|does not exist/i.test(e.message)) a.naoAtivada = true   // migration ainda não aplicada
+    else a.erro = e.code || navigator.onLine ? e.message : 'sem internet'
+  }
+  a.carregando = false; render()
+}
+
 async function loadAll() {
   const sec = role() === 'secretaria', arb = role() === 'arbitro', eq = role() === 'equipe', all = (t, ordem = POR_ID) => ler(t, ordem)
   let r; LEITURAS_INCOMPLETAS.clear()
@@ -112,7 +139,7 @@ async function loadAll() {
     }
     r = {campeonatos, equipes, atletas, jogos, eventos, sorteios, historico, suspensoes, perfis, cancelados}
     if (arb) local.set('tnt-oficial-dados', JSON.stringify(r))   // árbitro abre a súmula mesmo sem sinal na quadra (só dados públicos)
-    S.arbitros = perfis.filter(p => p.papel === 'arbitro'); S.secretarias = perfis.filter(p => p.papel === 'secretaria')
+    S.perfis = perfis; S.arbitros = perfis.filter(p => p.papel === 'arbitro'); S.secretarias = perfis.filter(p => p.papel === 'secretaria')
   } catch (e) {
     if (!(arb && !e.code && (r = json('tnt-oficial-dados')))) throw e
     S.offline = true
