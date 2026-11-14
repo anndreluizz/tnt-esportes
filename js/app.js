@@ -1231,7 +1231,14 @@ const F = {
 }
 
 /* ---------- desenho da página ---------- */
-const VIEWS = {painel: vPainel, campeonatos: vCamps, inscricoes: vInscricoes, jogos: vJogos, sumula: vSumula, sorteio: vSorteio,
+// aviso da Central: imagens antigas do bucket "marcas" que ainda não puderam ser apagadas (só no modo oficial; a lista fica no aparelho)
+function avisoMarcas() {
+  if (typeof pendentesMarcas !== 'function') return ''
+  const {total, esgotadas} = pendentesMarcas(); if (!total) return ''
+  return `<div class="card mt"><h3>Imagens antigas pendentes de exclusão <span class="pill amber">${total}</span></h3>
+    <p class="sub">${total === 1 ? 'Uma imagem substituída ainda não foi apagada' : total + ' imagens substituídas ainda não foram apagadas'} do armazenamento. Nenhuma imagem em uso é apagada.${esgotadas ? ' ' + (esgotadas === 1 ? 'Uma já' : esgotadas + ' já') + ' atingiu o limite de tentativas automáticas e continua registrada, sem novas tentativas.' : ' O sistema tenta de novo sozinho ao abrir a Central.'}</p></div>`
+}
+const VIEWS = {painel: () => avisoMarcas() + vPainel(), campeonatos: vCamps, inscricoes: vInscricoes, jogos: vJogos, sumula: vSumula, sorteio: vSorteio,
                relatorios: vRelatorios, divulgacao: vDiv, portal: vPortal, equipe: vEquipe}
 function render() {
   const r = role(), app = $('#app'), doc = $('#doc')

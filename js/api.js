@@ -237,6 +237,9 @@ const equipeCampos = v => ({nome: v.name, bairro: v.bairro, cores: v.colors, res
 const PENDENTES = 'tnt-arquivos-pendentes'
 function leePendentes() { try { return JSON.parse(local.get(PENDENTES) || '[]') } catch { return [] } }
 function guardaPendentes(l) { local.set(PENDENTES, l.length ? JSON.stringify(l) : null) }
+const LIMITE_TENTATIVAS = 5   // depois disso a pendência continua registrada e visível, mas não é mais tentada sozinha
+// para a Central da Secretaria: quantas imagens antigas esperam exclusão e quantas já não são tentadas sozinhas
+function pendentesMarcas() { const l = leePendentes(); return {total: l.length, esgotadas: l.filter(x => (x.tentativas || 0) >= LIMITE_TENTATIVAS).length} }
 // quais candidatos podem ser apagados: da pasta certa e que ninguém mais referencia
 function escolheParaApagar(candidatos, referenciados, pasta) {
   const vivos = new Set(referenciados.filter(Boolean))
@@ -269,12 +272,14 @@ async function reprocessaPendencias() {
   let vivos; try { vivos = await caminhosReferenciados() } catch { return }
   const restam = []
   for (const x of l) {
+    if ((x.tentativas || 0) >= LIMITE_TENTATIVAS) { restam.push(x); continue }   // esgotou as tentativas: fica registrada, sem novas tentativas
     if (vivos.includes(x.path) || !x.path.startsWith(x.pasta + '/')) continue   // em uso (ou fora da pasta): descarta, não apaga
     const {data, error} = await sb.storage.from('marcas').remove([x.path])
     if (!error && (data || []).some(d => d.name === x.path)) continue          // apagado: sai da lista
     restam.push({...x, tentativas: (x.tentativas || 0) + 1})
   }
   guardaPendentes(restam)
+  if (JSON.stringify(restam) !== JSON.stringify(l)) render()   // atualiza o aviso da Central (contagem e tentativas)
 }
 // grava logo e patrocinadores do campeonato e, só depois de conferir o resultado no banco, apaga as imagens que saíram de uso
 async function gravaMarcas(id, d, edicao) {

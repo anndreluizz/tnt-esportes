@@ -235,6 +235,23 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   b = novoBanco({falhaRemove: 'silencioso'}); usa(b)
   await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
   ok(b.pend.length === 1 && b.pend[0].path === 'c1/logo-1.png', 'se o Storage não apaga e não avisa, vira pendência (não é dado como apagado)')
+  // 6b) limite de tentativas automáticas: a pendência fica registrada e visível, sem novas tentativas
+  b = novoBanco({falhaRemove: 'erro'}); b.pend = [{path: 'c1/velho.png', pasta: 'c1', motivo: 'x', em: '2026-01-01', tentativas: 0}]; usa(b)
+  b.renders = 0; run('render = () => { __st.renders++ }')
+  let chamadas = 0;
+  for (let i = 0; i < 8; i++) { const antes = b.ordem.filter(x => x.startsWith('remove:')).length; await run('reprocessaPendencias()'); chamadas += b.ordem.filter(x => x.startsWith('remove:')).length - antes }
+  ok(chamadas === 5, 'a exclusão que sempre falha é tentada no máximo 5 vezes (foram ' + chamadas + ' em 8 aberturas da Central)')
+  ok(b.pend.length === 1 && b.pend[0].path === 'c1/velho.png' && b.pend[0].tentativas === 5 && b.removidos.length === 0, 'ao atingir o limite a pendência continua registrada e nada é apagado')
+  ok(JSON.stringify(await run('pendentesMarcas()')) === '{"total":1,"esgotadas":1}', 'a contagem para a Central mostra 1 pendente e 1 sem novas tentativas')
+  ok(b.renders >= 1, 'cada tentativa que falha atualiza a tela da Central')
+  // depois do limite, mesmo com o Storage funcionando de novo, não há exclusão automática
+  run(`sb = {from: __st.from, storage: {from: () => ({remove: async paths => { __st.removidos.push(...paths); return {data: paths.map(name => ({name})), error: null} }})}}`)
+  await run('reprocessaPendencias()')
+  ok(b.removidos.length === 0 && b.pend.length === 1, 'esgotadas as tentativas, não há nova exclusão automática (a pendência segue registrada)')
+  // aviso da Central
+  const aviso = await run('avisoMarcas()')
+  ok(/Imagens antigas pendentes de exclusão/.test(aviso) && />1</.test(aviso) && /limite de tentativas/.test(aviso), 'a Central mostra a quantidade de imagens pendentes e o limite de tentativas')
+  b = novoBanco(); usa(b); ok(!(await run('avisoMarcas()')), 'sem pendências, a Central não mostra o aviso')
   // 7) falha ao enviar a imagem nova: não apaga nada e o registro não muda
   b = novoBanco({falhaUpload: true}); usa(b)
   await tenta(`gravaMarcas('c1', ${dc({logo: 'ARQ', ...SP})}, true)`)
