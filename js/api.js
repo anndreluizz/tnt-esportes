@@ -96,6 +96,7 @@ async function loadAll() {
   S.champs = await toState(r)
   if (!S.champs.some(c => c.id === S.champId)) S.champId = S.champs[0]?.id ?? null
   if (sec) limparDocumentos(r).catch(() => {})   // não trava a tela
+  if (sec) reprocessaPendencias().catch(() => {})   // imagens antigas que não puderam ser apagadas antes (conferindo de novo que não estão em uso)
 }
 // LGPD: documento (RG) só fica guardado enquanto o campeonato não termina
 async function limparDocumentos(r) {
@@ -227,11 +228,90 @@ async function apagarArquivos(lista) {   // [[bucket, pasta], ...]
   for (const [b, pasta] of lista) { const ps = await listarTudo(b, pasta); if (ps.length) await sb.storage.from(b).remove(ps) }
 }
 const equipeCampos = v => ({nome: v.name, bairro: v.bairro, cores: v.colors, responsavel: v.coach, responsavel_telefone: v.coachPhone, ...(v.pot ? {pote: v.pot} : {})})
+/* ---------- imagens do bucket "marcas": exclusão controlada dos arquivos antigos ----------
+   Trocar ou tirar uma logo/escudo deixa o arquivo velho no bucket público. Ele só é apagado quando é seguro:
+   1) o registro no banco JÁ foi gravado e foi lido de volta, igual ao pretendido;
+   2) o arquivo é da pasta do próprio campeonato e NENHUM registro (campeonato, patrocinador, equipe) ainda o usa;
+   3) nenhuma imagem desta operação falhou, e nenhum patrocinador ficou sem a imagem que tinha;
+   4) se a exclusão falhar, ou o Storage "não apagar sem avisar", vira PENDÊNCIA guardada no aparelho e tentada de novo na próxima carga. */
+const PENDENTES = 'tnt-arquivos-pendentes'
+function leePendentes() { try { return JSON.parse(local.get(PENDENTES) || '[]') } catch { return [] } }
+function guardaPendentes(l) { local.set(PENDENTES, l.length ? JSON.stringify(l) : null) }
+// quais candidatos podem ser apagados: da pasta certa e que ninguém mais referencia
+function escolheParaApagar(candidatos, referenciados, pasta) {
+  const vivos = new Set(referenciados.filter(Boolean))
+  return [...new Set(candidatos.filter(Boolean))].filter(p => p.startsWith(pasta + '/') && !vivos.has(p))
+}
+// o que o banco referencia AGORA, lido do banco (não da tela)
+async function caminhosReferenciados() {
+  const [camps, eqs] = await Promise.all([q(sb.from('campeonatos').select('logo_path, patrocinadores')), q(sb.from('equipes').select('escudo_path'))])
+  return [...camps.flatMap(c => [c.logo_path, ...(c.patrocinadores || []).map(x => x.logo_path)]), ...eqs.map(e => e.escudo_path)]
+}
+function registraPendencia(paths, pasta, motivo) {
+  const l = leePendentes(), ja = new Set(l.map(x => x.path))
+  for (const path of paths) if (!ja.has(path)) l.push({path, pasta, motivo: String(motivo).slice(0, 120), em: new Date().toISOString(), tentativas: 0})
+  guardaPendentes(l)
+  toast('Uma imagem antiga não pôde ser apagada agora. Ela fica pendente e será tentada de novo.')
+}
+// apaga com segurança; devolve o que foi apagado. Sem conseguir conferir as referências, NÃO apaga nada (vira pendência).
+async function apagaMarcasAntigas(candidatos, pasta) {
+  let vivos; try { vivos = await caminhosReferenciados() } catch (e) { registraPendencia(candidatos.filter(Boolean), pasta, 'não deu para conferir o uso: ' + e.message); return [] }
+  const apagar = escolheParaApagar(candidatos, vivos, pasta); if (!apagar.length) return []
+  const {data, error} = await sb.storage.from('marcas').remove(apagar)
+  const feitos = new Set((data || []).map(x => x.name))   // o Storage devolve só o que apagou; sem permissão ele não avisa
+  const faltou = apagar.filter(p => !feitos.has(p))
+  if (faltou.length) registraPendencia(faltou, pasta, error ? error.message : 'o Storage não apagou')
+  return apagar.filter(p => feitos.has(p))
+}
+// tenta de novo as pendências; conferindo outra vez que o arquivo não está em uso (se virou referência, a pendência é descartada sem apagar)
+async function reprocessaPendencias() {
+  const l = leePendentes(); if (!l.length) return
+  let vivos; try { vivos = await caminhosReferenciados() } catch { return }
+  const restam = []
+  for (const x of l) {
+    if (vivos.includes(x.path) || !x.path.startsWith(x.pasta + '/')) continue   // em uso (ou fora da pasta): descarta, não apaga
+    const {data, error} = await sb.storage.from('marcas').remove([x.path])
+    if (!error && (data || []).some(d => d.name === x.path)) continue          // apagado: sai da lista
+    restam.push({...x, tentativas: (x.tentativas || 0) + 1})
+  }
+  guardaPendentes(restam)
+}
+// grava logo e patrocinadores do campeonato e, só depois de conferir o resultado no banco, apaga as imagens que saíram de uso
+async function gravaMarcas(id, d, edicao) {
+  const t = v => v?.trim() || null
+  const antes = edicao ? (await q(sb.from('campeonatos').select('logo_path, patrocinadores').eq('id', id)))[0] : null
+  let falhou = false
+  const marca = async (file, nome) => {
+    let b; try { b = await fitImage(file, 400, 'image/png') } catch { falhou = true; toast('Não foi possível ler a imagem de ' + nome); return null }
+    if (!b) return null
+    const path = `${id}/${nome}-${Date.now()}.png`, {error} = await sb.storage.from('marcas').upload(path, b, {contentType: 'image/png'})
+    if (error) { falhou = true; toast('Imagem não enviada: ' + error.message); return null }
+    return path
+  }
+  const extra = {patrocinadores: []}
+  const logo = await marca(d.logo, 'logo'); if (logo) extra.logo_path = logo
+  for (const i of Object.keys(d).filter(k => /^sp\d+$/.test(k)).map(k => k.slice(2)))   // na ordem da tela
+    if (t(d['sp' + i])) extra.patrocinadores.push({nome: t(d['sp' + i]), logo_path: (await marca(d['spl' + i], 'patrocinio-' + i)) || d['spp' + i] || null})
+  await q(sb.from('campeonatos').update(extra).eq('id', id))
+  if (!antes || falhou) return   // criação: não há o que apagar; falha de imagem: não apaga nada
+  const antigos = [antes.logo_path, ...(antes.patrocinadores || []).map(x => x.logo_path)]
+  // nenhum patrocinador pode ficar sem a imagem que tinha
+  if (extra.patrocinadores.some(p => !p.logo_path && (antes.patrocinadores || []).some(a => a.nome === p.nome && a.logo_path))) return
+  // lê de volta: o registro tem que estar exatamente como pretendido antes de apagar qualquer arquivo
+  const agora = (await q(sb.from('campeonatos').select('logo_path, patrocinadores').eq('id', id)))[0]
+  const logoEsperado = extra.logo_path ?? antes.logo_path, pathsEsperados = extra.patrocinadores.map(p => p.logo_path).join('|')
+  if (!agora || agora.logo_path !== logoEsperado || (agora.patrocinadores || []).map(p => p.logo_path).join('|') !== pathsEsperados) return
+  await apagaMarcasAntigas(antigos, id)
+}
 async function enviaEscudo(c, tid, blob) {   // escudo vai para o arquivo público das marcas
   if (!blob) return
+  const antes = (await q(sb.from('equipes').select('escudo_path').eq('id', tid)))[0]?.escudo_path || null
   const path = `${c.id}/equipe-${tid}-${Date.now()}.png`, {error} = await sb.storage.from('marcas').upload(path, blob, {contentType: 'image/png'})
   if (error) return toast('Escudo não enviado: ' + error.message)
   await q(sb.from('equipes').update({escudo_path: path}).eq('id', tid))
+  if (!antes || antes === path) return
+  const agora = (await q(sb.from('equipes').select('escudo_path').eq('id', tid)))[0]?.escudo_path
+  if (agora === path) await apagaMarcasAntigas([antes], c.id)   // o escudo novo já está gravado e foi lido de volta: o antigo pode sair
 }
 // mudança no banco: mostra o erro em português e sempre recarrega, para a tela ficar igual ao banco
 // erro de validação (return toast) não recarrega: o formulário fica preenchido. Devolve false quando deu erro.
@@ -434,19 +514,8 @@ const REAL_F = {
     let id = d.id
     if (id) await q(sb.from('campeonatos').update(campos).eq('id', id))
     else id = (await q(sb.from('campeonatos').insert({...campos, modalidade: d.sport}).select('id')))[0].id
-    // logos: arquivo público "marcas/<campeonato>/..."; se uma imagem falhar, o resto continua salvo
-    const marca = async (file, nome) => {
-      let b; try { b = await fitImage(file, 400, 'image/png') } catch { toast('Não foi possível ler a imagem de ' + nome); return null }
-      if (!b) return null
-      const path = `${id}/${nome}-${Date.now()}.png`, {error} = await sb.storage.from('marcas').upload(path, b, {contentType: 'image/png'})
-      if (error) { toast('Imagem não enviada: ' + error.message); return null }
-      return path
-    }
-    const extra = {patrocinadores: []}
-    const logo = await marca(d.logo, 'logo'); if (logo) extra.logo_path = logo
-    for (const i of Object.keys(d).filter(k => /^sp\d+$/.test(k)).map(k => k.slice(2)))   // na ordem da tela
-      if (t(d['sp' + i])) extra.patrocinadores.push({nome: t(d['sp' + i]), logo_path: (await marca(d['spl' + i], 'patrocinio-' + i)) || d['spp' + i] || null})
-    await q(sb.from('campeonatos').update(extra).eq('id', id))
+    // logos: arquivo público "marcas/<campeonato>/..."; se uma imagem falhar, o resto continua salvo; as imagens antigas só saem depois de conferir (gravaMarcas)
+    await gravaMarcas(id, d, !!d.id)
     if (d.id) { ui.editChamp = null; toast('Dados do campeonato atualizados.') }
     else { S.champId = id; resetTransient(); ui.tab = 'inscricoes'; toast('Campeonato criado. Cadastre as equipes e mande o link de inscrição.') }
   }),
