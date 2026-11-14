@@ -36,7 +36,7 @@ async function toState(r) {
     const a = j.assinaturas || {}, m = newMatch({id: j.id, phase: j.fase, round: j.rodada, group: j.grupo, title: j.titulo,
       home: j.mandante_id, away: j.visitante_id, slotH: j.vaga_mandante, slotA: j.vaga_visitante, date: j.data, time: j.hora, status: j.status,
       events: evs[j.id] || [], pen: j.pen_mandante == null ? null : [j.pen_mandante, j.pen_visitante], wo: j.wo_ausente_id, postponed: j.adiado,
-      notes: j.observacoes, hash: j.hash, local: j.local, woGoals: byId[j.campeonato_id] ? regras(byId[j.campeonato_id]).wo : 3, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
+      notes: j.observacoes ?? '', hash: j.hash, local: j.local, woGoals: byId[j.campeonato_id] ? regras(byId[j.campeonato_id]).wo : 3, refereeId: j.arbitro_id, referee: nomes[j.arbitro_id] || (j.arbitro_id ? 'Árbitro escalado' : 'A definir'),
       signatures: Object.fromEntries([['arbitro', a.arbitro], ['home', a.mandante], ['away', a.visitante]].filter(x => x[1]))})
     const d = j.status !== 'encerrado' && json(draftKey(j.id))   // súmula em andamento neste aparelho
     if (d) { const ids = new Set(m.events.map(e => e.id))
@@ -69,14 +69,15 @@ async function loadAll() {
   try {
     // ponytail: cada consulta traz até 1000 linhas (limite do Supabase); paginar se a cidade passar disso
     const [campeonatos, equipes, pub, jogos, eventos, sorteios, historico, suspensoes, perfis, meus, cancelados, minha] = await Promise.all([
-      q(sb.from('campeonatos').select('*').order('criado_em')), q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
-      all(sec ? 'atletas' : 'atletas_publico'), all('jogos'), all('eventos'), all('sorteios_publico'),
+      q(sb.from(sec ? 'campeonatos' : 'campeonatos_publico').select('*').order('criado_em')),   // o público não lê o telefone do responsável q(sb.from(sec ? 'equipes' : 'equipes_publico').select('*').order('nome')),
+      all(sec ? 'atletas' : 'atletas_publico'), all(sec ? 'jogos' : 'jogos_publico'), all('eventos'),   // jogos sem observações nem assinaturas, exceto para a Secretaria all('sorteios_publico'),
       q(sb.from(sec ? 'historico' : 'historico_publico').select('*').order('em', {ascending: false}).limit(1000)),
       sec || arb || eq ? all('suspensoes') : [], sec ? q(sb.from('perfis').select('id, nome, papel').order('nome')) : [],
       // equipe: o próprio elenco completo (com pendências); árbitro: fotos dos atletas dos seus jogos (o banco filtra)
       eq ? q(sb.from('atletas').select('*').eq('equipe_id', S.session.teamId)) : arb ? q(sb.from('atletas').select('id, foto_path')) : [],
       all('sorteios_cancelados'), eq ? q(sb.from('equipes').select('id, link_token').eq('id', S.session.teamId)) : []])
     for (const x of minha) Object.assign(equipes.find(t => t.id === x.id) || {}, x)   // representante vê o link da própria equipe
+    if (arb) for (const x of await q(sb.from('jogos').select('id, observacoes, assinaturas'))) Object.assign(jogos.find(j => j.id === x.id) || {}, x)   // árbitro: observações e assinaturas só dos próprios jogos (o banco filtra)
     const foto = Object.fromEntries(meus.map(a => [a.id, a.foto_path]))
     const atletas = eq ? [...pub.filter(a => a.equipe_id !== S.session.teamId), ...meus] : pub.map(a => ({...a, foto_path: a.foto_path ?? foto[a.id]}))
     const paths = atletas.map(a => a.foto_path).filter(Boolean)

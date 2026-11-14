@@ -145,5 +145,13 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   run(`ui.doc = null; ui.reg = 'g4'; render()`); ok(els['#doc'].innerHTML.includes('REGULAMENTO') && els['#doc'].innerHTML.includes('4 grupos') && els['#doc'].innerHTML.includes('quartas de final'), 'regulamento gerado com o formato')
   run(`ui.reg = 'pc'; render()`); ok(els['#doc'].innerHTML.includes('turno e returno') && els['#doc'].innerHTML.includes('Vitória vale 2 pontos'), 'regulamento com as regras escolhidas')
   run(`ui.reg = null; render()`)
+  // privacidade: o documento público não mostra telefone do responsável nem observações internas da súmula
+  run(`S.session = {role: 'publico'}; const cp = C(); cp.responsible = 'Fulano'; cp.responsiblePhone = '97999990000'; ui.doc = null; ui.reg = cp.id; render()`)
+  ok(els['#doc'].innerHTML.includes('Fulano') && !els['#doc'].innerHTML.includes('97999990000'), 'regulamento público não mostra o telefone do responsável')
+  run(`const mp = C().matches.find(isDone); mp.notes = 'OBSERVACAO INTERNA'; ui.reg = null; ui.doc = {c: C().id, id: mp.id}; render()`)
+  ok(els['#doc'].innerHTML.includes('Gols') && !els['#doc'].innerHTML.includes('OBSERVACAO INTERNA'), 'súmula pública não mostra as observações do árbitro')
+  run(`S.session = {role: 'secretaria'}; render()`)
+  ok(els['#doc'].innerHTML.includes('OBSERVACAO INTERNA'), 'a Secretaria continua vendo as observações da súmula')
+  run(`ui.doc = null; render()`)
   console.log('ok: regras, mata-mata, sorteio e todas as telas')
 })()
