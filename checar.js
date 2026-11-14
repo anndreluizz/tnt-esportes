@@ -58,7 +58,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
     }
   }
   await allViews()
-  run(`S.session=null; render()`); ok(els['#app'].innerHTML.includes('TNT ESPORTES'), 'tela de entrada')
+  run(`S.session=null; render()`); ok(els['#app'].innerHTML.includes('lhero t3'), 'tela de entrada')
 
   // simula até o campeão e confere o mata-mata
   run(`S.session={role:'secretaria'}`)
