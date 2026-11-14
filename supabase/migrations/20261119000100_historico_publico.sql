@@ -9,6 +9,8 @@
 -- A lista é explícita: tipos novos de registro NÃO ficam públicos por padrão.
 -- Não apaga nem altera nenhum dado (a tabela historico não é tocada): só recria a view, que perde as colunas quem e motivo.
 
+-- Tudo numa transação: a view some e volta no mesmo instante, ou nada muda (o portal nunca fica sem a view).
+begin;
 drop view historico_publico;
 create view historico_publico as
   select jogo_id, o_que, em
@@ -18,9 +20,12 @@ create view historico_publico as
 grant select on historico_publico to anon, authenticated;
 -- A view recriada ganha de novo os privilégios automáticos do Supabase (REFERENCES, TRIGGER, TRUNCATE); o público só deve ter SELECT.
 revoke references, trigger, truncate on historico_publico from anon, authenticated;
+commit;
 
 -- COMO DESFAZER:
+--   begin;
 --   drop view historico_publico;
 --   create view historico_publico as select jogo_id, quem, o_que, motivo, em from historico where jogo_id is not null;
 --   grant select on historico_publico to anon, authenticated;
 --   revoke references, trigger, truncate on historico_publico from anon, authenticated;
+--   commit;
