@@ -419,6 +419,18 @@ function teamLink(c, t, daEquipe) {   // modo oficial: link de inscrição da eq
 function teamDetail(c, t, mode) {
   const ps = c.players.filter(p => p.team === t.id).sort((a, b) => a.num - b.num)
   const {susp} = discipline(c), nx = nextMatches(c, t.id)[0]
+  const ev = {}   // gols e cartões de cada atleta nos jogos encerrados
+  for (const m of c.matches.filter(isDone)) for (const e of m.events) if (e.player) { const x = (ev[e.player] ??= {g: 0, a: 0, v: 0}); if (e.type === 'gol') x.g++; if (e.type === 'amarelo') x.a++; if (e.type === 'vermelho') x.v++ }
+  const camp = {J: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0}, forma = []
+  for (const m of c.matches.filter(m => isDone(m) && (m.home === t.id || m.away === t.id)).sort(byDate)) {
+    const [h, a] = score(m), [pro, contra] = m.home === t.id ? [h, a] : [a, h], k = pro > contra ? 'V' : pro < contra ? 'D' : 'E'
+    camp.J++; camp[k]++; camp.GP += pro; camp.GC += contra; forma.push(k)
+  }
+  const cartoes = x => !x || !(x.a || x.v) ? '–' : `${x.a ? `<span class="cd y"></span> ${x.a} ` : ''}${x.v ? `<span class="cd r"></span> ${x.v}` : ''}`
+  const ficha = `<div class="tficha">${crest(t, 84)}<div class="tf-id"><div class="eyebrow">${t.group ? 'Grupo ' + t.group : esc(c.name)}</div><h3>${esc(t.name)}</h3>
+    <div class="sub">${[t.colors && 'Uniforme ' + esc(t.colors), t.bairro && esc(t.bairro), `${ps.length}${c.maxPlayers ? ' de ' + c.maxPlayers : ''} atletas`].filter(Boolean).join(' · ')}</div></div>
+    <div class="tf-num">${[['J', camp.J], ['V', camp.V], ['E', camp.E], ['D', camp.D], ['GP', camp.GP], ['GC', camp.GC]].map(([l, v]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>
+    ${forma.length ? `<div class="tf-forma" aria-label="Últimos resultados">${forma.slice(-5).map(k => `<i class="f${k}">${k}</i>`).join('')}</div>` : ''}</div>`
   const rows = ps.map(p => {
     const [s, why] = insc(c, p), sw = nx && susp[nx.id]?.[p.id]
     let acts = ''
@@ -430,15 +442,15 @@ function teamDetail(c, t, mode) {
       acts += ` <button class="btn ghost sm" data-act="editplayer" data-id="${p.id}">${ui.editPlayer === p.id ? 'Fechar' : 'Editar'}</button>`
     }
     const info = [p.pos, mode === 'sec' ? [p.address, p.bairro, p.city].filter(Boolean).join(', ') : p.bairro, p.phone].filter(Boolean).map(esc).join(' · ')
-    const row = `<tr><td><div class="ath">${avatar(p)}<div><b>${esc(p.name)}</b>${p.nick ? ` <span class="sub">“${esc(p.nick)}”</span>` : ''}${p.origin === 'link' ? ' <span class="pill blue">via link</span>' : ''}<div class="sub">${info}</div></div></div></td><td>${p.num}</td><td>${ageAt(p.birth, c.start)}</td>
+    const row = `<tr><td><div class="ath">${avatar(p)}<div><b>${esc(p.name)}</b>${p.nick ? ` <span class="sub">“${esc(p.nick)}”</span>` : ''}${p.origin === 'link' ? ' <span class="pill blue">via link</span>' : ''}<div class="sub">${info}</div></div></div></td><td>${p.num}</td><td>${ageAt(p.birth, c.start)}</td><td>${ev[p.id]?.g || '–'}</td><td>${cartoes(ev[p.id])}</td>
       <td class="l wrap">${spill(s)} ${sw ? '<span class="pill red">Suspenso</span>' : ''} ${why ? `<div class="sub">${why}</div>` : sw ? `<div class="sub">${esc(sw)}</div>` : ''}${p.resp ? `<div class="sub">Responsável: ${esc(p.resp)}${p.respPhone ? ' · ' + esc(p.respPhone) : ''}</div>` : ''}</td><td>${acts}</td></tr>`
-    const docs = mode === 'sec' && ui.docs?.id === p.id ? `<tr><td colspan="5"><div class="docs">${ui.docs.urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Documento de ${esc(p.name)}"></a>`).join('')}</div>
+    const docs = mode === 'sec' && ui.docs?.id === p.id ? `<tr><td colspan="7"><div class="docs">${ui.docs.urls.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Documento de ${esc(p.name)}"></a>`).join('')}</div>
       <p class="note">Documento visível só para a Secretaria. É apagado automaticamente quando o campeonato termina (LGPD).</p></td></tr>` : ''
-    const form = mode === 'sec' && ui.punish === p.id ? `<tr><td colspan="5"><form class="f manage" data-form="punish">
+    const form = mode === 'sec' && ui.punish === p.id ? `<tr><td colspan="7"><form class="f manage" data-form="punish">
       <label>Jogos de suspensão<select name="games"><option>1</option><option>2</option><option>3</option></select></label>
       <label class="span2">Decisão / motivo<input name="why" required minlength="5" placeholder="Ex.: agressão ao adversário, decisão da comissão em 05/11"></label>
       <div class="btns span2"><button class="btn danger">Aplicar suspensão</button><button type="button" class="btn ghost" data-act="punish" data-id="">Cancelar</button></div></form></td></tr>` : ''
-    const edit = mode === 'sec' && ui.editPlayer === p.id ? `<tr><td colspan="5"><form class="f manage" data-form="editplayer">
+    const edit = mode === 'sec' && ui.editPlayer === p.id ? `<tr><td colspan="7"><form class="f manage" data-form="editplayer">
       <label class="span2">Nome completo<input name="name" required minlength="3" maxlength="50" value="${esc(p.name)}"></label>
       <label>Apelido<input name="nick" maxlength="30" value="${esc(p.nick || '')}"></label>
       <label>Nº da camisa<input name="num" data-erro="número" type="number" min="1" max="99" required value="${p.num}"></label>
@@ -461,11 +473,10 @@ function teamDetail(c, t, mode) {
     : ui.confirmDel === 'team:' + t.id ? `<div class="info warn" style="margin-bottom:12px"><b>Excluir ${esc(t.name)}?</b> Os ${ps.length} atletas, fotos e documentos da equipe também serão apagados. Não dá para desfazer.
       <div class="btns" style="margin-top:8px"><button class="btn danger sm" data-act="delteam" data-id="${t.id}">Sim, excluir a equipe</button><button class="btn ghost sm" data-act="canceldel">Cancelar</button></div></div>`
     : `<div class="btns" style="margin-bottom:10px"><button class="btn ghost sm" data-act="editteam" data-id="${t.id}">Editar equipe</button>${podeExcluir ? `<button class="btn ghost sm" data-act="delteam" data-id="${t.id}">Excluir equipe</button>` : ''}</div>`
-  return `<div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">${crest(t, 52)}<div><h3>${esc(t.name)} <small>${ps.length}${c.maxPlayers ? ' de ' + c.maxPlayers : ''} atletas${t.group ? ' · Grupo ' + t.group : ''}</small></h3>
-    <div class="sub">${[t.colors && 'Uniforme ' + esc(t.colors), t.bairro && esc(t.bairro), mode === 'sec' && t.coach && 'Responsável: ' + esc(t.coach) + (t.coachPhone ? ' · ' + esc(t.coachPhone) : '')].filter(Boolean).join(' · ')}</div></div></div>
+  return `${ficha}
   ${gestao}${mode === 'team' ? teamLink(c, t, true) : ''}
   ${mode === 'sec' ? teamLink(c, t) + `<p class="sub" style="margin-bottom:8px">Código de acesso da equipe: <span class="codebox">${t.code}</span> · o representante usa para entrar no sistema.</p>` : ''}
-  <div class="scroll"><table class="st"><thead><tr><th class="l">Atleta</th><th>Nº</th><th>Idade</th><th class="l">Situação</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Nenhum atleta inscrito.</td></tr>'}</tbody></table></div>
+  <div class="scroll"><table class="st"><thead><tr><th class="l">Atleta</th><th>Nº</th><th>Idade</th><th>Gols</th><th>Cartões</th><th class="l">Situação</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="empty">Nenhum atleta inscrito.</td></tr>'}</tbody></table></div>
   ${mode === 'sec' || inscricaoAberta(c) ? athleteForm(c, mode) : '<p class="note" style="margin-top:18px">As inscrições de novos atletas estão encerradas para este campeonato.</p>'}`
 }
 
