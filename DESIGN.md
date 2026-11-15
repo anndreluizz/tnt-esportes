@@ -18,6 +18,9 @@ sobre foto), grade de pontos (fundo da página, bem leve), papel (documentos imp
 - Navegação da Secretaria: 5 grupos (Painel, Campeonatos, Jogos, Equipes, Mais) com sub-botões; barra inferior no celular.
 - Chips de filtro (`.chips`), selos (`.pill`), tabelas (`.st` dentro de `.scroll`).
 
+## Tokens da marca (3.1)
+Um nome por cor, em `:root` de `estilo.css`: `--tnt-marinho` #071426, `--tnt-painel` #0b1d38, `--tnt-campo` #0e2547, `--tnt-azul` #102F68, `--tnt-eletrico` #1769FF, `--tnt-neon` #00E676, `--tnt-texto-suave` #9bb0d1. Regra nova usa o token, não o hexadecimal.
+
 ## Regras
 - Tokens em `:root` (`--sp-*`, `--r-*`, `--sombra-*`, `--campo`); borda de campo com contraste 3:1.
 - Animar só transform, opacidade, cor e sombra; respeitar `prefers-reduced-motion`. Nunca `transition: all`.

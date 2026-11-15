@@ -119,6 +119,8 @@ function phaseNow(c) {
 // (Abrir súmula / Ver súmula) e o resto no menu "Mais" (Hick, Fitts, Proximidade). `destaque`: o próximo jogo.
 function matchRow(c, m, mode, destaque = false) {
   const ready = m.home && m.away, d = isDone(m)
+  const [gh, ga] = d ? score(m) : [0, 0], venc = !d ? '' : gh > ga ? 'h' : ga > gh ? 'a' : m.pen ? (m.pen[0] > m.pen[1] ? 'h' : 'a') : ''   // vencedor: gols, ou pênaltis no empate
+  const est = d ? ' est-fim' : m.date === hojeStr() ? ' est-hoje' : ''
   const principal = mode === 'sec' && !d && ready ? `<button class="btn" data-act="open" data-id="${m.id}">Abrir súmula</button>`
     : d ? `<button class="btn ghost" data-act="doc" data-c="${c.id}" data-id="${m.id}">Ver súmula</button>` : ''
   const mais = []
@@ -126,9 +128,9 @@ function matchRow(c, m, mode, destaque = false) {
   if (mode === 'sec' && ready) mais.push(`<a class="btn ghost sm" target="_blank" rel="noopener" href="${waLink(c, m)}" title="Mensagem pronta para o grupo">Avisar no WhatsApp</a>`)
   if (REAL && mode === 'sec' && !d) mais.push(refSelect(m))
   const menu = mais.length ? `<details class="mais"><summary class="btn ghost sm">Mais</summary><div class="mmenu">${mais.join('')}</div></details>` : ''
-  return `<div class="match jogo${destaque ? ' destaque' : ''}"><div class="jtop"><span>${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(m.local || c.venue)}</span>${mpill(m)}</div>
-    <div class="mline"><span class="r">${side(c, m, 'home')}</span>
-    <span class="sc ${d ? '' : 'time'}">${d ? scoreTxt(m) : m.time}</span><span>${side(c, m, 'away')}</span></div>
+  return `<div class="match jogo${destaque ? ' destaque' : ''}${est}"><div class="jtop"><span>${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(m.local || c.venue)}</span>${mpill(m)}</div>
+    <div class="mline"><span class="r${venc === 'h' ? ' venc' : venc === 'a' ? ' perd' : ''}">${side(c, m, 'home')}</span>
+    <span class="sc ${d ? '' : 'time'}">${d ? scoreTxt(m) : m.time}</span><span class="${venc === 'a' ? 'venc' : venc === 'h' ? 'perd' : ''}">${side(c, m, 'away')}</span></div>
     ${principal || menu ? `<div class="jacts">${principal}${menu}</div>` : ''}
     ${mode === 'sec' && ui.manage === m.id ? manageForm(c, m) : ''}</div>`
 }
@@ -153,11 +155,14 @@ function manageForm(c, m) {
 }
 
 const KO_PLURAL = {oitavas: 'Oitavas de final', quartas: 'Quartas de final', semi: 'Semifinais'}
+const FORMA = {V: 'Vitória', E: 'Empate', D: 'Derrota'}
+const formaDe = (c, id, g) => c.matches.filter(m => isDone(m) && m.phase === 'grupos' && m.group === g && (m.home === id || m.away === id)).sort(byDate)
+  .map(m => { const [h, a] = score(m), [p, q] = m.home === id ? [h, a] : [a, h]; return p > q ? 'V' : p < q ? 'D' : 'E' }).slice(-5)
 function table(c, g) {
   const pts = formato(c) === 'pontos', r = regras(c), q = pts ? 1 : r.classificam
   const note = pts ? 'Campeão: quem somar mais pontos' : `${q === 1 ? 'O 1º passa' : `Os ${q} primeiros passam`} para o mata-mata${groupDone(c, g) ? ' · grupo encerrado' : ''}`
-  return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
-  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l">${crest(r.t)} <b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
+  return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th class="forma">Últ. 5</th></tr></thead><tbody>
+  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l">${crest(r.t)} <b>${esc(r.t.name)}</b></td><td class="pts"><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td><td class="forma">${formaDe(c, r.t.id, g).map(k => `<i class="f${k}" title="${FORMA[k]}">${k}</i>`).join('') || '<span class="sub">–</span>'}</td></tr>`).join('')}
   </tbody></table></div><p class="note"><span class="qmark"></span>${note}</p></div>`
 }
 const tables = c => formato(c) === 'mata' ? '' : `<div class="grid ${groupsOf(c).length > 1 ? 'g2' : ''}">${groupsOf(c).map(g => table(c, g)).join('')}</div>`
@@ -207,8 +212,23 @@ const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div 
 // fotos de Tonantins: ginásio, praça (piso nas cores da bandeira) e orla; só lugares, sem rostos em destaque
 const FAIXA = ['ginasio', 'praca', 'orla'].map(n => `<img src="img/faixa-${n}.jpg" width="720" height="540" alt="" loading="lazy">`).join('')
 // cartão de placar de transmissão: campeonato, rodada, escudos, horário e local
+// Portal (3.1): hoje/amanhã em vez de só a data; cartão de situação quando não há jogo; faixa de resultados rolável
+const hojeStr = () => new Date().toLocaleDateString('sv', {timeZone: 'America/Manaus'})
+const quando = m => m.date === hojeStr() ? 'Hoje' : m.date === addDays(hojeStr(), 1) ? 'Amanhã' : dm(m.date)
+function placarSemJogo(c) {
+  const fim = c.matches.length > 0 && c.matches.every(isDone)
+  const titulo = fim ? 'Campeonato encerrado' : c.matches.length ? 'Próximos jogos a definir' : c.status === 'inscricoes' ? 'Inscrições abertas' : 'Aguardando sorteio'
+  const n = c.teams.length, eq = `${n} ${n === 1 ? 'equipe inscrita' : 'equipes inscritas'}`
+  const sub = !c.matches.length && c.regUntil ? `Até ${dmy(c.regUntil)} · ${eq}` : eq
+  return `<div class="placar sem-jogo" aria-label="Situação do campeonato"><div class="top"><span>${esc(c.name)}</span></div><b>${titulo}</b><p>${sub}</p></div>`
+}
+function faixaResultados(c) {
+  const ult = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 8)
+  if (!ult.length) return ''
+  return `<section class="fres" aria-label="Últimos resultados"><div class="fres-tit">Resultados</div><div class="fres-lista">${ult.map(m => `<button class="fres-it" data-act="doc" data-c="${c.id}" data-id="${m.id}" title="Ver súmula"><span class="fres-t">${crest(T(c, m.home), 20)}${esc(T(c, m.home).name)}</span><b>${score(m).join(' × ')}</b><span class="fres-t">${esc(T(c, m.away).name)}${crest(T(c, m.away), 20)}</span></button>`).join('')}</div></section>`
+}
 const placarJogo = (c, m) => `<div class="placar" aria-label="Próximo jogo"><div class="top"><span>${esc(c.name)}</span><b>${esc(mtitle(m))}</b></div>
-  <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${dm(m.date)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
+  <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${quando(m)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
   <div class="base"><span>${esc(m.local || c.venue)}</span></div></div>`
 // Hero da entrada (3.0): título grande e o próximo jogo de verdade, de qualquer campeonato
 function loginHero() {
@@ -233,6 +253,23 @@ function vLogin() {
 }
 
 /* ---------- Secretaria ---------- */
+// Painel "Hoje": o que a Secretaria precisa decidir agora, num lugar só. Cada item leva à tela onde se resolve.
+function hojeCard(c) {
+  const hoje = new Date().toLocaleDateString('sv', {timeZone: 'America/Manaus'})
+  const abertos = c.matches.filter(m => !isDone(m))
+  const dia = abertos.filter(m => m.date === hoje).length
+  const atrasadas = abertos.filter(m => m.home && m.away && m.date < hoje).length   // a data passou e a súmula não foi confirmada
+  const aprovar = c.teams.filter(t => teamInsc(c, t)[0] !== 'aprovado').length + c.players.filter(p => insc(c, p)[0] !== 'aprovado').length
+  const dias = c.status === 'inscricoes' && c.regUntil && c.regUntil >= hoje ? Math.round((new Date(c.regUntil + 'T12:00') - new Date(hoje + 'T12:00')) / 864e5) : null
+  const it = (v, l, tab, tom = '') => `<button class="hoje-it ${tom}" data-act="tab" data-tab="${tab}"><b>${v}</b><span>${l}</span></button>`
+  const itens = [it(dia, dia === 1 ? 'jogo hoje' : 'jogos hoje', 'jogos', dia ? 'neon' : ''),
+    it(atrasadas, atrasadas === 1 ? 'súmula atrasada' : 'súmulas atrasadas', 'jogos', atrasadas ? 'alerta' : ''),
+    it(aprovar, aprovar === 1 ? 'inscrição a aprovar' : 'inscrições a aprovar', 'inscricoes', aprovar ? 'alerta' : '')]
+  if (dias !== null) itens.push(it(dias, dias === 1 ? 'dia para fechar as inscrições' : 'dias para fechar as inscrições', 'inscricoes', dias <= 3 ? 'alerta' : ''))
+  const emDia = !atrasadas && !aprovar
+  return `<section class="hoje mt" aria-label="Hoje"><div class="hoje-top"><h3>Hoje</h3><span class="sub">${emDia ? 'Nada pendente. Tudo em dia.' : 'Toque para resolver.'}</span></div><div class="hoje-grid">${itens.join('')}</div></section>`
+}
+
 function vPainel() {
   const c = C(), r = 'sec'
   const head = `<div class="head"><div><div class="eyebrow">Painel da Secretaria</div><h2>${esc(c.name)}</h2>
@@ -245,7 +282,7 @@ function vPainel() {
   const hist = `<div class="card mt"><h3>Histórico de alterações <small>quem, quando e por quê</small></h3>${c.log.slice(0, 8).map(logRow).join('') || '<p class="sub">Nada registrado.</p>'}</div>`
   if (c.status === 'inscricoes') {
     const pend = c.players.filter(p => insc(c, p)[0] !== 'aprovado').length
-    return head + `<div class="grid g4">${stat(c.teams.length, 'equipes inscritas')}${stat(aprov, 'atletas aprovados')}${stat(pend, 'atletas com pendência', 'gold')}${stat(new Date(c.start + 'T12:00').toLocaleDateString('pt-BR'), 'início previsto')}</div>
+    return head + hojeCard(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes inscritas')}${stat(aprov, 'atletas aprovados')}${stat(pend, 'atletas com pendência', 'gold')}${stat(new Date(c.start + 'T12:00').toLocaleDateString('pt-BR'), 'início previsto', 'data')}</div>
       <div class="grid side mt"><div class="card"><h3>Próximo passo</h3><p>Com as inscrições fechadas, faça o <b>sorteio público</b>. O sistema monta os grupos e gera a tabela completa, com o mata-mata.</p>
         <div class="btns" style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button><button class="btn ghost" data-act="tab" data-tab="inscricoes">Ver inscrições</button></div></div>${pendCard}</div>` + hist
   }
@@ -258,7 +295,7 @@ function vPainel() {
     return tag && `<div class="row"><div class="ath">${avatar(p, 30)}<div><b>${esc(p.name)}</b> <span class="sub">nº ${p.num}</span><div class="sub">${esc(T(c, p.team).name)}${why ? ' · ' + esc(why) : ''}</div></div></div>${tag}</div>`
   }).join('')
   const nb = nextBatch(c)
-  return head + banner(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes')}${stat(aprov, 'atletas aprovados')}${stat(fin.length + '/' + c.matches.length, 'jogos realizados')}${stat(gols, 'gols marcados', 'gold')}</div>
+  return head + hojeCard(c) + banner(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes')}${stat(aprov, 'atletas aprovados')}${stat(fin.length + '/' + c.matches.length, 'jogos realizados')}${stat(gols, 'gols marcados', 'gold')}</div>
   <div class="grid side mt">
     <div class="card"><h3>Próximos jogos <small>${up.length} a realizar</small></h3>${up.slice(0, 6).map((m, i) => matchRow(c, m, r, i === 0)).join('') || '<p class="empty">Todos os jogos foram realizados.</p>'}</div>
     <div class="grid" style="align-content:start">
@@ -536,7 +573,9 @@ function trocaCampo(c) {
 function vJogos() {
   const c = C()
   const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: ' + regras(c).desempate.map(k => CRITERIOS[k].toLowerCase()).join(', ')}</span></div>`
-  if (!c.matches.length) return head + `<div class="card empty">A tabela é gerada automaticamente depois do sorteio.<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button></div></div>`
+  if (!c.matches.length) return head + `<div class="card vazio"><h3>A tabela ainda não existe</h3><p class="sub">Ela é gerada sozinha depois do sorteio. Falta pouco:</p>
+    <ol class="passos"><li><b>Inscrições.</b> Equipes e atletas se inscrevem pelo link; você aprova.</li><li><b>Sorteio público.</b> Grupos, tabela completa e mata-mata nascem de uma vez.</li><li><b>Jogos.</b> Esta tela passa a mostrar classificação, chave e a lista de jogos.</li></ol>
+    <div class="btns"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button><button class="btn ghost" data-act="tab" data-tab="inscricoes">Ver inscrições</button></div></div>`
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
   return head + (mode === 'sec' ? trocaCampo(c) : '') + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
@@ -685,12 +724,33 @@ function vSorteio() {
 }
 
 /* ---------- relatórios ---------- */
+// Gráficos em SVG puro (sem biblioteca): cores pelos tokens, texto equivalente em aria-label para leitor de tela.
+const ROT_FASE = {oitavas: 'Oit.', quartas: 'Qtas', semi: 'Semi', terceiro: '3º', final: 'Final'}
+function graficoRosca(feitos, total) {
+  if (!total) return '<p class="empty">Ainda sem jogos. O gráfico aparece depois do sorteio.</p>'
+  const r = 60, circ = 2 * Math.PI * r, arco = circ * feitos / total, txt = `${feitos} de ${total} jogos realizados`
+  return `<div class="rosca"><svg viewBox="0 0 160 160" role="img" aria-label="${txt}"><title>${txt}</title>
+    <circle cx="80" cy="80" r="${r}" fill="none" class="rosca-fundo" stroke-width="18"/>
+    ${feitos ? `<circle cx="80" cy="80" r="${r}" fill="none" class="rosca-arco" stroke-width="18" stroke-linecap="round" stroke-dasharray="${arco.toFixed(1)} ${(circ - arco).toFixed(1)}" transform="rotate(-90 80 80)"/>` : ''}
+    <text x="80" y="82" text-anchor="middle" class="rosca-num">${feitos}/${total}</text><text x="80" y="104" text-anchor="middle" class="rosca-leg">realizados</text></svg>
+    <ul class="rosca-lista"><li><i class="a"></i>${feitos} realizados</li><li><i class="b"></i>${total - feitos} a realizar</li></ul></div>`
+}
+function graficoColunas(lista, titulo, vazio) {   // lista: [[rótulo curto, valor]]
+  if (!lista.some(x => x[1] > 0)) return `<p class="empty">${vazio}</p>`
+  const W = 360, H = 190, base = 158, topo = 26, max = Math.max(...lista.map(x => x[1])), passo = (W - 20) / lista.length, larg = Math.min(38, passo * .6)
+  const cols = lista.map(([l, v], i) => { const h = v / max * (base - topo), x = 10 + passo * i + (passo - larg) / 2, cx = x + larg / 2
+    return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${larg.toFixed(1)}" height="${Math.max(h, 2).toFixed(1)}" rx="5" class="col${v === max ? ' max' : ''}"/><text x="${cx.toFixed(1)}" y="${(base - h - 6).toFixed(1)}" text-anchor="middle" class="col-v">${v}</text><text x="${cx.toFixed(1)}" y="${base + 18}" text-anchor="middle" class="col-l">${esc(l)}</text>` }).join('')
+  const txt = esc(titulo + ': ' + lista.map(([l, v]) => `${l} ${v}`).join(', '))
+  return `<svg class="colunas" viewBox="0 0 ${W} ${H}" role="img" aria-label="${txt}"><title>${txt}</title><line x1="10" y1="${base}" x2="${W - 10}" y2="${base}" class="col-base"/>${cols}</svg>`
+}
+
 function vRelatorios() {
   const rows = S.champs.flatMap(c => c.players.filter(p => insc(c, p)[0] === 'aprovado').map(p => ({c, p, a: ageAt(p.birth, c.start)})))
   const ms = S.champs.flatMap(c => c.matches.filter(isDone))
   const gols = ms.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)
   const cnt = t => ms.reduce((s, m) => s + m.events.filter(e => e.type === t).length, 0)
-  const bars = list => { const max = Math.max(1, ...list.map(x => x[1]))
+  const bars = (list, vazio) => { const max = Math.max(1, ...list.map(x => x[1]))
+    if (!list.some(x => x[1] > 0)) return `<p class="empty">${vazio}</p>`
     return `<div class="bars">${list.map(([l, n]) => `<div class="bar"><span>${esc(l)}</span><i style="width:${n / max * 100}%"></i><b>${n}</b></div>`).join('')}</div>` }
   const ages = [['Até 14 anos', r => r.a <= 14], ['15 a 17 anos', r => r.a >= 15 && r.a <= 17], ['18 a 29 anos', r => r.a >= 18 && r.a <= 29], ['30 anos ou mais', r => r.a >= 30]]
     .map(([l, f]) => [l, rows.filter(f).length])
@@ -698,10 +758,15 @@ function vRelatorios() {
   const chave = b => (b || 'Não informado').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), cont = {}
   for (const r of rows) { const k = chave(r.p.bairro); (cont[k] ??= [r.p.bairro?.trim() || 'Não informado', 0])[1]++ }
   const bairros = Object.values(cont).sort((a, b) => b[1] - a[1]).slice(0, 8)
+  // gols por rodada do campeonato aberto (últimas 8 etapas, na ordem em que foram jogadas)
+  const c0 = C(), porRodada = new Map()
+  if (c0) for (const m of c0.matches.filter(isDone).sort(byDate)) { const k = m.phase === 'grupos' ? 'R' + m.round : ROT_FASE[m.phase] || m.phase; porRodada.set(k, (porRodada.get(k) || 0) + goals(m)[0] + goals(m)[1]) }
+  const totalJogos = S.champs.reduce((s, c) => s + c.matches.length, 0)
   return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
-  <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages)}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros)}</div></div>
-  <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5)) || ''}</div>
+  <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages, 'Ainda sem atletas aprovados. Os números aparecem quando a Secretaria aprova as inscrições.')}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros, 'Ainda sem atletas aprovados. Aparece o bairro de cada atleta inscrito.')}</div></div>
+  <div class="grid g2 mt"><div class="card"><h3>Jogos realizados <small>todos os campeonatos</small></h3>${graficoRosca(ms.length, totalJogos)}</div><div class="card"><h3>Gols por rodada <small>${esc(c0?.name || '')}</small></h3>${graficoColunas([...porRodada].slice(-8), 'Gols por rodada', 'Sem gols registrados ainda. O gráfico aparece depois da primeira súmula confirmada.')}</div></div>
+  <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5), 'Sem gols registrados ainda. A artilharia aparece depois da primeira súmula confirmada.')}</div>
   <div class="card mt"><h3>Por campeonato</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Campeonato</th><th class="l">Modalidade</th><th>Categoria</th><th>Situação</th><th>Equipes</th><th>Atletas</th><th>Jogos</th><th>Gols</th></tr></thead><tbody>
     ${S.champs.map(c => { const d = c.matches.filter(isDone); return `<tr><td class="l"><b>${esc(c.name)}</b></td><td class="l">${esc(c.sport)}</td><td>${esc(c.category)}</td><td>${cpill(c)}</td><td>${c.teams.length}</td><td>${c.players.filter(p => insc(c, p)[0] === 'aprovado').length}</td><td>${d.length}/${c.matches.length}</td><td>${d.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)}</td></tr>` }).join('')}
   </tbody></table></div></div>
@@ -744,16 +809,16 @@ function vPortal() {
   const chips = role() === 'equipe' ? '' : `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`
   const nx = c.matches.filter(m => !isDone(m) && m.home && m.away).sort(byDate)[0]
   const hero = `<div class="phero"><div><div class="eyebrow">Portal público · sem login</div><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<h2>${esc(c.name)}</h2></div>
-    <p>${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</p></div>${nx ? placarJogo(c, nx) : ''}</div>`
+    <p>${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</p></div>${nx ? placarJogo(c, nx) : placarSemJogo(c)}</div>`
   const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD). <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>'
   if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
     ${c.teams.map(t => `<div class="row"><span>${crest(t)} <b>${esc(t.name)}</b></span><span class="sub">${esc([t.colors, t.bairro].filter(Boolean).join(' · '))}</span></div>`).join('')}
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
   const up = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 4), last = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 5)
-  return chips + hero + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
-  <div class="grid g2 mt"><div class="card"><h3>Próximos jogos</h3>${up.map((m, i) => matchRow(c, m, 'pub', i === 0)).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
+  return chips + hero + faixaResultados(c) + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
+  <div class="grid g2 mt topo"><div class="card"><h3>Próximos jogos</h3>${up.map((m, i) => matchRow(c, m, 'pub', i === 0)).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
     <div class="card"><h3>Últimos resultados</h3>${last.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo realizado.</p>'}</div></div>
-  <div class="grid g2 mt"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
+  <div class="grid g2 mt topo"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i === 0 ? 'first' : i < 3 ? 'top' : ''}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub art-eq">${crest(T(c, s.p.team), 16)} ${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
     ${statsCard(c)}</div><div class="mt">${transparency(c)}</div>` + lgpd
 }
 
@@ -1329,12 +1394,14 @@ function render() {
     : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c?.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${esc(S.session.name || ROLES[r].name)}</b>${ROLES[r].label}</span></span>`)
     + '<button class="out" data-act="logout">Trocar perfil</button>'
   const agrupa = r === 'secretaria', rotulo = k => (tabs.find(t => t[0] === k) || [])[1] || ''
-  const tabBtn = (k, l, on, ic = '') => `<button class="${on ? 'on' : ''}" data-act="tab" data-tab="${k}" ${on ? 'aria-current="page"' : ''}>${ic}${l}</button>`
+  const tabBtn = (k, l, on, ic = '', cls = '') => `<button class="${[cls, on ? 'on' : ''].filter(Boolean).join(' ')}" data-act="tab" data-tab="${k}" ${on ? 'aria-current="page"' : ''}>${ic}${l}</button>`
   ui.ultimo ??= {}   // última tela vista em cada grupo: tocar no grupo volta para ela
   const grupo = agrupa ? GRUPOS.find(g => g[2].includes(ui.tab)) : null
   if (grupo) ui.ultimo[grupo[0]] = ui.tab
-  const grupoBtns = ic => GRUPOS.map(([g, l, ks]) => tabBtn(ui.ultimo[g] || ks[0], l, g === grupo?.[0], ic ? IC_GRUPO[g] : '')).join('')
-  $('#tabs').innerHTML = agrupa ? grupoBtns(false) : tabs.map(([k, l]) => tabBtn(k, l, ui.tab === k)).join('')
+  const atalhos = agrupa ? ['portal', 'auditoria'].filter(k => tabs.some(t => t[0] === k)) : []   // atalhos diretos: fora da barra de baixo (celular), que segue com 5 itens
+  const atalhoOn = atalhos.includes(ui.tab)   // quando um atalho está aberto, o grupo "Mais" não fica aceso junto
+  const grupoBtns = ic => GRUPOS.map(([g, l, ks]) => tabBtn(ui.ultimo[g] || ks[0], l, g === grupo?.[0] && (ic || !atalhoOn), ic ? IC_GRUPO[g] : '')).join('')
+  $('#tabs').innerHTML = agrupa ? grupoBtns(false) + (atalhos.length ? '<span class="tabs-sep" aria-hidden="true">Atalhos</span>' + atalhos.map(k => tabBtn(k, rotulo(k), ui.tab === k, '', 'atalho')).join('') : '') : tabs.map(([k, l]) => tabBtn(k, l, ui.tab === k)).join('')
   $('#bnav').innerHTML = agrupa ? grupoBtns(true) : ''   // celular: barra de navegação embaixo (Fitts, Jakob)
   document.body.classList.toggle('has-bnav', agrupa)
   document.title = (rotulo(ui.tab) ? rotulo(ui.tab) + ' · ' : '') + 'TNT Esportes'
