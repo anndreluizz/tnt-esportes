@@ -574,7 +574,7 @@ function vJogos() {
   const c = C()
   const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: ' + regras(c).desempate.map(k => CRITERIOS[k].toLowerCase()).join(', ')}</span></div>`
   if (!c.matches.length) return head + `<div class="card vazio"><h3>A tabela ainda não existe</h3><p class="sub">Ela é gerada sozinha depois do sorteio. Falta pouco:</p>
-    <ol class="passos"><li><b>Inscrições.</b> Equipes e atletas se inscrevem pelo link; você aprova.</li><li><b>Sorteio público.</b> Grupos, tabela completa e mata-mata nascem de uma vez.</li><li><b>Jogos.</b> Esta tela passa a mostrar classificação, chave e a lista de jogos.</li></ol>
+    <ol class="passos"><li><span><b>Inscrições.</b> Equipes e atletas se inscrevem pelo link; você aprova.</span></li><li><span><b>Sorteio público.</b> Grupos, tabela completa e mata-mata nascem de uma vez.</span></li><li><span><b>Jogos.</b> Esta tela passa a mostrar classificação, chave e a lista de jogos.</span></li></ol>
     <div class="btns"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button><button class="btn ghost" data-act="tab" data-tab="inscricoes">Ver inscrições</button></div></div>`
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
