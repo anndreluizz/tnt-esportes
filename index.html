@@ -3,34 +3,47 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TNT Esportes</title>
-<meta name="description" content="Gestão de campeonatos da Secretaria Municipal de Esportes de Tonantins">
-<meta name="theme-color" content="#0d2f73">
+<title>TNT Esportes · Tonantins/AM</title>
+<meta name="description" content="Tabelas, súmulas e resultados dos campeonatos da Secretaria Municipal de Esportes de Tonantins">
+<meta name="theme-color" content="#071426">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="estilo.css">
+<script>
+// endereços antigos do protótipo (index.html#publico/portal, #secretaria/jogos...) agora ficam em demo.html
+if (/^#(publico|secretaria|arbitro|equipe)\b/.test(location.hash)) location.replace('demo.html' + location.hash)
+</script>
 </head>
 <body class="escuro">
-<a class="skip" href="#app">Pular para o conteúdo</a>
+<a class="skip" href="#entrar">Pular para o conteúdo</a>
 <header class="top">
   <div class="wrap brand">
     <img class="logo" src="img/marca.svg" alt="" width="44" height="44">
     <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div>
-    <div class="hright" id="hright"></div>
   </div>
-  <nav class="wrap tabs" id="tabs" aria-label="Seções"></nav>
 </header>
-<main id="app" tabindex="-1" class="wrap"></main>
-<footer class="wrap foot noprint"><span>Protótipo · times, atletas e resultados são fictícios, criados para demonstração. · <a href="manual.html">Manual de uso</a></span><button class="btn ghost sm" data-act="reset">Restaurar dados de exemplo</button></footer>
-<nav id="bnav" class="bnav noprint" aria-label="Seções"></nav>
-<div id="doc" hidden></div>
-<div id="toast" role="status" aria-live="polite"></div>
-<script src="js/etapas.js"></script>
-<script src="js/regras.js"></script>
-<script src="js/dados.js"></script>
-<script src="js/app.js"></script>
+<main id="app">
+<div class="login">
+  <div class="lhero t3"><div class="wrap lgrid">
+    <div><div class="eyebrow">Tonantins · Amazonas</div><h1>TNT<br><em>Esportes</em></h1>
+      <p>Tabelas, súmulas e resultados dos campeonatos da cidade, organizados pela Secretaria Municipal de Esportes.</p>
+      <div class="acts"><a class="btn" href="oficial.html#portal">Ver campeonatos e tabelas</a><a class="btn ghost" href="oficial.html">Entrar no sistema</a></div></div>
+    <div class="placar" aria-label="O que você encontra no portal"><div class="top"><span>No portal</span><b>Sem login</b></div>
+      <ul class="entra-lista"><li>Classificação e jogos de cada campeonato</li><li>Súmula e resultado logo que o árbitro confirma</li><li>Artilharia e estatísticas</li><li>Sorteio público e auditável</li></ul>
+      <div class="base"><span>Dados de nascimento, documentos e fotos de atletas não aparecem (LGPD).</span></div></div>
+  </div></div>
+  <div class="wrap" id="entrar"><div class="roles">
+    <div class="role"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4"/></svg></div><h3>Secretaria</h3><p>Campeonatos, inscrições, sorteios, súmulas e relatórios em um só lugar.</p><a class="btn" href="oficial.html">Entrar no sistema</a></div>
+    <div class="role"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 13l2 2 4-4"/></svg></div><h3>Árbitro</h3><p>Súmula digital no celular. Funciona mesmo sem internet.</p><a class="btn" href="oficial.html">Entrar no sistema</a></div>
+    <div class="role"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg></div><h3>Equipe</h3><p>Inscreve os atletas e acompanha a situação do elenco e os jogos.</p><a class="btn" href="oficial.html">Entrar no sistema</a></div>
+    <div class="role"><div class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></div><h3>População</h3><p>Tabela, jogos, artilharia e súmulas abertos para todos, sem login.</p><a class="btn" href="oficial.html#portal">Ver o portal</a></div>
+  </div>
+  <div class="faixa"><img src="img/faixa-ginasio.jpg" width="720" height="540" alt="" loading="lazy"><img src="img/faixa-praca.jpg" width="720" height="540" alt="" loading="lazy"><img src="img/faixa-orla.jpg" width="720" height="540" alt="" loading="lazy"></div>
+  <p class="note" style="text-align:center;margin:20px 0">Quer conhecer o sistema antes? <a href="demo.html">Veja a demonstração com dados de exemplo</a> · <a href="manual.html">Manual de uso</a> · <a href="privacidade.html">Privacidade</a></p></div>
+</div>
+</main>
 </body>
 </html>
