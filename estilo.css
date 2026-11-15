@@ -278,7 +278,6 @@ form:has(input[name=format][value=pontos]:checked) .so-grupos, form:has(input[na
 form:has(input[name=format][value=grupos]:checked) .so-pontos, form:has(input[name=format][value=mata]:checked) .so-pontos,
 form:has(input[name=format][value=pontos]:checked) .so-mata-mata{display:none}
 .bracket{grid-template-columns:repeat(var(--cols,2),minmax(0,1fr))}
-@media(max-width:620px){.bracket{grid-template-columns:1fr}}
 .paper.reg ol{margin:4px 0 10px;padding-left:22px}.paper.reg li{margin:3px 0}
 form:has(input[name=format][value=mata]:checked) .so-rodadas{display:none}
 .dias{display:flex;flex-wrap:wrap;gap:8px}.dias label.chk{padding:10px 14px}
@@ -329,13 +328,13 @@ form input:user-invalid,form select:user-invalid,form textarea:user-invalid{bord
 /* só na tela: a impressão (crachás, espelho, súmula) mantém os tamanhos dela */
 @media screen{
   body{font-size:17px}
-  .eyebrow{font-size:12.5px}
+  .eyebrow{font-size:13.5px}
   .head h2{font-size:34px}
   .card h3{font-size:22px}
   .sub,.note{font-size:14px}
   .info,.msg{font-size:16px}
-  .pill{font-size:13px;padding:3px 10px}
-  table{font-size:16px} th{font-size:12.5px} td{padding:10px 8px}
+  .pill{font-size:13.5px;padding:3px 10px}
+  table{font-size:16px} th{font-size:13.5px} td{padding:10px 8px}
   .tabs a{font-size:16px}
   .btn{font-size:16px;min-height:46px;padding:11px 18px}
   .btn.sm{font-size:14.5px;min-height:38px;padding:7px 13px}
@@ -413,6 +412,8 @@ main:focus{outline:none}
   --r-sm:8px;--r-md:12px;--r-lg:16px;--campo:#7b88a0;
   --sombra-1:0 1px 3px rgba(13,47,115,.08);--sombra-2:0 8px 24px rgba(13,47,115,.10),0 2px 6px rgba(13,47,115,.05);
   --fs-xs:12px;--fs-sm:13px;--fs-md:15px;--fs-lg:19px;--fs-xl:30px}
+/* TNT 3.1, entrega 1: as cores da marca têm um nome só (as regras abaixo e as próximas usam estes tokens, não o hexadecimal) */
+:root{--tnt-marinho:#071426;--tnt-painel:#0b1d38;--tnt-campo:#0e2547;--tnt-azul:#102F68;--tnt-eletrico:#1769FF;--tnt-neon:#00E676;--tnt-texto-suave:#9bb0d1}
 /* foco visível também sobre fundo escuro */
 header.top :focus-visible,.lhero :focus-visible,.hero :focus-visible,.jogo.destaque :focus-visible,.board :focus-visible,.bnav :focus-visible{outline-color:#fff}
 .bnav :focus-visible{outline-color:var(--g7)}
@@ -458,74 +459,75 @@ body{background-image:radial-gradient(rgba(13,47,115,.065) 1px,transparent 1.3px
 }
 
 /* TNT Esportes 3.0, etapa 1: tema escuro da entrada e do portal público (as telas internas seguem claras até as próximas etapas) */
-body.escuro{--bg:#071426;--card:#0b1d38;--line:rgba(255,255,255,.12);--ink:#F5F7FA;--muted:#9bb0d1;--g7:#5aa0ff;--g1:rgba(255,255,255,.08);--gold:#00E676;--goldink:#00E676;
+body.escuro{--bg:var(--tnt-marinho);--card:var(--tnt-painel);--line:rgba(255,255,255,.12);--ink:#F5F7FA;--muted:var(--tnt-texto-suave);--g7:#5aa0ff;--g1:rgba(255,255,255,.08);--gold:var(--tnt-neon);--goldink:var(--tnt-neon);
   --red:#ff8794;--redbg:rgba(255,59,78,.2);--amber:#ffc266;--amberbg:rgba(245,166,35,.2);--blue:#8db8ff;--bluebg:rgba(23,105,255,.22);--campo:#6f83a8;color-scheme:dark;
   background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.3px)}
-body.escuro .btn{background:#00E676;color:#071426}
+body.escuro .btn{background:var(--tnt-neon);color:var(--tnt-marinho)}
 body.escuro .btn:hover{background:#33ee91}
 body.escuro .btn.ghost,body.escuro .chips button,body.escuro .mmenu{background:rgba(255,255,255,.07);color:var(--ink)}
-body.escuro .chips button.on{background:#00E676;color:#071426;border-color:#00E676}
+body.escuro .chips button.on{background:var(--tnt-neon);color:var(--tnt-marinho);border-color:var(--tnt-neon)}
 body.escuro .pill{background:rgba(255,255,255,.12);color:#d3def2}
-body.escuro .pill.green{background:rgba(0,230,118,.16);color:#00E676}
+body.escuro .pill.green{background:rgba(0,230,118,.16);color:var(--tnt-neon)}
 body.escuro .pill.amber{background:var(--amberbg);color:var(--amber)}body.escuro .pill.red{background:var(--redbg);color:var(--red)}body.escuro .pill.blue{background:var(--bluebg);color:var(--blue)}
 body.escuro .sc{background:rgba(255,255,255,.1)}
 body.escuro .info,body.escuro .box,body.escuro .manage,body.escuro .bbox,body.escuro .sponsors,body.escuro .role{background:var(--card)}
 body.escuro .bmeta{background:rgba(255,255,255,.05)}body.escuro .bteam.win{background:rgba(0,230,118,.12)}
 body.escuro .st tr.hl td{background:rgba(0,230,118,.14)}
-body.escuro .match.jogo{background:#0e2547}
-body.escuro .match.jogo.destaque{background:linear-gradient(135deg,#102F68,#1769FF)}
-body.escuro .jogo.destaque .btn:not(.ghost){background:#00E676;color:#071426}
-body.escuro input,body.escuro select,body.escuro textarea{background:#0e2547;color:var(--ink)}
-body.escuro .role .ic{background:rgba(0,230,118,.12);color:#00E676}
+body.escuro .match.jogo{background:var(--tnt-campo)}
+body.escuro .match.jogo.destaque{background:linear-gradient(135deg,var(--tnt-azul),var(--tnt-eletrico))}
+body.escuro .jogo.destaque .btn:not(.ghost){background:var(--tnt-neon);color:var(--tnt-marinho)}
+body.escuro input,body.escuro select,body.escuro textarea{background:var(--tnt-campo);color:var(--ink)}
+body.escuro .role .ic{background:rgba(0,230,118,.12);color:var(--tnt-neon)}
 body.escuro .role{box-shadow:none}
-body.escuro .role:hover,body.escuro .match.jogo:hover{border-color:#00E676;box-shadow:0 12px 34px rgba(0,230,118,.12)}
+body.escuro .role:hover,body.escuro .match.jogo:hover{border-color:var(--tnt-neon);box-shadow:0 12px 34px rgba(0,230,118,.12)}
 body.escuro .foot{color:var(--muted)}
 body.escuro .hero{background-image:linear-gradient(100deg,rgba(7,20,38,.95),rgba(16,47,104,.7) 55%,rgba(23,105,255,.25)),url(img/hero-praca.jpg)}
-body.escuro a{color:#6fb0ff}body.escuro a.btn{color:#071426}
+body.escuro a{color:#6fb0ff}body.escuro a.btn{color:var(--tnt-marinho)}
 
 /* entrada: hero cinematográfico com o próximo jogo */
-.lhero.t3{padding:96px 0 120px;background-image:linear-gradient(180deg,rgba(7,20,38,.45),rgba(7,20,38,.1) 35%,rgba(7,20,38,.9) 92%,#071426),linear-gradient(90deg,rgba(7,20,38,.92) 0,rgba(7,20,38,.4) 58%,rgba(23,105,255,.2)),var(--grao),url(img/hero-rio.jpg);background-size:auto,auto,180px 180px,cover;background-position:0 0,0 0,0 0,center 40%}
+.lhero.t3{padding:96px 0 120px;background-image:linear-gradient(180deg,rgba(7,20,38,.45),rgba(7,20,38,.1) 35%,rgba(7,20,38,.9) 92%,var(--tnt-marinho)),linear-gradient(90deg,rgba(7,20,38,.92) 0,rgba(7,20,38,.4) 58%,rgba(23,105,255,.2)),var(--grao),url(img/hero-rio.jpg);background-size:auto,auto,180px 180px,cover;background-position:0 0,0 0,0 0,center 40%}
 .lhero.t3::after{display:none}
-.lhero.t3 .eyebrow{display:inline-flex;gap:10px;align-items:center;color:#00E676;letter-spacing:.18em;font-size:13px}
-.lhero.t3 .eyebrow::before{content:"";width:28px;height:3px;background:#00E676}
+.lhero.t3 .eyebrow{display:inline-flex;gap:10px;align-items:center;color:var(--tnt-neon);letter-spacing:.18em;font-size:13px}
+.lhero.t3 .eyebrow::before{content:"";width:28px;height:3px;background:var(--tnt-neon)}
 .lhero.t3 h1{font-size:clamp(84px,13vw,170px);line-height:.88;margin:14px 0 18px;text-shadow:0 8px 40px rgba(0,0,0,.5)}
 .lhero.t3 h1 em{font-style:normal;color:transparent;-webkit-text-stroke:2px #fff}
 .lhero.t3 p{max-width:520px;font-size:19px}
 .lgrid{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:end}
 .placar{background:rgba(7,20,38,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.45);color:#fff}
-.placar .top{display:flex;justify-content:space-between;gap:8px;font:600 13px "Barlow Condensed";letter-spacing:.14em;text-transform:uppercase;color:#9bb0d1}
-.placar .top b{color:#00E676}
+.placar .top{display:flex;justify-content:space-between;gap:8px;font:600 13px "Barlow Condensed";letter-spacing:.14em;text-transform:uppercase;color:var(--tnt-texto-suave)}
+.placar .top b{color:var(--tnt-neon)}
 .placar .conf{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin:18px 0}
 .placar .t{display:grid;justify-items:center;gap:8px;text-align:center;font:700 20px/1 "Barlow Condensed";text-transform:uppercase}
 .placar .vs{font:700 50px "Barlow Condensed";padding:2px 14px;background:rgba(255,255,255,.08);border-radius:8px;min-width:104px;text-align:center}
-.placar .vs small{display:block;font:600 12px "Barlow Condensed";letter-spacing:.14em;color:#9bb0d1}
-.placar .base{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:#9bb0d1;border-top:1px solid rgba(255,255,255,.12);padding-top:12px}
+.placar .vs small{display:block;font:600 12px "Barlow Condensed";letter-spacing:.14em;color:var(--tnt-texto-suave)}
+.placar .base{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--tnt-texto-suave);border-top:1px solid rgba(255,255,255,.12);padding-top:12px}
 .lhero .acts{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
 @media(max-width:860px){.lgrid{grid-template-columns:1fr;gap:28px}.lhero.t3{padding:72px 0 96px}.lhero.t3 h1{font-size:84px}}
 .lhero.t3 h1{text-transform:uppercase}
 body.escuro header.top{background:#050e1c;border-bottom:1px solid var(--line)}
-body.escuro .scroll{background:linear-gradient(90deg,#0b1d38 30%,rgba(11,29,56,0)) left center/40px 100% no-repeat local,linear-gradient(90deg,rgba(11,29,56,0),#0b1d38 70%) right center/40px 100% no-repeat local,radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.5),transparent) left center/14px 100% no-repeat scroll,radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.5),transparent) right center/14px 100% no-repeat scroll}
+body.escuro .scroll{background:linear-gradient(90deg,var(--tnt-painel) 30%,rgba(11,29,56,0)) left center/40px 100% no-repeat local,linear-gradient(90deg,rgba(11,29,56,0),var(--tnt-painel) 70%) right center/40px 100% no-repeat local,radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.5),transparent) left center/14px 100% no-repeat scroll,radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.5),transparent) right center/14px 100% no-repeat scroll}
 
 /* TNT 3.0, etapa 2: o tema escuro vale para todas as telas; painel da Secretaria com menu lateral */
 body.escuro .bnav{background:#050e1c;border-top-color:var(--line);box-shadow:none}
-body.escuro .bnav button.on{color:#00E676;box-shadow:inset 0 3px #00E676}
-body.escuro .tabs button.on{border-color:#00E676}
-body.escuro .hsel{background:#0e2547;border-color:var(--line)}
-body.escuro .phone,body.escuro .upload,body.escuro .pat,body.escuro .formato,body.escuro fieldset.step,body.escuro form label.chk,body.escuro .net,body.escuro .evb,body.escuro .et-chip,body.escuro .addrow,body.escuro .codebox,body.escuro code.hash,body.escuro .dscore{background:#0e2547;color:var(--ink);border-color:var(--line)}
+body.escuro .bnav button.on{color:var(--tnt-neon);box-shadow:inset 0 3px var(--tnt-neon)}
+body.escuro .tabs button.on{border-color:var(--tnt-neon)}
+body.escuro .hsel{background:var(--tnt-campo);border-color:var(--line)}
+body.escuro .phone,body.escuro .upload,body.escuro .pat,body.escuro .formato,body.escuro fieldset.step,body.escuro form label.chk,body.escuro .net,body.escuro .evb,body.escuro .et-chip,body.escuro .addrow,body.escuro .codebox,body.escuro code.hash,body.escuro .dscore{background:var(--tnt-campo);color:var(--ink);border-color:var(--line)}
 body.escuro .upload:hover,body.escuro .upload:focus-within,body.escuro .addpat:hover,body.escuro .addrow:hover,body.escuro .formato:has(input:checked){background:#12305e}
 body.escuro .et-chip{color:#9ec5ff}
-body.escuro .skip{background:#00E676;color:#071426}
+body.escuro .skip{background:var(--tnt-neon);color:var(--tnt-marinho)}
 body.escuro .pad{background:#fff}   /* assinatura: traço escuro sobre branco */
-@media(max-width:760px){body.escuro form input:not([type=checkbox]):not([type=radio]):not([type=file]),body.escuro form select,body.escuro form textarea{background:#0e2547;border-color:var(--campo)}}
+@media(max-width:760px){body.escuro form input:not([type=checkbox]):not([type=radio]):not([type=file]),body.escuro form select,body.escuro form textarea{background:var(--tnt-campo);border-color:var(--campo)}}
 /* KPIs do painel */
 .card.stat{position:relative;overflow:hidden;padding:18px 20px}
-.card.stat::after{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:var(--el,#1769FF);opacity:.2;pointer-events:none}
-.card.stat.gold::after{background:#00E676}
+.card.stat::after{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:var(--el,var(--tnt-eletrico));opacity:.2;pointer-events:none}
+.card.stat.gold::after{background:var(--tnt-neon)}
 .card.stat b{font-size:56px;line-height:.95}
 .card.stat span{font:600 14px "Barlow Condensed";letter-spacing:.14em;text-transform:uppercase}
+.card.stat{container-type:inline-size}.card.stat.data b{font-size:30px;font-size:clamp(26px,19cqw,44px)}
 .head h2{font-size:clamp(34px,5vw,52px);text-transform:uppercase;line-height:.95}
-.head .eyebrow{color:#00E676;display:inline-flex;gap:10px;align-items:center}
-.head .eyebrow::before{content:"";width:28px;height:3px;background:#00E676}
+.head .eyebrow{color:var(--tnt-neon);display:inline-flex;gap:10px;align-items:center}
+.head .eyebrow::before{content:"";width:28px;height:3px;background:var(--tnt-neon)}
 /* próximo jogo como card de transmissão */
 body.escuro .match.jogo.destaque{background:linear-gradient(135deg,rgba(16,47,104,.94),rgba(10,31,69,.9) 60%),url(img/faixa-ginasio.jpg) center/cover;border-color:rgba(23,105,255,.55)}
 .jogo.destaque .crest{width:44px!important;height:44px!important;font-size:18px!important}
@@ -539,7 +541,7 @@ body.escuro .match.jogo.destaque{background:linear-gradient(135deg,rgba(16,47,10
   body.has-bnav .hsel{max-width:none}
   body.has-bnav #tabs{flex-direction:column;gap:4px;padding:8px 16px;max-width:none;margin:0;width:100%;overflow:visible;order:2}
   body.has-bnav #tabs button{text-align:left;padding:11px 12px;border:0;border-radius:8px;font-size:16px}
-  body.has-bnav #tabs button.on{background:rgba(0,230,118,.12);color:#00E676}
+  body.has-bnav #tabs button.on{background:rgba(0,230,118,.12);color:var(--tnt-neon)}
   body.has-bnav #tabs button:hover:not(.on){background:rgba(255,255,255,.06)}
   body.has-bnav main.wrap,body.has-bnav .foot{margin-left:240px;max-width:none;padding-left:32px;padding-right:32px}
   body.has-bnav main.wrap>*{max-width:1100px}
@@ -547,31 +549,31 @@ body.escuro .match.jogo.destaque{background:linear-gradient(135deg,rgba(16,47,10
 
 /* TNT 3.0, etapa 3: campeonatos com imagem, relatórios com barras de destaque, impressão em papel claro */
 .card.champ{padding:0;overflow:hidden;display:grid;grid-template-rows:auto 1fr;transition:transform .2s,border-color .2s}
-.card.champ:hover{transform:translateY(-3px);border-color:#00E676}
+.card.champ:hover{transform:translateY(-3px);border-color:var(--tnt-neon)}
 .cimg{position:relative;min-height:170px;padding:14px 16px;display:grid;align-content:space-between;gap:36px;isolation:isolate;background:linear-gradient(180deg,rgba(7,20,38,.15),rgba(7,20,38,.9)),var(--f) center/cover}
 .cimg .ctit{display:flex;gap:10px;align-items:center}
 .cimg h3{font-size:30px;line-height:.95;text-transform:uppercase;color:#fff}
 .cbody{padding:14px 16px 16px}
-.bar i{background:linear-gradient(90deg,#1769FF,#00E676)}
+.bar i{background:linear-gradient(90deg,var(--tnt-eletrico),var(--tnt-neon))}
 .bars .bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media print{body.escuro{--bg:#fff;--card:#fff;--line:#dbe3ef;--ink:#142036;--muted:#5b6680;--g7:#1d55b8;--gold:#2db35d;--goldink:#157a3a;--red:#b3261e;--redbg:#fbe3e1;--amber:#8a5a00;--amberbg:#fbefd2;color-scheme:light;background-image:none}
   body.escuro .card,body.escuro .info,body.escuro .box{background:#fff;color:#142036}
   body.escuro .pill{background:#e8ebf2;color:#454f63}body.escuro .st th,body.escuro .st td{color:#142036}
   .card.stat::after{display:none}}
-body.escuro form input:not([type=checkbox]):not([type=radio]):not([type=file]),body.escuro form select,body.escuro form textarea{background:#0e2547;color:var(--ink);border-color:var(--campo);box-shadow:none}
-body.escuro form input:focus,body.escuro form select:focus,body.escuro form textarea:focus{background:#0e2547}
+body.escuro form input:not([type=checkbox]):not([type=radio]):not([type=file]),body.escuro form select,body.escuro form textarea{background:var(--tnt-campo);color:var(--ink);border-color:var(--campo);box-shadow:none}
+body.escuro form input:focus,body.escuro form select:focus,body.escuro form textarea:focus{background:var(--tnt-campo)}
 body.escuro ::placeholder{color:#7f93b6;opacity:1}
 body.escuro .et-topo b{color:var(--ink)}
-body.escuro .et-chip[aria-checked=true]{background:#00E676;border-color:#00E676;color:#071426}
+body.escuro .et-chip[aria-checked=true]{background:var(--tnt-neon);border-color:var(--tnt-neon);color:var(--tnt-marinho)}
 body.escuro .et-invalido>input,body.escuro .et-invalido>select,body.escuro .et-invalido>textarea,body.escuro .et-invalido input:invalid{background:var(--redbg)!important}
 .cimg{background:linear-gradient(180deg,rgba(7,20,38,.65),rgba(7,20,38,.25) 40%,rgba(7,20,38,.92)),var(--f) center/cover}
-body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--ink)}
+body.escuro .team-chip{background:var(--tnt-campo);border-color:var(--line);color:var(--ink)}
 
 /* TNT 3.0, etapa 4: hero do portal público no estilo do protótipo */
 .phero{position:relative;overflow:hidden;isolation:isolate;border-radius:18px;padding:44px 36px;margin-bottom:16px;display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:end;color:#fff;
   background:linear-gradient(90deg,rgba(7,20,38,.94),rgba(7,20,38,.55) 60%,rgba(23,105,255,.25)),linear-gradient(180deg,rgba(7,20,38,.2),rgba(7,20,38,.8)),var(--grao),url(img/hero-rio.jpg);background-size:auto,auto,180px 180px,cover;background-position:0 0,0 0,0 0,center 45%}
-.phero .eyebrow{display:inline-flex;gap:10px;align-items:center;color:#00E676;letter-spacing:.18em}
-.phero .eyebrow::before{content:"";width:28px;height:3px;background:#00E676}
+.phero .eyebrow{display:inline-flex;gap:10px;align-items:center;color:var(--tnt-neon);letter-spacing:.18em}
+.phero .eyebrow::before{content:"";width:28px;height:3px;background:var(--tnt-neon)}
 .phero h2{font-size:clamp(40px,6vw,84px);line-height:.92;text-transform:uppercase;margin:10px 0 12px;text-shadow:0 6px 30px rgba(0,0,0,.5)}
 .phero p{color:#d5e0f5;font-size:17px}
 .phero .placar{box-shadow:0 20px 60px rgba(0,0,0,.4)}
@@ -582,14 +584,14 @@ body.escuro .team-chip{background:#0e2547;border-color:var(--line);color:var(--i
   background:linear-gradient(135deg,rgba(16,47,104,.96),rgba(7,20,38,.9)),url(img/faixa-ginasio.jpg) center/cover;border:1px solid rgba(23,105,255,.45)}
 .tficha .crest{box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .tf-id h3{font-size:clamp(28px,4vw,42px);line-height:.95;text-transform:uppercase}
-.tf-id .eyebrow{color:#00E676}
+.tf-id .eyebrow{color:var(--tnt-neon)}
 .tf-num{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:10px}
 .tf-num div{background:rgba(255,255,255,.08);border-radius:10px;padding:8px 4px;text-align:center}
 .tf-num b{display:block;font:700 28px/1 "Barlow Condensed"}
-.tf-num span{font:600 12px "Barlow Condensed";letter-spacing:.14em;color:#9bb0d1}
+.tf-num span{font:600 12px "Barlow Condensed";letter-spacing:.14em;color:var(--tnt-texto-suave)}
 .tf-forma{grid-column:1/-1;display:flex;gap:6px}
-.tf-forma i{font:700 13px "Barlow Condensed";font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#071426}
-.tf-forma .fV{background:#00E676}.tf-forma .fE{background:#ffc266}.tf-forma .fD{background:#ff8794}
+.tf-forma i{font:700 13px "Barlow Condensed";font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--tnt-marinho)}
+.tf-forma .fV{background:var(--tnt-neon)}.tf-forma .fE{background:#ffc266}.tf-forma .fD{background:#ff8794}
 @media(max-width:560px){.tficha{grid-template-columns:1fr}.tf-num{grid-template-columns:repeat(3,1fr)}}
 
 /* TNT 3.0: telas largas (ou navegador com zoom abaixo de 100%) não deixam a interface pequena no meio da tela.

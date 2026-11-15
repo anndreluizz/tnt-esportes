@@ -245,7 +245,7 @@ function vPainel() {
   const hist = `<div class="card mt"><h3>Histórico de alterações <small>quem, quando e por quê</small></h3>${c.log.slice(0, 8).map(logRow).join('') || '<p class="sub">Nada registrado.</p>'}</div>`
   if (c.status === 'inscricoes') {
     const pend = c.players.filter(p => insc(c, p)[0] !== 'aprovado').length
-    return head + `<div class="grid g4">${stat(c.teams.length, 'equipes inscritas')}${stat(aprov, 'atletas aprovados')}${stat(pend, 'atletas com pendência', 'gold')}${stat(new Date(c.start + 'T12:00').toLocaleDateString('pt-BR'), 'início previsto')}</div>
+    return head + `<div class="grid g4">${stat(c.teams.length, 'equipes inscritas')}${stat(aprov, 'atletas aprovados')}${stat(pend, 'atletas com pendência', 'gold')}${stat(new Date(c.start + 'T12:00').toLocaleDateString('pt-BR'), 'início previsto', 'data')}</div>
       <div class="grid side mt"><div class="card"><h3>Próximo passo</h3><p>Com as inscrições fechadas, faça o <b>sorteio público</b>. O sistema monta os grupos e gera a tabela completa, com o mata-mata.</p>
         <div class="btns" style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button><button class="btn ghost" data-act="tab" data-tab="inscricoes">Ver inscrições</button></div></div>${pendCard}</div>` + hist
   }
