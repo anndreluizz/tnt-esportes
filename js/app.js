@@ -1349,12 +1349,14 @@ function render() {
     : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c?.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${esc(S.session.name || ROLES[r].name)}</b>${ROLES[r].label}</span></span>`)
     + '<button class="out" data-act="logout">Trocar perfil</button>'
   const agrupa = r === 'secretaria', rotulo = k => (tabs.find(t => t[0] === k) || [])[1] || ''
-  const tabBtn = (k, l, on, ic = '') => `<button class="${on ? 'on' : ''}" data-act="tab" data-tab="${k}" ${on ? 'aria-current="page"' : ''}>${ic}${l}</button>`
+  const tabBtn = (k, l, on, ic = '', cls = '') => `<button class="${[cls, on ? 'on' : ''].filter(Boolean).join(' ')}" data-act="tab" data-tab="${k}" ${on ? 'aria-current="page"' : ''}>${ic}${l}</button>`
   ui.ultimo ??= {}   // última tela vista em cada grupo: tocar no grupo volta para ela
   const grupo = agrupa ? GRUPOS.find(g => g[2].includes(ui.tab)) : null
   if (grupo) ui.ultimo[grupo[0]] = ui.tab
-  const grupoBtns = ic => GRUPOS.map(([g, l, ks]) => tabBtn(ui.ultimo[g] || ks[0], l, g === grupo?.[0], ic ? IC_GRUPO[g] : '')).join('')
-  $('#tabs').innerHTML = agrupa ? grupoBtns(false) : tabs.map(([k, l]) => tabBtn(k, l, ui.tab === k)).join('')
+  const atalhos = agrupa ? ['portal', 'auditoria'].filter(k => tabs.some(t => t[0] === k)) : []   // atalhos diretos: fora da barra de baixo (celular), que segue com 5 itens
+  const atalhoOn = atalhos.includes(ui.tab)   // quando um atalho está aberto, o grupo "Mais" não fica aceso junto
+  const grupoBtns = ic => GRUPOS.map(([g, l, ks]) => tabBtn(ui.ultimo[g] || ks[0], l, g === grupo?.[0] && (ic || !atalhoOn), ic ? IC_GRUPO[g] : '')).join('')
+  $('#tabs').innerHTML = agrupa ? grupoBtns(false) + (atalhos.length ? '<span class="tabs-sep" aria-hidden="true">Atalhos</span>' + atalhos.map(k => tabBtn(k, rotulo(k), ui.tab === k, '', 'atalho')).join('') : '') : tabs.map(([k, l]) => tabBtn(k, l, ui.tab === k)).join('')
   $('#bnav').innerHTML = agrupa ? grupoBtns(true) : ''   // celular: barra de navegação embaixo (Fitts, Jakob)
   document.body.classList.toggle('has-bnav', agrupa)
   document.title = (rotulo(ui.tab) ? rotulo(ui.tab) + ' · ' : '') + 'TNT Esportes'

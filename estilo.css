@@ -628,3 +628,17 @@ body.escuro .paper .dscore{background:#f3f5fa;color:#142036;border-color:#dbe3ef
 .vazio .passos li::before{content:counter(p);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(0,230,118,.16);color:var(--tnt-neon);font:700 18px "Barlow Condensed",sans-serif}
 .card p.empty{padding:var(--sp-5) var(--sp-4);border:1px dashed var(--line);border-radius:var(--r-md);font-size:15px}
 @media print{.hoje{display:none}}
+
+/* TNT 3.1, entrega 3: atalhos no menu lateral e tabelas com o mesmo acabamento em todas as telas */
+.tabs-sep{display:none}
+@media(min-width:1000px){
+  body.has-bnav #tabs .tabs-sep{display:block;font:600 13.5px "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:16px 12px 4px;margin-top:8px;border-top:1px solid var(--line)}
+}
+.st{font-variant-numeric:tabular-nums}
+.st thead th{letter-spacing:.06em;border-bottom:2px solid var(--line);white-space:nowrap}
+.st tbody tr{transition:background-color .15s}
+body.escuro .st tbody tr:hover td{background:rgba(255,255,255,.05)}
+body.escuro .st tr.hl:hover td{background:rgba(0,230,118,.2)}
+body.escuro .st th{color:#b3c7ea}
+.chips button{min-height:40px}
+@media print{.tabs-sep{display:none}}
