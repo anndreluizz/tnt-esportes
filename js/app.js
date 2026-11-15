@@ -119,6 +119,8 @@ function phaseNow(c) {
 // (Abrir súmula / Ver súmula) e o resto no menu "Mais" (Hick, Fitts, Proximidade). `destaque`: o próximo jogo.
 function matchRow(c, m, mode, destaque = false) {
   const ready = m.home && m.away, d = isDone(m)
+  const [gh, ga] = d ? score(m) : [0, 0], venc = !d ? '' : gh > ga ? 'h' : ga > gh ? 'a' : m.pen ? (m.pen[0] > m.pen[1] ? 'h' : 'a') : ''   // vencedor: gols, ou pênaltis no empate
+  const est = d ? ' est-fim' : m.date === hojeStr() ? ' est-hoje' : ''
   const principal = mode === 'sec' && !d && ready ? `<button class="btn" data-act="open" data-id="${m.id}">Abrir súmula</button>`
     : d ? `<button class="btn ghost" data-act="doc" data-c="${c.id}" data-id="${m.id}">Ver súmula</button>` : ''
   const mais = []
@@ -126,9 +128,9 @@ function matchRow(c, m, mode, destaque = false) {
   if (mode === 'sec' && ready) mais.push(`<a class="btn ghost sm" target="_blank" rel="noopener" href="${waLink(c, m)}" title="Mensagem pronta para o grupo">Avisar no WhatsApp</a>`)
   if (REAL && mode === 'sec' && !d) mais.push(refSelect(m))
   const menu = mais.length ? `<details class="mais"><summary class="btn ghost sm">Mais</summary><div class="mmenu">${mais.join('')}</div></details>` : ''
-  return `<div class="match jogo${destaque ? ' destaque' : ''}"><div class="jtop"><span>${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(m.local || c.venue)}</span>${mpill(m)}</div>
-    <div class="mline"><span class="r">${side(c, m, 'home')}</span>
-    <span class="sc ${d ? '' : 'time'}">${d ? scoreTxt(m) : m.time}</span><span>${side(c, m, 'away')}</span></div>
+  return `<div class="match jogo${destaque ? ' destaque' : ''}${est}"><div class="jtop"><span>${esc(mtitle(m))} · ${dm(m.date)} · ${m.time} · ${esc(m.local || c.venue)}</span>${mpill(m)}</div>
+    <div class="mline"><span class="r${venc === 'h' ? ' venc' : venc === 'a' ? ' perd' : ''}">${side(c, m, 'home')}</span>
+    <span class="sc ${d ? '' : 'time'}">${d ? scoreTxt(m) : m.time}</span><span class="${venc === 'a' ? 'venc' : venc === 'h' ? 'perd' : ''}">${side(c, m, 'away')}</span></div>
     ${principal || menu ? `<div class="jacts">${principal}${menu}</div>` : ''}
     ${mode === 'sec' && ui.manage === m.id ? manageForm(c, m) : ''}</div>`
 }
@@ -207,8 +209,23 @@ const logRow = l => `<div class="row"><div><b>${esc(l.what)}</b>${l.why ? `<div 
 // fotos de Tonantins: ginásio, praça (piso nas cores da bandeira) e orla; só lugares, sem rostos em destaque
 const FAIXA = ['ginasio', 'praca', 'orla'].map(n => `<img src="img/faixa-${n}.jpg" width="720" height="540" alt="" loading="lazy">`).join('')
 // cartão de placar de transmissão: campeonato, rodada, escudos, horário e local
+// Portal (3.1): hoje/amanhã em vez de só a data; cartão de situação quando não há jogo; faixa de resultados rolável
+const hojeStr = () => new Date().toLocaleDateString('sv', {timeZone: 'America/Manaus'})
+const quando = m => m.date === hojeStr() ? 'Hoje' : m.date === addDays(hojeStr(), 1) ? 'Amanhã' : dm(m.date)
+function placarSemJogo(c) {
+  const fim = c.matches.length > 0 && c.matches.every(isDone)
+  const titulo = fim ? 'Campeonato encerrado' : c.matches.length ? 'Próximos jogos a definir' : c.status === 'inscricoes' ? 'Inscrições abertas' : 'Aguardando sorteio'
+  const n = c.teams.length, eq = `${n} ${n === 1 ? 'equipe inscrita' : 'equipes inscritas'}`
+  const sub = !c.matches.length && c.regUntil ? `Até ${dmy(c.regUntil)} · ${eq}` : eq
+  return `<div class="placar sem-jogo" aria-label="Situação do campeonato"><div class="top"><span>${esc(c.name)}</span></div><b>${titulo}</b><p>${sub}</p></div>`
+}
+function faixaResultados(c) {
+  const ult = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 8)
+  if (!ult.length) return ''
+  return `<section class="fres" aria-label="Últimos resultados"><div class="fres-tit">Resultados</div><div class="fres-lista">${ult.map(m => `<button class="fres-it" data-act="doc" data-c="${c.id}" data-id="${m.id}" title="Ver súmula"><span class="fres-t">${crest(T(c, m.home), 20)}${esc(T(c, m.home).name)}</span><b>${score(m).join(' × ')}</b><span class="fres-t">${esc(T(c, m.away).name)}${crest(T(c, m.away), 20)}</span></button>`).join('')}</div></section>`
+}
 const placarJogo = (c, m) => `<div class="placar" aria-label="Próximo jogo"><div class="top"><span>${esc(c.name)}</span><b>${esc(mtitle(m))}</b></div>
-  <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${dm(m.date)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
+  <div class="conf"><div class="t">${crest(T(c, m.home), 64)}${esc(T(c, m.home).name)}</div><div class="vs"><small>${quando(m)}</small>${m.time}</div><div class="t">${crest(T(c, m.away), 64)}${esc(T(c, m.away).name)}</div></div>
   <div class="base"><span>${esc(m.local || c.venue)}</span></div></div>`
 // Hero da entrada (3.0): título grande e o próximo jogo de verdade, de qualquer campeonato
 function loginHero() {
@@ -789,16 +806,16 @@ function vPortal() {
   const chips = role() === 'equipe' ? '' : `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`
   const nx = c.matches.filter(m => !isDone(m) && m.home && m.away).sort(byDate)[0]
   const hero = `<div class="phero"><div><div class="eyebrow">Portal público · sem login</div><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<h2>${esc(c.name)}</h2></div>
-    <p>${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</p></div>${nx ? placarJogo(c, nx) : ''}</div>`
+    <p>${esc(c.sport)} · ${esc(c.category)} · atualizado assim que a súmula é confirmada.</p></div>${nx ? placarJogo(c, nx) : placarSemJogo(c)}</div>`
   const lgpd = '<p class="note" style="text-align:center;margin-top:18px">Data de nascimento, documentos e fotos dos atletas não são exibidos no portal público (LGPD). <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></p>'
   if (!c.matches.length) return chips + hero + sponsorsBar(c) + `<div class="card"><h3>Inscrições abertas <small>${c.teams.length} equipes</small></h3>
     ${c.teams.map(t => `<div class="row"><span>${crest(t)} <b>${esc(t.name)}</b></span><span class="sub">${esc([t.colors, t.bairro].filter(Boolean).join(' · '))}</span></div>`).join('')}
     <p class="note">Os grupos serão definidos em sorteio público e auditável. A tabela aparece aqui logo depois.</p></div>` + lgpd
   const up = c.matches.filter(m => !isDone(m)).sort(byDate).slice(0, 4), last = c.matches.filter(isDone).sort(byDate).reverse().slice(0, 5)
-  return chips + hero + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
-  <div class="grid g2 mt"><div class="card"><h3>Próximos jogos</h3>${up.map((m, i) => matchRow(c, m, 'pub', i === 0)).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
+  return chips + hero + faixaResultados(c) + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
+  <div class="grid g2 mt topo"><div class="card"><h3>Próximos jogos</h3>${up.map((m, i) => matchRow(c, m, 'pub', i === 0)).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
     <div class="card"><h3>Últimos resultados</h3>${last.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo realizado.</p>'}</div></div>
-  <div class="grid g2 mt"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
+  <div class="grid g2 mt topo"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
     ${statsCard(c)}</div><div class="mt">${transparency(c)}</div>` + lgpd
 }
 

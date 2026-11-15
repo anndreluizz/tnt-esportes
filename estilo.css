@@ -657,3 +657,20 @@ body.escuro .st th{color:#b3c7ea}
 .bars .bar i{height:14px;border-radius:7px}
 .bars .bar:first-child b{color:var(--tnt-neon)}
 @media print{.col{fill:#1d55b8}.col.max{fill:#157a3a}.col-v,.rosca-num{fill:#142036}.col-l,.rosca-leg{fill:#5b6680}}
+
+/* TNT 3.1, entrega 5: portal público (cartão de situação, faixa de resultados e cards de jogo por estado) */
+.grid.topo{align-items:start}
+.placar.sem-jogo b{display:block;font:700 36px/1 "Barlow Condensed",sans-serif;text-transform:uppercase;margin:20px 0 8px}
+.placar.sem-jogo p{color:var(--tnt-texto-suave);font-size:16px;margin:0}
+.fres{margin-bottom:var(--sp-4)}
+.fres-tit{font:700 14px "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--tnt-neon);margin-bottom:var(--sp-2)}
+.fres-lista{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px}
+.fres-it{flex:none;scroll-snap-align:start;display:flex;align-items:center;gap:10px;background:var(--tnt-painel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 14px;font:inherit;cursor:pointer;min-height:44px;transition:border-color .15s,transform .15s}
+.fres-it:hover{border-color:var(--tnt-neon);transform:translateY(-1px)}
+.fres-it b{font:700 24px "Barlow Condensed",sans-serif;background:rgba(255,255,255,.08);border-radius:6px;padding:0 10px;white-space:nowrap}
+.fres-t{display:inline-flex;align-items:center;gap:6px;font-weight:600;white-space:nowrap}
+body.escuro .match.jogo.est-hoje{border-color:var(--tnt-neon);box-shadow:inset 4px 0 var(--tnt-neon)}
+.match.jogo.est-fim .sc{font-size:26px}
+.mline .venc{font-weight:800}
+.mline .perd{opacity:.7}
+@media print{.fres{display:none}}
