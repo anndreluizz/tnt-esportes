@@ -15,7 +15,7 @@ const migrations = new URL('migrations/', import.meta.url)
 
 // Postgres local com o que o Supabase já traz (schema auth, auth.uid(), papéis anon/authenticated) e um storage mínimo.
 // A migration de limpeza de RG fica de fora: precisa de pg_cron, pg_net e Vault, e tem a URL da produção escrita.
-export async function criaBanco() {
+export async function criaBanco(ate) {   // ate: nome de uma migration; aplica só as anteriores a ela (para testar migrations antes e depois)
   const db = new PGlite({ extensions: { pgcrypto } })
   await db.exec(`
     create schema auth; create table auth.users (id uuid primary key, email text);
@@ -30,7 +30,7 @@ export async function criaBanco() {
     grant usage on schema storage to anon, authenticated; grant select on storage.buckets to anon, authenticated;
     grant select, insert, update, delete on storage.objects to anon, authenticated;
     alter default privileges for role postgres in schema public grant truncate, references, trigger, maintain on tables to anon, authenticated`)
-  for (const f of readdirSync(migrations).sort().filter(f => !f.includes('_storage_limpeza'))) await db.exec(readFileSync(new URL(f, migrations), 'utf8'))
+  for (const f of readdirSync(migrations).sort().filter(f => !f.includes('_storage_limpeza') && (!ate || f < ate))) await db.exec(readFileSync(new URL(f, migrations), 'utf8'))
   return db
 }
 export const como = (db, uid) => db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ''}', false); set role ${uid ? 'authenticated' : 'anon'};`)
