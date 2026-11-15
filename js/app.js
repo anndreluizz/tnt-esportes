@@ -233,6 +233,23 @@ function vLogin() {
 }
 
 /* ---------- Secretaria ---------- */
+// Painel "Hoje": o que a Secretaria precisa decidir agora, num lugar só. Cada item leva à tela onde se resolve.
+function hojeCard(c) {
+  const hoje = new Date().toLocaleDateString('sv', {timeZone: 'America/Manaus'})
+  const abertos = c.matches.filter(m => !isDone(m))
+  const dia = abertos.filter(m => m.date === hoje).length
+  const atrasadas = abertos.filter(m => m.home && m.away && m.date < hoje).length   // a data passou e a súmula não foi confirmada
+  const aprovar = c.teams.filter(t => teamInsc(c, t)[0] !== 'aprovado').length + c.players.filter(p => insc(c, p)[0] !== 'aprovado').length
+  const dias = c.status === 'inscricoes' && c.regUntil && c.regUntil >= hoje ? Math.round((new Date(c.regUntil + 'T12:00') - new Date(hoje + 'T12:00')) / 864e5) : null
+  const it = (v, l, tab, tom = '') => `<button class="hoje-it ${tom}" data-act="tab" data-tab="${tab}"><b>${v}</b><span>${l}</span></button>`
+  const itens = [it(dia, dia === 1 ? 'jogo hoje' : 'jogos hoje', 'jogos', dia ? 'neon' : ''),
+    it(atrasadas, atrasadas === 1 ? 'súmula atrasada' : 'súmulas atrasadas', 'jogos', atrasadas ? 'alerta' : ''),
+    it(aprovar, aprovar === 1 ? 'inscrição a aprovar' : 'inscrições a aprovar', 'inscricoes', aprovar ? 'alerta' : '')]
+  if (dias !== null) itens.push(it(dias, dias === 1 ? 'dia para fechar as inscrições' : 'dias para fechar as inscrições', 'inscricoes', dias <= 3 ? 'alerta' : ''))
+  const emDia = !atrasadas && !aprovar
+  return `<section class="hoje mt" aria-label="Hoje"><div class="hoje-top"><h3>Hoje</h3><span class="sub">${emDia ? 'Nada pendente. Tudo em dia.' : 'Toque para resolver.'}</span></div><div class="hoje-grid">${itens.join('')}</div></section>`
+}
+
 function vPainel() {
   const c = C(), r = 'sec'
   const head = `<div class="head"><div><div class="eyebrow">Painel da Secretaria</div><h2>${esc(c.name)}</h2>
@@ -245,7 +262,7 @@ function vPainel() {
   const hist = `<div class="card mt"><h3>Histórico de alterações <small>quem, quando e por quê</small></h3>${c.log.slice(0, 8).map(logRow).join('') || '<p class="sub">Nada registrado.</p>'}</div>`
   if (c.status === 'inscricoes') {
     const pend = c.players.filter(p => insc(c, p)[0] !== 'aprovado').length
-    return head + `<div class="grid g4">${stat(c.teams.length, 'equipes inscritas')}${stat(aprov, 'atletas aprovados')}${stat(pend, 'atletas com pendência', 'gold')}${stat(new Date(c.start + 'T12:00').toLocaleDateString('pt-BR'), 'início previsto', 'data')}</div>
+    return head + hojeCard(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes inscritas')}${stat(aprov, 'atletas aprovados')}${stat(pend, 'atletas com pendência', 'gold')}${stat(new Date(c.start + 'T12:00').toLocaleDateString('pt-BR'), 'início previsto', 'data')}</div>
       <div class="grid side mt"><div class="card"><h3>Próximo passo</h3><p>Com as inscrições fechadas, faça o <b>sorteio público</b>. O sistema monta os grupos e gera a tabela completa, com o mata-mata.</p>
         <div class="btns" style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button><button class="btn ghost" data-act="tab" data-tab="inscricoes">Ver inscrições</button></div></div>${pendCard}</div>` + hist
   }
@@ -258,7 +275,7 @@ function vPainel() {
     return tag && `<div class="row"><div class="ath">${avatar(p, 30)}<div><b>${esc(p.name)}</b> <span class="sub">nº ${p.num}</span><div class="sub">${esc(T(c, p.team).name)}${why ? ' · ' + esc(why) : ''}</div></div></div>${tag}</div>`
   }).join('')
   const nb = nextBatch(c)
-  return head + banner(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes')}${stat(aprov, 'atletas aprovados')}${stat(fin.length + '/' + c.matches.length, 'jogos realizados')}${stat(gols, 'gols marcados', 'gold')}</div>
+  return head + hojeCard(c) + banner(c) + `<div class="grid g4">${stat(c.teams.length, 'equipes')}${stat(aprov, 'atletas aprovados')}${stat(fin.length + '/' + c.matches.length, 'jogos realizados')}${stat(gols, 'gols marcados', 'gold')}</div>
   <div class="grid side mt">
     <div class="card"><h3>Próximos jogos <small>${up.length} a realizar</small></h3>${up.slice(0, 6).map((m, i) => matchRow(c, m, r, i === 0)).join('') || '<p class="empty">Todos os jogos foram realizados.</p>'}</div>
     <div class="grid" style="align-content:start">
@@ -536,7 +553,9 @@ function trocaCampo(c) {
 function vJogos() {
   const c = C()
   const head = `<div class="head"><div><div class="eyebrow">${esc(FORMATOS[formato(c)].nome)} · classificação e tabela</div><h2>${esc(c.name)}</h2></div><span class="sub">${formato(c) === 'mata' ? 'Empate no mata-mata: pênaltis' : 'Desempate: ' + regras(c).desempate.map(k => CRITERIOS[k].toLowerCase()).join(', ')}</span></div>`
-  if (!c.matches.length) return head + `<div class="card empty">A tabela é gerada automaticamente depois do sorteio.<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button></div></div>`
+  if (!c.matches.length) return head + `<div class="card vazio"><h3>A tabela ainda não existe</h3><p class="sub">Ela é gerada sozinha depois do sorteio. Falta pouco:</p>
+    <ol class="passos"><li><b>Inscrições.</b> Equipes e atletas se inscrevem pelo link; você aprova.</li><li><b>Sorteio público.</b> Grupos, tabela completa e mata-mata nascem de uma vez.</li><li><b>Jogos.</b> Esta tela passa a mostrar classificação, chave e a lista de jogos.</li></ol>
+    <div class="btns"><button class="btn" data-act="tab" data-tab="sorteio">Ir para o sorteio</button><button class="btn ghost" data-act="tab" data-tab="inscricoes">Ver inscrições</button></div></div>`
   const mode = role() === 'secretaria' ? 'sec' : null
   const sec = (title, ms) => ms.length ? `<div class="round">${title}</div>${ms.map(m => matchRow(c, m, mode)).join('')}` : ''
   return head + (mode === 'sec' ? trocaCampo(c) : '') + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
@@ -690,7 +709,8 @@ function vRelatorios() {
   const ms = S.champs.flatMap(c => c.matches.filter(isDone))
   const gols = ms.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)
   const cnt = t => ms.reduce((s, m) => s + m.events.filter(e => e.type === t).length, 0)
-  const bars = list => { const max = Math.max(1, ...list.map(x => x[1]))
+  const bars = (list, vazio) => { const max = Math.max(1, ...list.map(x => x[1]))
+    if (!list.some(x => x[1] > 0)) return `<p class="empty">${vazio}</p>`
     return `<div class="bars">${list.map(([l, n]) => `<div class="bar"><span>${esc(l)}</span><i style="width:${n / max * 100}%"></i><b>${n}</b></div>`).join('')}</div>` }
   const ages = [['Até 14 anos', r => r.a <= 14], ['15 a 17 anos', r => r.a >= 15 && r.a <= 17], ['18 a 29 anos', r => r.a >= 18 && r.a <= 29], ['30 anos ou mais', r => r.a >= 30]]
     .map(([l, f]) => [l, rows.filter(f).length])
@@ -700,8 +720,8 @@ function vRelatorios() {
   const bairros = Object.values(cont).sort((a, b) => b[1] - a[1]).slice(0, 8)
   return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
-  <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages)}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros)}</div></div>
-  <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5)) || ''}</div>
+  <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages, 'Ainda sem atletas aprovados. Os números aparecem quando a Secretaria aprova as inscrições.')}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros, 'Ainda sem atletas aprovados. Aparece o bairro de cada atleta inscrito.')}</div></div>
+  <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5), 'Sem gols registrados ainda. A artilharia aparece depois da primeira súmula confirmada.')}</div>
   <div class="card mt"><h3>Por campeonato</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Campeonato</th><th class="l">Modalidade</th><th>Categoria</th><th>Situação</th><th>Equipes</th><th>Atletas</th><th>Jogos</th><th>Gols</th></tr></thead><tbody>
     ${S.champs.map(c => { const d = c.matches.filter(isDone); return `<tr><td class="l"><b>${esc(c.name)}</b></td><td class="l">${esc(c.sport)}</td><td>${esc(c.category)}</td><td>${cpill(c)}</td><td>${c.teams.length}</td><td>${c.players.filter(p => insc(c, p)[0] === 'aprovado').length}</td><td>${d.length}/${c.matches.length}</td><td>${d.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)}</td></tr>` }).join('')}
   </tbody></table></div></div>

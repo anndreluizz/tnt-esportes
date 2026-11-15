@@ -611,3 +611,20 @@ body.escuro .paper .box,body.escuro .paper .info,body.escuro .paper .codebox,bod
 body.escuro .paper a{color:#1d55b8}
 body.escuro .paper .dscore{background:#f3f5fa;color:#142036;border-color:#dbe3ef}
 .aud-det{margin:6px 0 4px 18px;padding:0;font-size:13px;line-height:1.5}.aud-reg details summary{cursor:pointer;color:inherit;text-decoration:underline;opacity:.85;font-size:13px;margin-top:4px}
+
+/* TNT 3.1, entrega 2: painel "Hoje" da Secretaria e estados vazios com orientação */
+.hoje{background:linear-gradient(135deg,rgba(23,105,255,.14),rgba(0,230,118,.06));border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--sp-4) var(--sp-5)}
+.hoje-top{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;margin-bottom:var(--sp-3)}
+.hoje-top h3{font:700 26px "Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.06em;margin:0}
+.hoje-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:var(--sp-3)}
+.hoje-it{display:grid;gap:4px;text-align:left;cursor:pointer;background:var(--tnt-painel);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r-md);padding:12px 14px;font:inherit;min-height:44px;transition:transform .15s,box-shadow .15s,border-color .15s}
+.hoje-it:hover{transform:translateY(-2px);box-shadow:var(--sombra-2)}
+.hoje-it b{font:700 40px/1 "Barlow Condensed",sans-serif}
+.hoje-it span{font-size:14px;color:var(--muted)}
+.hoje-it.neon{border-left-color:var(--tnt-neon)}.hoje-it.neon b{color:var(--tnt-neon)}
+.hoje-it.alerta{border-left-color:var(--amber)}.hoje-it.alerta b{color:var(--amber)}
+.vazio .passos{counter-reset:p;list-style:none;padding:0;margin:var(--sp-4) 0;display:grid;gap:var(--sp-3)}
+.vazio .passos li{counter-increment:p;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;font-size:16px;line-height:1.4}
+.vazio .passos li::before{content:counter(p);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(0,230,118,.16);color:var(--tnt-neon);font:700 18px "Barlow Condensed",sans-serif}
+.card p.empty{padding:var(--sp-5) var(--sp-4);border:1px dashed var(--line);border-radius:var(--r-md);font-size:15px}
+@media print{.hoje{display:none}}
