@@ -642,3 +642,18 @@ body.escuro .st tr.hl:hover td{background:rgba(0,230,118,.2)}
 body.escuro .st th{color:#b3c7ea}
 .chips button{min-height:40px}
 @media print{.tabs-sep{display:none}}
+
+/* TNT 3.1, entrega 4: gráficos em SVG (rosca e colunas) e barras com mais presença */
+.rosca{display:flex;align-items:center;gap:var(--sp-5);flex-wrap:wrap}
+.rosca svg{width:170px;height:170px;flex:none}
+.rosca-fundo{stroke:var(--line)}.rosca-arco{stroke:var(--tnt-neon)}
+.rosca-num{font:700 32px "Barlow Condensed",sans-serif;fill:var(--ink)}.rosca-leg{font-size:12px;fill:var(--muted)}
+.rosca-lista{list-style:none;padding:0;margin:0;display:grid;gap:var(--sp-2);font-size:15px}
+.rosca-lista i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:var(--sp-2);vertical-align:-1px}
+.rosca-lista i.a{background:var(--tnt-neon)}.rosca-lista i.b{background:var(--line)}
+.colunas{width:100%;height:auto;max-height:240px;display:block}
+.col{fill:var(--tnt-eletrico)}.col.max{fill:var(--tnt-neon)}
+.col-v{font:700 18px "Barlow Condensed",sans-serif;fill:var(--ink)}.col-l{font-size:14px;fill:var(--muted)}.col-base{stroke:var(--line)}
+.bars .bar i{height:14px;border-radius:7px}
+.bars .bar:first-child b{color:var(--tnt-neon)}
+@media print{.col{fill:#1d55b8}.col.max{fill:#157a3a}.col-v,.rosca-num{fill:#142036}.col-l,.rosca-leg{fill:#5b6680}}

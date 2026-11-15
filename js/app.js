@@ -704,6 +704,26 @@ function vSorteio() {
 }
 
 /* ---------- relatórios ---------- */
+// Gráficos em SVG puro (sem biblioteca): cores pelos tokens, texto equivalente em aria-label para leitor de tela.
+const ROT_FASE = {oitavas: 'Oit.', quartas: 'Qtas', semi: 'Semi', terceiro: '3º', final: 'Final'}
+function graficoRosca(feitos, total) {
+  if (!total) return '<p class="empty">Ainda sem jogos. O gráfico aparece depois do sorteio.</p>'
+  const r = 60, circ = 2 * Math.PI * r, arco = circ * feitos / total, txt = `${feitos} de ${total} jogos realizados`
+  return `<div class="rosca"><svg viewBox="0 0 160 160" role="img" aria-label="${txt}"><title>${txt}</title>
+    <circle cx="80" cy="80" r="${r}" fill="none" class="rosca-fundo" stroke-width="18"/>
+    ${feitos ? `<circle cx="80" cy="80" r="${r}" fill="none" class="rosca-arco" stroke-width="18" stroke-linecap="round" stroke-dasharray="${arco.toFixed(1)} ${(circ - arco).toFixed(1)}" transform="rotate(-90 80 80)"/>` : ''}
+    <text x="80" y="82" text-anchor="middle" class="rosca-num">${feitos}/${total}</text><text x="80" y="104" text-anchor="middle" class="rosca-leg">realizados</text></svg>
+    <ul class="rosca-lista"><li><i class="a"></i>${feitos} realizados</li><li><i class="b"></i>${total - feitos} a realizar</li></ul></div>`
+}
+function graficoColunas(lista, titulo, vazio) {   // lista: [[rótulo curto, valor]]
+  if (!lista.some(x => x[1] > 0)) return `<p class="empty">${vazio}</p>`
+  const W = 360, H = 190, base = 158, topo = 26, max = Math.max(...lista.map(x => x[1])), passo = (W - 20) / lista.length, larg = Math.min(38, passo * .6)
+  const cols = lista.map(([l, v], i) => { const h = v / max * (base - topo), x = 10 + passo * i + (passo - larg) / 2, cx = x + larg / 2
+    return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${larg.toFixed(1)}" height="${Math.max(h, 2).toFixed(1)}" rx="5" class="col${v === max ? ' max' : ''}"/><text x="${cx.toFixed(1)}" y="${(base - h - 6).toFixed(1)}" text-anchor="middle" class="col-v">${v}</text><text x="${cx.toFixed(1)}" y="${base + 18}" text-anchor="middle" class="col-l">${esc(l)}</text>` }).join('')
+  const txt = esc(titulo + ': ' + lista.map(([l, v]) => `${l} ${v}`).join(', '))
+  return `<svg class="colunas" viewBox="0 0 ${W} ${H}" role="img" aria-label="${txt}"><title>${txt}</title><line x1="10" y1="${base}" x2="${W - 10}" y2="${base}" class="col-base"/>${cols}</svg>`
+}
+
 function vRelatorios() {
   const rows = S.champs.flatMap(c => c.players.filter(p => insc(c, p)[0] === 'aprovado').map(p => ({c, p, a: ageAt(p.birth, c.start)})))
   const ms = S.champs.flatMap(c => c.matches.filter(isDone))
@@ -718,9 +738,14 @@ function vRelatorios() {
   const chave = b => (b || 'Não informado').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), cont = {}
   for (const r of rows) { const k = chave(r.p.bairro); (cont[k] ??= [r.p.bairro?.trim() || 'Não informado', 0])[1]++ }
   const bairros = Object.values(cont).sort((a, b) => b[1] - a[1]).slice(0, 8)
+  // gols por rodada do campeonato aberto (últimas 8 etapas, na ordem em que foram jogadas)
+  const c0 = C(), porRodada = new Map()
+  if (c0) for (const m of c0.matches.filter(isDone).sort(byDate)) { const k = m.phase === 'grupos' ? 'R' + m.round : ROT_FASE[m.phase] || m.phase; porRodada.set(k, (porRodada.get(k) || 0) + goals(m)[0] + goals(m)[1]) }
+  const totalJogos = S.champs.reduce((s, c) => s + c.matches.length, 0)
   return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatórios da Secretaria</h2></div><div class="btns noprint">${REAL ? '<button class="btn gold" data-act="backup" title="Baixa todos os dados do sistema num arquivo">Baixar cópia de segurança</button>' : ''}<button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
   <div class="grid g4">${stat(S.champs.length, 'campeonatos')}${stat(S.champs.reduce((s, c) => s + c.teams.length, 0), 'equipes')}${stat(rows.length, 'inscrições aprovadas')}${stat(rows.filter(r => r.a < 18).length, 'menores de 18 atendidos', 'gold')}${stat(ms.length, 'jogos realizados')}${stat(gols, `gols · média ${ms.length ? (gols / ms.length).toFixed(1) : 0} por jogo`)}</div>
   <div class="grid g2 mt"><div class="card"><h3>Atletas por faixa etária</h3>${bars(ages, 'Ainda sem atletas aprovados. Os números aparecem quando a Secretaria aprova as inscrições.')}</div><div class="card"><h3>Atletas por bairro</h3>${bars(bairros, 'Ainda sem atletas aprovados. Aparece o bairro de cada atleta inscrito.')}</div></div>
+  <div class="grid g2 mt"><div class="card"><h3>Jogos realizados <small>todos os campeonatos</small></h3>${graficoRosca(ms.length, totalJogos)}</div><div class="card"><h3>Gols por rodada <small>${esc(c0?.name || '')}</small></h3>${graficoColunas([...porRodada].slice(-8), 'Gols por rodada', 'Sem gols registrados ainda. O gráfico aparece depois da primeira súmula confirmada.')}</div></div>
   <div class="card mt"><h3>Artilharia <small>os 5 maiores artilheiros de todos os campeonatos</small></h3>${bars(S.champs.flatMap(c => scorers(c).map(s => [`${s.p.name} · ${T(c, s.p.team).name}`, s.n])).sort((x, y) => y[1] - x[1]).slice(0, 5), 'Sem gols registrados ainda. A artilharia aparece depois da primeira súmula confirmada.')}</div>
   <div class="card mt"><h3>Por campeonato</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Campeonato</th><th class="l">Modalidade</th><th>Categoria</th><th>Situação</th><th>Equipes</th><th>Atletas</th><th>Jogos</th><th>Gols</th></tr></thead><tbody>
     ${S.champs.map(c => { const d = c.matches.filter(isDone); return `<tr><td class="l"><b>${esc(c.name)}</b></td><td class="l">${esc(c.sport)}</td><td>${esc(c.category)}</td><td>${cpill(c)}</td><td>${c.teams.length}</td><td>${c.players.filter(p => insc(c, p)[0] === 'aprovado').length}</td><td>${d.length}/${c.matches.length}</td><td>${d.reduce((s, m) => s + goals(m)[0] + goals(m)[1], 0)}</td></tr>` }).join('')}
