@@ -155,11 +155,14 @@ function manageForm(c, m) {
 }
 
 const KO_PLURAL = {oitavas: 'Oitavas de final', quartas: 'Quartas de final', semi: 'Semifinais'}
+const FORMA = {V: 'Vitória', E: 'Empate', D: 'Derrota'}
+const formaDe = (c, id, g) => c.matches.filter(m => isDone(m) && m.phase === 'grupos' && m.group === g && (m.home === id || m.away === id)).sort(byDate)
+  .map(m => { const [h, a] = score(m), [p, q] = m.home === id ? [h, a] : [a, h]; return p > q ? 'V' : p < q ? 'D' : 'E' }).slice(-5)
 function table(c, g) {
   const pts = formato(c) === 'pontos', r = regras(c), q = pts ? 1 : r.classificam
   const note = pts ? 'Campeão: quem somar mais pontos' : `${q === 1 ? 'O 1º passa' : `Os ${q} primeiros passam`} para o mata-mata${groupDone(c, g) ? ' · grupo encerrado' : ''}`
-  return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th></tr></thead><tbody>
-  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l">${crest(r.t)} <b>${esc(r.t.name)}</b></td><td><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td></tr>`).join('')}
+  return `<div class="card"><h3>${pts ? 'Classificação' : 'Grupo ' + g}</h3><div class="scroll"><table class="st"><thead><tr><th>#</th><th class="l">Equipe</th><th>P</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th class="forma">Últ. 5</th></tr></thead><tbody>
+  ${standings(c, g).map((r, i) => `<tr class="${i < q ? 'q' : ''} ${ui.highlight.includes(r.t.id) ? 'hl' : ''}"><td>${i + 1}</td><td class="l">${crest(r.t)} <b>${esc(r.t.name)}</b></td><td class="pts"><b>${r.P}</b></td><td>${r.J}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td><td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? '+' : ''}${r.SG}</td><td class="forma">${formaDe(c, r.t.id, g).map(k => `<i class="f${k}" title="${FORMA[k]}">${k}</i>`).join('') || '<span class="sub">–</span>'}</td></tr>`).join('')}
   </tbody></table></div><p class="note"><span class="qmark"></span>${note}</p></div>`
 }
 const tables = c => formato(c) === 'mata' ? '' : `<div class="grid ${groupsOf(c).length > 1 ? 'g2' : ''}">${groupsOf(c).map(g => table(c, g)).join('')}</div>`
@@ -815,7 +818,7 @@ function vPortal() {
   return chips + hero + faixaResultados(c) + sponsorsBar(c) + banner(c) + tables(c) + `<div class="mt">${bracket(c)}</div>
   <div class="grid g2 mt topo"><div class="card"><h3>Próximos jogos</h3>${up.map((m, i) => matchRow(c, m, 'pub', i === 0)).join('') || '<p class="sub">Nenhum jogo agendado.</p>'}</div>
     <div class="card"><h3>Últimos resultados</h3>${last.map(m => matchRow(c, m, 'pub')).join('') || '<p class="sub">Nenhum jogo realizado.</p>'}</div></div>
-  <div class="grid g2 mt topo"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i ? '' : 'first'}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub">${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
+  <div class="grid g2 mt topo"><div class="card"><h3>Artilharia ${scorers(c).length > 8 ? `<small><button class="link" data-act="allscorers">${ui.allScorers ? 'ver só os 8 primeiros' : `ver todos (${scorers(c).length})`}</button></small>` : ''}</h3>${scorers(c).slice(0, ui.allScorers ? undefined : 8).map((s, i) => `<div class="row"><span class="rk ${i === 0 ? 'first' : i < 3 ? 'top' : ''}">${i + 1}</span><div style="flex:1"><b>${esc(s.p.name)}</b><div class="sub art-eq">${crest(T(c, s.p.team), 16)} ${esc(T(c, s.p.team).name)}</div></div><span class="sc">${s.n}</span></div>`).join('') || '<p class="sub">Nenhum gol ainda.</p>'}</div>
     ${statsCard(c)}</div><div class="mt">${transparency(c)}</div>` + lgpd
 }
 

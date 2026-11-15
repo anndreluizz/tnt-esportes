@@ -674,3 +674,17 @@ body.escuro .match.jogo.est-hoje{border-color:var(--tnt-neon);box-shadow:inset 4
 .mline .venc{font-weight:800}
 .mline .perd{opacity:.7}
 @media print{.fres{display:none}}
+
+/* TNT 3.1, entrega 6: classificação com pontos em destaque e forma dos últimos 5 jogos; artilharia com pódio */
+.st td.pts b{font:700 20px "Barlow Condensed",sans-serif}
+.st td.forma{white-space:nowrap}
+.st td.forma i{display:inline-grid;place-items:center;width:22px;height:22px;margin-left:3px;border-radius:50%;font:700 12px "Barlow Condensed",sans-serif;font-style:normal;color:var(--tnt-marinho)}
+.forma .fV{background:var(--tnt-neon)}.forma .fE{background:#ffc266}.forma .fD{background:#ff8794}
+.st tr.q td:first-child{box-shadow:inset 3px 0 var(--tnt-neon)}
+.qmark{background:var(--tnt-neon)}
+.rk.first,.rk.top{font-size:24px;width:26px}
+.rk.top{color:var(--tnt-texto-suave)}
+.art-eq{display:flex;align-items:center;gap:6px}
+@media(max-width:480px){.st .forma{display:none}}
+@media(max-width:480px){.st th,.st td{padding-left:3px;padding-right:3px}}
+@media print{.forma .fV{background:#157a3a;color:#fff}.forma .fE,.forma .fD{color:#142036}}
