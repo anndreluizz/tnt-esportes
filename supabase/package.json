@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node testar.mjs",
     "test:volume": "node testar-volume.mjs && node testar-volume-app.mjs",
-    "test:auditoria": "node testar-auditoria.mjs && node testar-auditoria-app.mjs"
+    "test:auditoria": "node testar-auditoria.mjs && node testar-auditoria-app.mjs && node testar-reversao-auditoria.mjs"
   },
   "keywords": [],
   "author": "",

@@ -154,7 +154,7 @@ begin
   end if;
 
   insert into auditoria (usuario_id, usuario_nome, usuario_papel, origem, tabela, operacao, registro_id, campeonato_id, resumo, alteradas, antes, depois)
-  values (uid, nome, papel, origem, TG_TABLE_NAME, TG_OP, r ->> 'id', camp, resumo, alt, antes, depois);
+  values (uid, nome, papel, origem, TG_TABLE_NAME, TG_OP, r ->> 'id', camp, coalesce(resumo, 'Alteração em ' || TG_TABLE_NAME), alt, antes, depois);   -- coalesce: um texto nulo nunca pode bloquear a gravação do usuário
   return retorno;
 end $$;
 revoke execute on function auditar(), auditoria_colunas(text), auditoria_imutavel() from public, anon, authenticated;
@@ -190,9 +190,34 @@ begin
   loop execute format('alter function %s set tnt.ja_registrado = ''on''', f); end loop;
 end $$;
 
--- COMO DESFAZER (não apaga o que já foi auditado; para guardar os registros, copie a tabela antes):
---   para cada tabela (campeonatos, equipes, atletas, perfis, jogos): drop trigger if exists auditoria_depois on <tabela>;
---   e, em campeonatos, equipes, atletas e perfis também: drop trigger if exists auditoria_antes_excluir on <tabela>;
---   alter function inscrever_pelo_link(uuid, jsonb) reset tnt.ja_registrado;   -- e as demais funções marcadas
---   drop table auditoria;   drop function auditar(), auditoria_colunas(text), auditoria_imutavel();
---   (historico.usuario_id pode ficar: é opcional e inofensivo)
+-- COMO DESFAZER (executável: o teste testar-reversao-auditoria.mjs roda exatamente as linhas abaixo que começam com "--   ").
+-- ANTES de desfazer, guarde os registros, porque a tabela some: no editor SQL, "select to_jsonb(a) from auditoria a order by id" e salve o resultado fora do banco.
+-- Não mexe em campeonatos, equipes, atletas, jogos, perfis nem no histórico existente. A coluna historico.usuario_id fica (opcional e inofensiva);
+-- para removê-la também: alter table historico drop column usuario_id;
+--   begin;
+--   drop trigger if exists auditoria_depois on campeonatos;
+--   drop trigger if exists auditoria_antes_excluir on campeonatos;
+--   drop trigger if exists auditoria_depois on equipes;
+--   drop trigger if exists auditoria_antes_excluir on equipes;
+--   drop trigger if exists auditoria_depois on atletas;
+--   drop trigger if exists auditoria_antes_excluir on atletas;
+--   drop trigger if exists auditoria_depois on perfis;
+--   drop trigger if exists auditoria_antes_excluir on perfis;
+--   drop trigger if exists auditoria_depois on jogos;
+--   do $$
+--   declare f regprocedure;
+--   begin
+--     for f in select p.oid::regprocedure from pg_proc p where p.pronamespace = 'public'::regnamespace
+--              and p.proname in ('inscrever_pelo_link', 'aplicar_sorteio', 'cancelar_sorteio', 'vincular_equipe', 'liberar_acesso')
+--     loop execute format('alter function %s reset tnt.ja_registrado', f); end loop;
+--   end $$;
+--   create or replace function registrar(c uuid, j uuid, o_que text, motivo text default null) returns void
+--   language sql security definer set search_path = public as $$
+--     insert into historico (campeonato_id, jogo_id, quem, o_que, motivo)
+--     values (c, j, coalesce((select nome || ' (' || papel || ')' from perfis where id = auth.uid()), 'sistema'), o_que, motivo)
+--   $$;
+--   drop table if exists auditoria;
+--   drop function if exists auditar();
+--   drop function if exists auditoria_colunas(text);
+--   drop function if exists auditoria_imutavel();
+--   commit;
