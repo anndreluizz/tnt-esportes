@@ -9,7 +9,7 @@
 --     Equipes: nunca o telefone do responsável, o código da equipe nem o link de inscrição (são credenciais).
 --  3) Gatilhos em campeonatos, equipes, atletas, perfis e, em jogos, só na troca de árbitro. O resto de jogos já é registrado pelas funções.
 --  4) Sem duplicidade: as funções que já gravam em "historico" (inscrição pelo link, sorteio, cancelamento do sorteio, vínculo de equipe, liberação
---     de acesso) ficam marcadas com tnt.ja_registrado, e o gatilho não registra de novo o que elas fazem.
+--     de acesso) ficam marcadas com application_name = 'tnt_ja_registrado', e o gatilho não registra de novo o que elas fazem.
 --  5) "historico" ganha a coluna usuario_id (opcional) e registrar() passa a preenchê-la. Nada do histórico existente é alterado.
 -- Não preenche o passado: só o que acontecer depois da migration entra. Não mexe no portal público (nenhuma view pública nova).
 -- Repetível: pode rodar de novo sem erro e sem mudar nada.
@@ -85,7 +85,7 @@ declare
   uid uuid := auth.uid(); nome text; papel text; origem text; n_eq int; n_at int; n_jg int; n_ev int;
 begin
   -- a função que está rodando já grava em "historico": não registra de novo
-  if current_setting('tnt.ja_registrado', true) = 'on' then return retorno; end if;
+  if current_setting('application_name', true) = 'tnt_ja_registrado' then return retorno; end if;
 
   if TG_OP = 'UPDATE' then
     select coalesce(array_agg(k order by k), '{}') into alt from jsonb_object_keys(vn) k where vn -> k is distinct from vo -> k;
@@ -187,7 +187,7 @@ declare f regprocedure;
 begin
   for f in select p.oid::regprocedure from pg_proc p where p.pronamespace = 'public'::regnamespace
            and p.proname in ('inscrever_pelo_link', 'aplicar_sorteio', 'cancelar_sorteio', 'vincular_equipe', 'liberar_acesso')
-  loop execute format('alter function %s set tnt.ja_registrado = ''on''', f); end loop;
+  loop execute format('alter function %s set application_name = ''tnt_ja_registrado''', f); end loop;
 end $$;
 
 -- COMO DESFAZER (executável: o teste testar-reversao-auditoria.mjs roda exatamente as linhas abaixo que começam com "--   ").
@@ -209,7 +209,7 @@ end $$;
 --   begin
 --     for f in select p.oid::regprocedure from pg_proc p where p.pronamespace = 'public'::regnamespace
 --              and p.proname in ('inscrever_pelo_link', 'aplicar_sorteio', 'cancelar_sorteio', 'vincular_equipe', 'liberar_acesso')
---     loop execute format('alter function %s reset tnt.ja_registrado', f); end loop;
+--     loop execute format('alter function %s reset application_name', f); end loop;
 --   end $$;
 --   create or replace function registrar(c uuid, j uuid, o_que text, motivo text default null) returns void
 --   language sql security definer set search_path = public as $$

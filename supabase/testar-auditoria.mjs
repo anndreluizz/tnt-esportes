@@ -173,7 +173,7 @@ await q(`update perfis set papel = 'secretaria' where id = $1`, [U3])
 n = await novos()
 ok(n.length === 1 && n[0].tabela === 'perfis' && n[0].alteradas.join() === 'papel' && n[0].antes.papel === 'arbitro' && n[0].depois.papel === 'secretaria', 'mudar o papel de um acesso (árbitro → Secretaria) fica registrado')
 const flags = await q(`select p.proname, p.proconfig::text c from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('inscrever_pelo_link', 'aplicar_sorteio', 'cancelar_sorteio', 'vincular_equipe', 'liberar_acesso')`)
-ok(flags.length >= 5 && flags.every(f => f.c.includes('tnt.ja_registrado=on')), 'as 5 funções que já gravam no histórico continuam marcadas (um create or replace futuro que apague a marca quebra este teste)')
+ok(flags.length >= 5 && flags.every(f => f.c.includes('application_name=tnt_ja_registrado')), 'as 5 funções que já gravam no histórico continuam marcadas (um create or replace futuro que apague a marca quebra este teste)')
 
 secao('Exclusão: a auditoria sobrevive')
 const antesDel = (await q(`select count(*)::int c from auditoria`))[0].c
