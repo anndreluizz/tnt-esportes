@@ -692,3 +692,9 @@ body.escuro .match.jogo.est-hoje{border-color:var(--tnt-neon);box-shadow:inset 4
 /* TNT 3.1, entrega 8: acessibilidade (auditoria no site publicado) */
 body.escuro fieldset.step legend > span{color:var(--tnt-marinho)}   /* número da etapa: branco sobre azul claro dava 2,7:1; marinho dá mais de 7:1 */
 .link{min-height:36px;padding:8px 4px;display:inline-flex;align-items:center}   /* botão de link com alvo de toque de pelo menos 36 px */
+
+/* TNT 3.1, entrega 7: entrada pública (index.html estática) */
+.entra-lista{list-style:none;padding:0;margin:18px 0;display:grid;gap:12px;font-size:17px;line-height:1.35}
+.entra-lista li{display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start}
+.entra-lista li::before{content:"";width:10px;height:10px;margin-top:7px;border-radius:50%;background:var(--tnt-neon)}
+.role a.btn{text-align:center;justify-content:center}

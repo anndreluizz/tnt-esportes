@@ -136,7 +136,7 @@ function matchRow(c, m, mode, destaque = false) {
 }
 // aviso pronto para o grupo do WhatsApp: resultado ou jogo marcado/remarcado
 function waLink(c, m) {
-  let portal = ''; try { portal = new URL(REAL ? 'oficial.html#portal' : 'index.html#publico/portal', location.href).href } catch {}
+  let portal = ''; try { portal = new URL(REAL ? 'oficial.html#portal' : 'demo.html#publico/portal', location.href).href } catch {}
   const [h, a] = score(m), txt = isDone(m)
     ? `⚽ RESULTADO · ${c.name}\n${tname(c, m, 'home')} ${h} × ${a} ${tname(c, m, 'away')}${m.pen ? ` (pênaltis ${m.pen[0]}×${m.pen[1]})` : ''}${m.wo ? ' (W.O.)' : ''}\n${mtitle(m)}\n\nTabela e classificação: ${portal}`
     : `📅 ${m.postponed ? 'JOGO REMARCADO' : 'JOGO'} · ${c.name}\n${tname(c, m, 'home')} × ${tname(c, m, 'away')}\n${mtitle(m)} · ${dmy(m.date)} às ${m.time}\n📍 ${m.local || c.venue}\n\nAcompanhe: ${portal}`
@@ -542,7 +542,7 @@ function jogosPorCampo(c) {
   return g
 }
 function avisoTroca(c, sw, jogos) {
-  let portal = ''; try { portal = new URL(REAL ? 'oficial.html#portal' : 'index.html#publico/portal', location.href).href } catch {}
+  let portal = ''; try { portal = new URL(REAL ? 'oficial.html#portal' : 'demo.html#publico/portal', location.href).href } catch {}
   const txt = `📍 TROCA DE CAMPO · ${c.name}\n${diaSem(sw.date)} ${dmy(sw.date)}: os jogos do ${sw.antigo} passam para o ${sw.novo}.\n\n`
     + jogos.sort(byDate).map(m => `${m.time} · ${tname(c, m, 'home')} × ${tname(c, m, 'away')}`).join('\n')
     + `\n\nMotivo: ${sw.why}\nAcompanhe: ${portal}`
@@ -1444,7 +1444,7 @@ setInterval(() => { if (!ui.clock.running) return; ui.clock.sec++; const el = do
 async function ensureHashes() { for (const c of S.champs) for (const m of c.matches) if (isDone(m) && !m.hash) m.hash = await sha(sumulaPayload(c, m)).catch(() => null) }
 if (!REAL) {   // protótipo; o modo oficial começa em api.js
   S.champs.forEach(resolveKO)
-  // link direto: index.html#publico/portal, #secretaria/jogos, #arbitro/sumula
+  // link direto: demo.html#publico/portal, #secretaria/jogos, #arbitro/sumula
   const [hr, ht] = decodeURIComponent(location.hash.slice(1)).split('/')
   if (ROLE_TABS[hr] && hr !== 'equipe') { S.session = {role: hr}; ui.tab = ht }
   render()
