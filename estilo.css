@@ -688,3 +688,7 @@ body.escuro .match.jogo.est-hoje{border-color:var(--tnt-neon);box-shadow:inset 4
 @media(max-width:480px){.st .forma{display:none}}
 @media(max-width:480px){.st th,.st td{padding-left:3px;padding-right:3px}}
 @media print{.forma .fV{background:#157a3a;color:#fff}.forma .fE,.forma .fD{color:#142036}}
+
+/* TNT 3.1, entrega 8: acessibilidade (auditoria no site publicado) */
+body.escuro fieldset.step legend > span{color:var(--tnt-marinho)}   /* número da etapa: branco sobre azul claro dava 2,7:1; marinho dá mais de 7:1 */
+.link{min-height:36px;padding:8px 4px;display:inline-flex;align-items:center}   /* botão de link com alvo de toque de pelo menos 36 px */

@@ -357,8 +357,8 @@ function patRow(s, i = patN++) {   // um patrocinador; adicionar e remover mexem
 }
 // horários e locais do calendário: um por linha, com + e ×
 let linhaN = 1000
-const linhaHora = v => `<div class="linha"><input name="r_hora${linhaN++}" data-hora inputmode="numeric" maxlength="5" placeholder="19:00" value="${esc(String(v || '').replace('h', ':'))}"><button type="button" class="x" data-rmrow title="Remover" aria-label="Remover">×</button></div>`
-const linhaLocal = v => `<div class="linha"><input name="r_local${linhaN++}" maxlength="60" placeholder="Ex.: Campo do Bairro Novo" value="${esc(v || '')}"><button type="button" class="x" data-rmrow title="Remover" aria-label="Remover">×</button></div>`
+const linhaHora = v => `<div class="linha"><input name="r_hora${linhaN++}" aria-label="Horário do jogo" data-hora inputmode="numeric" maxlength="5" placeholder="19:00" value="${esc(String(v || '').replace('h', ':'))}"><button type="button" class="x" data-rmrow title="Remover" aria-label="Remover">×</button></div>`
+const linhaLocal = v => `<div class="linha"><input name="r_local${linhaN++}" aria-label="Local do jogo" maxlength="60" placeholder="Ex.: Campo do Bairro Novo" value="${esc(v || '')}"><button type="button" class="x" data-rmrow title="Remover" aria-label="Remover">×</button></div>`
 document.addEventListener('click', e => {
   if (e.target.closest?.('[data-rmrow]')) return e.target.closest('.linha').remove()
   const nova = e.target.closest?.('[data-addrow]')
