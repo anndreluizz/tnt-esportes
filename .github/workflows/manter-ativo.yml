@@ -14,6 +14,6 @@ jobs:
       - name: Consulta pública ao banco
         run: |
           KEY=sb_publishable_3iSg39IiqxfKxET5Us1MxA_vThWtmEu   # chave pública (a mesma de js/config.js)
-          code=$(curl -s -o /dev/null -w '%{http_code}' "https://alebsgxaswcjifwkwebe.supabase.co/rest/v1/campeonatos?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://alebsgxaswcjifwkwebe.supabase.co/rest/v1/campeonatos_publico?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
           echo "Resposta do banco: $code"
           test "$code" = "200"
