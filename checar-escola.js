@@ -12,7 +12,7 @@ const rows = {
   esc_turmas: [{id: 't9', campeonato_id: 'c1', nome: '9º ano'}, {id: 't10', campeonato_id: 'c1', nome: '6ª etapa / 7º ano - EJAI'}, {id: 't2', campeonato_id: 'c1', nome: '2º ano'}, {id: 't1', campeonato_id: 'c1', nome: '1º ano 01'}],
   esc_times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time B'}],
   esc_jogadores: [{id: 'j1', time_id: 'a', nome: 'Aluno <i>1</i>'}],
-  esc_partidas: [{id: 'p1', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', juiz_id: 'z1', placar_a: 2, placar_b: 2, penaltis_a: 4, penaltis_b: 3, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}],
+  esc_partidas: [{id: 'p1', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', juiz_id: 'z1', data: '2026-12-07', hora: '08:00:00', quadra: 1, placar_a: 2, placar_b: 2, penaltis_a: 4, penaltis_b: 3, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}],
   esc_juizes: [{id: 'z1', campeonato_id: 'c1', nome: 'Carlos <u>Silva'}],
   perfis: [{papel: 'secretaria'}],
 }
@@ -41,6 +41,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('Sou da Secretaria') && !h.includes('Painel da Secretaria') && !h.includes('data-form="placar"') && !h.includes(TOK), 'público não vê painel, edição de placar nem link do professor')
   ok(h.includes('Resultados') && h.includes('Jogos a jogar') && h.includes('data-act="fm"') && !h.includes('JUIZTOK'), 'portal público lista os jogos (a jogar e resultados), com filtro, sem o link do juiz')
   ok(h.includes('Respons') && h.includes('Prof. Carlos &lt;b&gt;') && h.includes('marcas/escola/c1/logo.png') && h.includes('class="sponsors"') && h.includes('Mercado Bom') && h.includes('<b>Sem Logo</b>'), 'portal mostra logo, responsável (escapado) e patrocinadores')
+  ok(h.includes('seg 07/12') && h.includes('08:00') && h.includes('Quadra 1'), 'portal mostra o dia, a hora e a quadra do jogo')
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
@@ -50,6 +51,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('Sorteio dos jogos') && !h.includes('data-form="partida"') && h.includes('campeão: Time A'), 'jogos são sorteados pelo sistema (sem escolher confronto à mão)')
   ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
+  ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
   els = roda(['js/config.js', 'js/juiz.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
@@ -63,6 +65,16 @@ function roda(arquivos, {logado}) {
   let rp = rj(jz(3), jg2(10)); ok(rp.length === 3 && rp.every(([, l]) => l.length >= 3 && l.length <= 4) && rp.flatMap(([, l]) => l).length === 10, '10 jogos entre 3 juízes: 3 ou 4 para cada')
   rp = rj(jz(2), [{id: 'a', fase: 'final', juiz_id: 'j0'}, {id: 'b', fase: 'final', juiz_id: 'j0'}, {id: 'c', fase: 'final'}]); ok(rp.length === 1 && rp[0][0] === 'j1' && rp[0][1].join() === 'c', 'quem tem menos jogos recebe; escalado à mão não muda')
   ok(rj([], jg2(3)).length === 0 && rj(jz(2), [{id: 'a', fase: 'final', juiz_id: 'j0'}]).length === 0, 'sem juiz cadastrado ou sem jogo livre: nada a distribuir')
+  // agenda por horário: 1 e 2 quadras, janelas, sobra, fase em ordem, jogos já marcados
+  const mods = [{id: 'f', tempos: 2, tempo_min: 10}, {id: 'q', tempos: 1, tempo_min: 10}]
+  const ag = (ps, o) => vm.runInContext(`montaAgenda(${JSON.stringify(ps)}, ${JSON.stringify(mods)}, ${JSON.stringify({dias: ['2026-12-07', '2026-12-08'], janelas: [['08:00', '09:00'], ['13:30', '14:30']], quadras: 1, ...o})})`, ctxEscola)
+  const fut = (n, fase = 'quartas') => Array.from({length: n}, (_, i) => ({id: 'f' + i, modalidade_id: 'f', fase}))
+  let a1 = ag(fut(5)); ok(a1.linhas.map(l => l.data + ' ' + l.hora).join() === '2026-12-07 08:00,2026-12-07 08:30,2026-12-07 13:30,2026-12-07 14:00,2026-12-08 08:00', 'agenda: 30 min por jogo de futsal, manhã depois tarde, depois o dia seguinte')
+  a1 = ag(fut(10)); ok(a1.linhas.length === 8 && a1.sobra.length === 2 && a1.precisa === 300 && a1.tem === 240, 'agenda: o que não cabe vai para a sobra, com horas precisas e disponíveis')
+  a1 = ag(fut(4), {quadras: 2}); ok(a1.linhas.filter(l => l.hora === '08:00').length === 2 && a1.linhas.every(l => l.quadra <= 2), 'agenda: 2 quadras jogam ao mesmo tempo')
+  a1 = ag([...fut(1, 'final').map(p => ({...p, id: 'fin'})), ...fut(1, 'semifinal').map(p => ({...p, id: 'semi'}))]); ok(a1.linhas[0].id === 'semi' && a1.linhas[1].id === 'fin', 'agenda: fases em ordem (semifinal antes da final)')
+  a1 = ag([{id: 'x', modalidade_id: 'q', fase: 'final'}, {id: 'y', modalidade_id: 'q', fase: 'final'}]); ok(a1.linhas[1].hora === '08:15', 'agenda: queimada ocupa 15 min')
+  a1 = ag([{id: 'ja', modalidade_id: 'f', fase: 'final', data: '2026-12-07', hora: '08:00:00', quadra: 1}, {id: 'novo', modalidade_id: 'f', fase: 'final'}]); ok(a1.linhas.length === 1 && a1.linhas[0].hora === '08:30', 'agenda: jogo já marcado não muda e o novo vem depois')
   // sorteio: o sistema monta os confrontos (mata-mata, com folga quando o numero e impar)
   const pr = (n, ps = []) => vm.runInContext(`proximaRodada(${JSON.stringify(Array.from({length: n}, (_, i) => ({id: 't' + i})))}, ${JSON.stringify(ps)})`, ctxEscola)
   const usados = r => [...r.jogos.flatMap(j => [j.a, j.b]), ...(r.folga ? [r.folga] : [])].sort().join()
