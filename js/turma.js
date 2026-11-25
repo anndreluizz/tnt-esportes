@@ -7,8 +7,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 4500) }
 const MSG = {'elenco cheio': 'O time já está completo (titulares + reservas).', 'duplicate': 'Esse aluno já está num time.', 'link invalido': 'Link inválido ou inscrições encerradas.', 'check': 'Digite o nome completo.'}
 const erroAmigavel = m => Object.entries(MSG).find(([k]) => m.includes(k))?.[1] || (/fetch/i.test(m) ? 'Sem internet. Confira a conexão e tente de novo.' : m)
-const MODALIDADES = ['Futsal']   // modalidades que este link monta por enquanto (a queimada entra depois)
-const MINIMO = {Futsal: 5}
+const MODALIDADES = ['Futsal', 'Queimada']
+const MINIMO = {Futsal: 5, Queimada: 10}
 const norm = s => String(s).trim().replace(/\s+/g, ' ').toLowerCase()
 const abertas = new Set()
 document.addEventListener('toggle', e => { const k = e.target.dataset?.k; if (k) e.target.open ? abertas.add(k) : abertas.delete(k) }, true)
