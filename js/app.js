@@ -398,7 +398,7 @@ function champForm(c) {   // criar ou editar; logo, responsável, patrocínio e 
   </form>${REAL && c ? excluirCampeonato(c) : ''}</div>`
 }
 function vCamps() {
-  const cards = S.champs.map(c => {
+  const cards = S.champs.filter(c => !c.escolar).map(c => {
     const done = c.matches.filter(isDone).length, ch = champion(c)
     const foto = /futsal|quadra|salão/i.test(c.sport) ? 'ginasio' : /society|futebol|campo/i.test(c.sport) ? 'orla' : 'praca'
     return `<div class="card champ"><div class="cimg" style="--f:url(img/faixa-${foto}.jpg)"><div class="tags">${cpill(c)}<span class="pill">${esc(c.sport)}</span><span class="pill">${esc(c.category)}</span></div>
@@ -410,7 +410,7 @@ function vCamps() {
       ${c.regUntil ? `<p class="sub">Inscrições até ${dmy(c.regUntil)}</p>` : ''}${sponsorsBar(c)}
       <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button>
         ${REAL ? `<button class="btn ghost sm" data-act="editchamp" data-id="${c.id}">Editar dados</button>` : ''}<button class="btn ghost sm" data-act="reg" data-id="${c.id}">Regulamento</button></div></div></div>`
-  }).join('')
+  }).join('') + (typeof escolarCards === 'function' ? escolarCards() : '')
   const editing = S.champs.find(c => c.id === ui.editChamp)
   return `<div class="head"><div><div class="eyebrow">Gestão</div><h2>Campeonatos</h2></div><span class="sub">Cada campeonato tem modalidade, categoria e faixa etária próprias.</span></div>
   ${cards ? `<div class="grid g3">${cards}</div>` : '<div class="info">Comece criando o primeiro campeonato aqui embaixo. As outras abas (inscrições, sorteio, jogos, relatórios) passam a funcionar depois disso.</div>'}
