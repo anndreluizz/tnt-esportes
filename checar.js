@@ -10,7 +10,7 @@ const ctx = vm.createContext({
              body: el(), fonts: {load: () => Promise.resolve()},
              createElement: () => ({getContext: () => new Proxy({}, {get: (t, k) => k === 'measureText' ? () => ({width: 0}) : /Gradient$/.test(k) ? () => ({addColorStop() {}}) : () => {}, set: () => true})})},
 })
-for (const f of ['js/regras.js', 'js/dados.js', 'js/app.js', 'js/api.js']) vm.runInContext(read(f), ctx, {filename: f})
+for (const f of ['js/regras.js', 'js/dados.js', 'js/app.js', 'js/escolar.js', 'js/api.js']) vm.runInContext(read(f), ctx, {filename: f})
 const run = code => vm.runInContext(code, ctx)
 const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.exit(1) } }
 
@@ -59,6 +59,24 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   }
   await allViews()
   run(`S.session=null; render()`); ok(els['#app'].innerHTML.includes('lhero t3'), 'tela de entrada')
+  // Jogos Escolares como campeonato do sistema: todas as telas, todos os perfis, sem derrubar nada
+  run(`S.champs.push({teams: [], players: [], matches: [], punishments: [], draw: null, log: [], escolar: true, id: 'esc-1', name: 'II Jogos Escolares <b>', sport: 'Futsal', category: 'Escolar', minAge: 6, maxAge: null,
+    start: '2026-12-07', end: '2026-12-09', venue: 'Quadra', status: 'andamento', logo: 'https://x/l.png', responsible: 'Prof. Carlos', sponsors: [{name: 'Mercado Bom', logo: null}],
+    esc: {mod: [{id: 'm1', nome: 'Futsal'}], turmas: [{id: 't1', nome: '1º ano'}], times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: '1º ano 01 - A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: '1º ano 02 - C'}],
+      jog: [{id: 'j', time_id: 'a', nome: 'Aluno <i>'}], partidas: [{id: 'p', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', placar_a: 2, placar_b: 1, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}]}})`)
+  run(`S.champId = 'esc-1'`)
+  for (const [r, tabs] of Object.entries(run('ROLE_TABS')).filter(([r]) => r !== 'equipe'))
+    for (const [t] of tabs.filter(([k]) => k !== 'escolar')) {
+      run(`S.session = {role: '${r}'}; ui.tab='${t}'; render()`)
+      const h = els['#app'].innerHTML
+      if (t !== 'auditoria') ok(h.length > 150 && !h.includes('Aluno <i>') && !h.includes('II Jogos Escolares <b>'), `escolar ${r}/${t}`)
+    }
+  run(`S.session = {role: 'secretaria'}; ui.tab='jogos'; render()`)
+  ok(els['#app'].innerHTML.includes('1º ano 01 - A') && els['#app'].innerHTML.includes('2 x 1'), 'Jogos mostra os jogos escolares')
+  run(`ui.tab='campeonatos'; render()`); ok(els['#app'].innerHTML.includes('Jogos Escolares') || els['#app'].innerHTML.includes('II Jogos Escolares'), 'Campeonatos lista o escolar')
+  run(`ui.tab='portal'; render()`); ok(els['#app'].innerHTML.includes('Mercado Bom') && els['#app'].innerHTML.includes('Prof. Carlos'), 'Portal mostra patrocínio e responsável')
+  run(`S.champs = S.champs.filter(c => !c.escolar); S.champId = S.champs[0].id`)
+
 
   // simula até o campeão e confere o mata-mata
   run(`S.session={role:'secretaria'}`)

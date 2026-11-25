@@ -145,6 +145,7 @@ async function loadAll() {
     S.offline = true
   }
   S.champs = await toState(r)
+  try { S.champs.push(...await escolarCamps()) } catch (e) { console.warn('Jogos Escolares indisponiveis', e) }   // o campeonato escolar nunca derruba o resto do sistema
   S.incompleto = [...LEITURAS_INCOMPLETAS]
   if (S.incompleto.length) toast('Atenção: a leitura de ' + S.incompleto.join(', ') + ' veio incompleta. Os números podem estar errados. Recarregue a página.')
   if (!S.champs.some(c => c.id === S.champId)) S.champId = S.champs[0]?.id ?? null
