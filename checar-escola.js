@@ -16,7 +16,7 @@ const rows = {
   esc_juizes: [{id: 'z1', campeonato_id: 'c1', nome: 'Carlos <u>Silva'}],
   perfis: [{papel: 'secretaria'}],
 }
-const rpcs = {esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
+const rpcs = {esc_candidatos_time: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
 
 function roda(arquivos, {logado}) {
   const els = {}, el = () => ({innerHTML: '', textContent: '', classList: {add() {}, remove() {}}, addEventListener() {}})
@@ -61,6 +61,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('Mesa do juiz') && h.includes('name="pa"') && h.includes('name="ea"') && h.includes('Corrigir resultado'), 'juiz vê os jogos com campos de placar e pênaltis')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
+  ok(h.includes('Alunos da turma') && h.includes('data-add="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor de futsal vê a lista da turma para escolher (nome escapado)')
   ok(h.includes('Professor responsável') && h.includes('name="prof"'), 'professor sem nome cadastrado vê o campo para preencher')
   // juízes: distribuição igual, sem mexer em quem já foi escalado
   const rj = (js, ps) => [...vm.runInContext(`reparteJuizes(${JSON.stringify(js)}, ${JSON.stringify(ps)})`, ctxEscola).entries()]

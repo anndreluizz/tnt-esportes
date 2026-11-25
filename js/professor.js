@@ -8,7 +8,7 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 const MSG = {'elenco cheio': 'O time já está completo (titulares + reservas).', 'duplicate': 'Esse nome já está no time.', 'link invalido': 'Link inválido ou inscrições encerradas.'}
 const erroAmigavel = m => Object.entries(MSG).find(([k]) => m.includes(k))?.[1] || (/fetch/i.test(m) ? 'Sem internet. Confira a conexão e tente de novo.' : m)
 
-let time = null, jogadores = [], editandoProf = false
+let time = null, jogadores = [], candidatos = [], editandoProf = false
 
 async function carregar() {
   if (!/^[0-9a-f-]{36}$/i.test(token)) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
@@ -18,6 +18,8 @@ async function carregar() {
   if (!time) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
   const j = await sb.from('esc_jogadores').select('id, nome').eq('time_id', time.time_id).order('nome')
   jogadores = j.data || []
+  candidatos = []   // lista privada da turma (só futsal): o professor toca no nome para inscrever
+  if (time.modalidade_nome === 'Futsal') { const c = await sb.rpc('esc_candidatos_time', {p_token: token}); candidatos = (c.data || []).map(x => x.nome) }
   render()
 }
 const aviso = msg => { $('#app').innerHTML = `<div class="card empty">${esc(msg)}</div>` }
@@ -29,6 +31,9 @@ function render() {
     <div class="card"><h3>Professor responsável</h3>${t.professor && !editandoProf ? `<div class="row"><span><b>${esc(t.professor)}</b></span>${t.inscricoes_abertas ? '<button class="btn ghost sm" id="trocaprof">Alterar</button>' : ''}</div>`
       : t.inscricoes_abertas ? `<form class="f" id="formprof"><label class="span2">Seu nome completo<input name="prof" required minlength="3" maxlength="60" autocomplete="name" value="${esc(t.professor || '')}"></label>
           <div class="span2"><button class="btn">Salvar meu nome</button></div></form>` : '<p class="sub">Não informado.</p>'}</div>
+    ${t.inscricoes_abertas && !cheio && candidatos.length ? `<div class="card"><h3>Alunos da turma <small>${candidatos.length} disponíveis</small></h3>
+      <p class="note">Toque no nome para colocar o aluno neste time (${esc(t.genero)}). Escolha só quem vai jogar: mínimo 5, até ${t.vagas}. Só os escolhidos aparecem no portal.</p>
+      <div class="chips">${candidatos.map(n => `<button type="button" class="btn ghost sm" data-add="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div></div>` : ''}
     <div class="card"><h3>Alunos do time <small>${jogadores.length} de ${t.vagas}${t.modalidade_nome === 'Futsal' ? ' · mínimo 5 para jogar' : ''}</small></h3>
       ${jogadores.length ? jogadores.map(j => `<div class="row"><span>${esc(j.nome)}</span>${t.inscricoes_abertas ? `<button class="btn ghost sm" data-del="${j.id}" aria-label="Remover ${esc(j.nome)}">Remover</button>` : ''}</div>`).join('')
         : '<p class="sub">Nenhum aluno ainda.</p>'}</div>
@@ -41,6 +46,7 @@ function render() {
   $('#formprof')?.addEventListener('submit', salvarProf)
   $('#trocaprof')?.addEventListener('click', () => { editandoProf = true; render() })
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => remover(b.dataset.del))
+  document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => adicionar(b.dataset.add))
 }
 
 async function inscrever(e) {
@@ -51,6 +57,12 @@ async function inscrever(e) {
   const {error} = await sb.rpc('esc_inscrever_jogador', {p_token: token, p_nome: nome})
   if (error) { toast(erroAmigavel(error.message)); btn.disabled = false; return }
   toast(`${nome} inscrito.`); await carregar(); $('#form')?.nome.focus()
+}
+
+async function adicionar(nome) {
+  const {error} = await sb.rpc('esc_inscrever_jogador', {p_token: token, p_nome: nome})
+  if (error) return toast(erroAmigavel(error.message))
+  toast(`${nome} inscrito.`); await carregar()
 }
 
 async function salvarProf(e) {

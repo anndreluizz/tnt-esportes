@@ -17,6 +17,8 @@ jobs:
         run: node checar.js
       - name: Telas do campeonato escolar (checar-escola.js)
         run: node checar-escola.js
+      - name: Leitor da lista do portal (gera-candidatos)
+        run: node supabase/testar-candidatos.mjs
       - name: Banco, privacidade e políticas de armazenamento (supabase/testar.mjs)
         working-directory: supabase
         run: |
