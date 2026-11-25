@@ -79,6 +79,17 @@ const nomeMod = id => D.mod.find(m => m.id === id)?.nome || '?'
 const nomeTurma = id => D.turmas.find(t => t.id === id)?.nome || '?'
 const timeDe = id => D.times.find(t => t.id === id)
 const rotuloTime = t => `${nomeTurma(t.turma_id)} · ${nomeMod(t.modalidade_id)} ${t.genero} · ${t.nome}`
+const marca = p => p ? `${SUPABASE_URL}/storage/v1/object/public/marcas/${p}` : null   // logos e patrocinadores ficam no bucket público 'marcas'
+let patN = 0
+const patRow = (s, i = patN++) => `<div class="pat"><button type="button" class="x" data-act="rmpat" aria-label="Remover patrocinador">×</button>
+  <label>Nome<input name="sp${i}" maxlength="40" required value="${esc(s?.nome || '')}" placeholder="Nome do patrocinador"></label>${s?.logo_path ? `<input type="hidden" name="spp${i}" value="${esc(s.logo_path)}"><img class="clogo" src="${esc(marca(s.logo_path))}" alt="" style="height:40px;width:auto;max-width:100%">` : ''}
+  <label>Logo<input type="file" name="spl${i}" accept="image/*"></label></div>`
+async function fit(file, max = 400) {   // reduz a imagem (o bucket aceita até 1 MB) e guarda como PNG
+  const bmp = await createImageBitmap(file), k = Math.min(1, max / Math.max(bmp.width, bmp.height)), cv = document.createElement('canvas')
+  cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k); cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height)
+  return new Promise((ok, no) => cv.toBlob(b => b ? ok(b) : no(new Error('Imagem inválida.')), 'image/png'))
+}
+const sponsorsBar = c => (c.patrocinadores || []).length ? `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${c.patrocinadores.map(s => s.logo_path ? `<img src="${esc(marca(s.logo_path))}" alt="${esc(s.nome)}" title="${esc(s.nome)}">` : `<b>${esc(s.nome)}</b>`).join('')}</div>` : ''
 const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).href
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
@@ -103,6 +114,15 @@ function secretaria() {
   return resumo + `<div class="card"><h3>Painel da Secretaria <small><button class="btn ghost sm" data-act="sair">Sair</button></small></h3>
     <div class="row"><span><b>Inscrições dos professores:</b> ${c.inscricoes_abertas ? '<span class="pill green">abertas</span>' : '<span class="pill red">encerradas</span>'}</span>
       <button class="btn ghost sm" data-act="inscricoes">${c.inscricoes_abertas ? 'Encerrar inscrições' : 'Reabrir inscrições'}</button></div></div>
+    <div class="card"><h3>Identidade do campeonato <small>logo, responsável e patrocínio aparecem no portal público</small></h3><form class="f" data-form="identidade">
+      <label class="span2">Nome<input name="nome" required minlength="5" maxlength="80" value="${esc(c.nome)}"></label>
+      <label>Responsável<input name="responsavel" maxlength="60" value="${esc(c.responsavel || '')}" placeholder="Nome de quem organiza"></label>
+      <label>Local<input name="local" maxlength="80" value="${esc(c.local)}"></label>
+      <label>Início<input name="inicio" type="date" required value="${esc(c.inicio)}"></label><label>Fim<input name="fim" type="date" required value="${esc(c.fim)}"></label>
+      <label class="span2">Logo do campeonato ${c.logo_path ? `<img class="clogo" src="${esc(marca(c.logo_path))}" alt="" style="height:48px;width:auto;vertical-align:middle;margin-left:8px">` : ''}<input type="file" name="logo" accept="image/*"></label>
+      <div class="span2"><h4>Patrocinadores <small class="sub">(opcional)</small></h4><div class="pats" id="pats">${(c.patrocinadores || []).map(s => patRow(s)).join('')}</div>
+        <button type="button" class="btn ghost sm" data-act="addpat" style="margin-top:8px">+ Adicionar patrocinador</button></div>
+      <div class="span2"><button class="btn">Salvar identidade</button></div></form></div>
     <div class="card"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
       return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
       <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Mesa do juiz - Jogos Escolares. Lance o placar e os pênaltis por este link: ' + lk)}">WhatsApp</a></div>` })()}</div>
@@ -154,8 +174,8 @@ function publico() {
   const aJogar = lista.filter(p => p.placar_a == null), feitos = lista.filter(p => p.placar_a != null)
   const portal = D.partidas.length ? `<div class="btns chips"><button class="btn ${fm ? 'ghost' : ''}" data-act="fm" data-m="">Todas</button>${D.mod.map(m => `<button class="btn ${fm === m.id ? '' : 'ghost'}" data-act="fm" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div>
     ${pasta('ja', 'Jogos a jogar', `${aJogar.length}`, aJogar.map(linhaJogo).join('') || '<p class="sub">Nenhum jogo pendente.</p>')}${pasta('jr', 'Resultados', `${feitos.length}`, feitos.map(linhaJogo).join('') || '<p class="sub">Ainda sem resultados.</p>')}` : ''
-  return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><h2>${esc(c.nome)}</h2>
-    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}</div></div></div>${portal}${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
+  return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><div style="display:flex;gap:14px;align-items:center">${c.logo_path ? `<img class="clogo" src="${esc(marca(c.logo_path))}" alt="" style="width:64px;height:64px">` : ''}<h2>${esc(c.nome)}</h2></div>
+    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}${c.responsavel ? ` · Responsável: ${esc(c.responsavel)}` : ''}</div></div></div>${sponsorsBar(c)}${portal}${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
 }
 
 function login() {
@@ -172,6 +192,14 @@ const ACOES = {
   turmas: async d => { const novas = [...new Set(d.nomes.split('\n').map(x => x.trim()).filter(Boolean))].filter(n => !D.turmas.some(t => t.nome === n))
     if (novas.length) await q(sb.from('esc_turmas').insert(novas.map(nome => ({campeonato_id: D.c.id, nome})))) },
   time: async d => q(sb.from('esc_times').insert({campeonato_id: D.c.id, turma_id: d.turma, modalidade_id: d.mod, genero: d.genero, nome: `${d.origem.trim()} - ${d.nome.trim()}`})),
+  identidade: async d => { const t = v => v?.trim() || null
+    const envia = async (file, nome) => { if (!file?.size) return null; const path = `escola/${D.c.id}/${nome}-${Date.now()}.png`
+      const {error} = await sb.storage.from('marcas').upload(path, await fit(file), {contentType: 'image/png'}); if (error) throw new Error('Imagem não enviada: ' + error.message); return path }
+    const patrocinadores = []
+    for (const i of Object.keys(d).filter(k => /^sp\d+$/.test(k)).map(k => k.slice(2))) if (t(d['sp' + i])) patrocinadores.push({nome: t(d['sp' + i]), logo_path: (await envia(d['spl' + i], 'patrocinio-' + i)) || d['spp' + i] || null})
+    const upd = {nome: d.nome.trim(), responsavel: t(d.responsavel), local: t(d.local) || 'A definir', inicio: d.inicio, fim: d.fim, patrocinadores}
+    const logo = await envia(d.logo, 'logo'); if (logo) upd.logo_path = logo
+    await q(sb.from('esc_campeonatos').update(upd).eq('id', D.c.id)) },
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
   login: async d => { const {error} = await sb.auth.signInWithPassword({email: d.email, password: d.senha}); if (error) throw new Error('E-mail ou senha incorretos.') },
@@ -186,6 +214,8 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
+    if (act === 'addpat') { document.querySelector('#pats').insertAdjacentHTML('beforeend', patRow()); return }
+    if (act === 'rmpat') { b.closest('.pat').remove(); return }
     if (act === 'fm') { fm = b.dataset.m; return render() }
     if (act === 'sair') { await sb.auth.signOut(); return carregar() }
     if (act === 'sortear' || act === 'todos' || act === 'refazer') {
