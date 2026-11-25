@@ -33,15 +33,15 @@ const IC = {
 }
 const ROLES = {secretaria: {name: 'Ana Souza', label: 'Secretaria'}, arbitro: {name: 'João Paulo', label: 'Árbitro'}, publico: {name: 'Visitante', label: 'População'}}
 const ROLE_TABS = {
-  secretaria: [['painel','Painel'],['campeonatos','Campeonatos'],['inscricoes','Inscrições'],['jogos','Jogos e tabela'],['sumula','Súmula'],['sorteio','Sorteio'],['relatorios','Relatórios'],['divulgacao','Divulgação'],['portal','Portal público'], ...(REAL ? [['auditoria','Auditoria']] : [])],
-  arbitro: [['sumula','Minhas partidas'],['portal','Portal público']],
-  equipe: [['equipe','Minha equipe'],['portal','Portal público']],
-  publico: [['portal','Portal público']],
+  secretaria: [['painel','Painel'],['campeonatos','Campeonatos'],['inscricoes','Inscrições'],['jogos','Jogos e tabela'],['sumula','Súmula'],['sorteio','Sorteio'],['relatorios','Relatórios'],['divulgacao','Divulgação'],['portal','Portal público'], ['escolar','Jogos Escolares'], ...(REAL ? [['auditoria','Auditoria']] : [])],
+  arbitro: [['sumula','Minhas partidas'],['portal','Portal público'],['escolar','Jogos Escolares']],
+  equipe: [['equipe','Minha equipe'],['portal','Portal público'],['escolar','Jogos Escolares']],
+  publico: [['portal','Portal público'],['escolar','Jogos Escolares']],
 }
 // Navegação da Secretaria: 9 telas em 5 grupos (menos escolhas por vez: Hick e Miller).
 // Cada tela mantém a sua chave (ui.tab, links #secretaria/jogos etc.); o grupo só organiza.
 const GRUPOS = [['painel', 'Painel', ['painel']], ['campeonatos', 'Campeonatos', ['campeonatos']], ['jogos', 'Jogos', ['jogos', 'sumula', 'sorteio']],
-  ['equipes', 'Equipes', ['inscricoes']], ['mais', 'Mais', ['relatorios', 'divulgacao', 'portal', ...(REAL ? ['auditoria'] : [])]]]
+  ['equipes', 'Equipes', ['inscricoes']], ['mais', 'Mais', ['relatorios', 'divulgacao', 'portal', 'escolar', ...(REAL ? ['auditoria'] : [])]]]
 const IC_GRUPO = {
   painel: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
   campeonatos: IC.trophy,
@@ -1377,7 +1377,10 @@ function vAuditoria() {
     <p class="sub">Quem alterou o quê e quando. Os registros não podem ser editados nem excluídos. Dados pessoais (nome de atleta, nascimento, telefone, endereço, documentos) não são guardados aqui.</p></div></div>` + filtros + corpo + pager
 }
 const VIEWS = {auditoria: vAuditoria, painel: () => avisoMarcas() + vPainel(), campeonatos: vCamps, inscricoes: vInscricoes, jogos: vJogos, sumula: vSumula, sorteio: vSorteio,
-               relatorios: vRelatorios, divulgacao: vDiv, portal: vPortal, equipe: vEquipe}
+               relatorios: vRelatorios, divulgacao: vDiv, portal: vPortal, equipe: vEquipe, escolar: vEscolar}
+// Jogos Escolares: a tela do campeonato interno (escola.html) dentro do sistema, com o mesmo cabeçalho e menu. Mesmo banco e mesmo login.
+function vEscolar() { return '<iframe class="escolar" src="escola.html?embed=1" title="Jogos Escolares" style="width:100%;border:0;min-height:75vh;display:block"></iframe><p class="note noprint">Os jogos do campeonato interno da escola ficam nesta aba. Se a tela não abrir, <a href="escola.html?embed=1">abra aqui</a>.</p>' }
+if (typeof addEventListener === 'function') addEventListener('message', e => { const f = document.querySelector('iframe.escolar'); if (f && e.origin === location.origin && e.source === f.contentWindow && e.data?.escolaAltura) f.style.height = e.data.escolaAltura + 'px' })
 function render() {
   const r = role(), app = $('#app'), doc = $('#doc')
   if (r === 'equipe') { const c = S.champs.find(x => T(x, S.session.teamId)); if (c) S.champId = c.id; else S.session = null }
@@ -1398,7 +1401,7 @@ function render() {
   ui.ultimo ??= {}   // última tela vista em cada grupo: tocar no grupo volta para ela
   const grupo = agrupa ? GRUPOS.find(g => g[2].includes(ui.tab)) : null
   if (grupo) ui.ultimo[grupo[0]] = ui.tab
-  const atalhos = agrupa ? ['portal', 'auditoria'].filter(k => tabs.some(t => t[0] === k)) : []   // atalhos diretos: fora da barra de baixo (celular), que segue com 5 itens
+  const atalhos = agrupa ? ['portal', 'escolar', 'auditoria'].filter(k => tabs.some(t => t[0] === k)) : []   // atalhos diretos: fora da barra de baixo (celular), que segue com 5 itens
   const atalhoOn = atalhos.includes(ui.tab)   // quando um atalho está aberto, o grupo "Mais" não fica aceso junto
   const grupoBtns = ic => GRUPOS.map(([g, l, ks]) => tabBtn(ui.ultimo[g] || ks[0], l, g === grupo?.[0] && (ic || !atalhoOn), ic ? IC_GRUPO[g] : '')).join('')
   $('#tabs').innerHTML = agrupa ? grupoBtns(false) + (atalhos.length ? '<span class="tabs-sep" aria-hidden="true">Atalhos</span>' + atalhos.map(k => tabBtn(k, rotulo(k), ui.tab === k, '', 'atalho')).join('') : '') : tabs.map(([k, l]) => tabBtn(k, l, ui.tab === k)).join('')
@@ -1406,7 +1409,7 @@ function render() {
   document.body.classList.toggle('has-bnav', agrupa)
   document.title = (rotulo(ui.tab) ? rotulo(ui.tab) + ' · ' : '') + 'TNT Esportes'
   const sub = grupo && grupo[2].length > 1 ? `<div class="chips subnav" role="group" aria-label="${grupo[1]}">${grupo[2].map(k => tabBtn(k, rotulo(k), ui.tab === k)).join('')}</div>` : ''
-  const view = c || ['campeonatos', 'relatorios', 'auditoria'].includes(ui.tab) ? VIEWS[ui.tab]()
+  const view = c || ['campeonatos', 'relatorios', 'auditoria', 'escolar'].includes(ui.tab) ? VIEWS[ui.tab]()
     : `<div class="card empty mt">Nenhum campeonato cadastrado ainda.${r === 'secretaria' ? '<div style="margin-top:12px"><button class="btn" data-act="tab" data-tab="campeonatos">Criar o primeiro campeonato</button></div>' : ''}</div>`
   app.className = 'wrap'; app.innerHTML = `<h1 class="sr">${esc(rotulo(ui.tab))}${c ? ' · ' + esc(c.name) : ''}</h1>` + sub + avisoLeitura() + view
   if (REAL && ui.tab === 'auditoria' && role() === 'secretaria' && ui.aud && ui.aud.linhas === null && !ui.aud.carregando && typeof carregaAuditoria === 'function') carregaAuditoria()

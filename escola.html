@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<script>if (!/[?&]embed/.test(location.search)) location.replace('oficial.html#escolar')   // a tela vive dentro do sistema (aba Jogos Escolares)</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>II Jogos Escolares Internos · TNT Esportes</title>
 <meta name="description" content="Campeonato interno da escola: turmas, times, jogos e campeões">
@@ -31,6 +32,8 @@
   .pasta[open]>summary::after{transform:rotate(90deg)}
   .pasta>summary small{font:500 13px Barlow;color:var(--muted);margin-left:auto}
   .pasta-corpo{padding:0 12px 12px}
+  .embed .top,.embed .skip{display:none}.embed .esc{margin-top:8px;margin-bottom:12px}
+  body.escuro .resumo b{color:var(--tnt-neon)}
   .chips{margin:12px 0}
   .grupo{font:600 13px Barlow;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 2px}
   .placar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%}
@@ -40,7 +43,7 @@
   @media (max-width:560px){.esc{gap:12px}.resumo b{font-size:26px}}
 </style>
 </head>
-<body>
+<body class="escuro embed">
 <a class="skip" href="#app">Pular para o conteúdo</a>
 <header class="top"><div class="wrap brand"><img class="logo" src="img/marca.svg" alt="" width="44" height="44">
   <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div></div></header>
