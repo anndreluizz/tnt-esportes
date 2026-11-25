@@ -96,7 +96,7 @@ async function carregar() {
   const {data: {session}} = await sb.auth.getSession()
   sec = !!session && (await sb.from('perfis').select('papel').eq('id', session.user.id)).data?.[0]?.papel === 'secretaria'
   const [c] = await q(sb.from('esc_campeonatos').select('*').order('inicio', {ascending: false}).limit(1))
-  D = {c, mod: [], turmas: [], times: [], jog: [], partidas: [], juizes: [], links: {}, profs: {}}
+  D = {c, mod: [], turmas: [], times: [], jog: [], partidas: [], juizes: [], turmasLinks: [], links: {}, profs: {}}
   if (c) {
     const por = t => q(sb.from(t).select('*').eq('campeonato_id', c.id))
     ;[D.mod, D.turmas] = await Promise.all([por('esc_modalidades'), por('esc_turmas')])
@@ -106,6 +106,7 @@ async function carregar() {
     D.jog = ids.length ? await q(sb.from('esc_jogadores').select('id,time_id,nome').in('time_id', ids).order('nome')) : []
     D.partidas = tid.length ? await q(sb.from('esc_partidas').select('*').in('turma_id', tid).order('fase').order('id')) : []
     if (sec) D.juiz = await q(sb.rpc('esc_juiz_link', {p_campeonato: c.id}))
+    if (sec) D.turmasLinks = await q(sb.rpc('esc_links_turmas', {p_campeonato: c.id}))   // um link por turma (professor responsável da turma)
     if (sec) for (const l of await q(sb.rpc('esc_links_times', {p_campeonato: c.id}))) { D.links[l.time_id] = l.token; D.profs[l.time_id] = l.professor }
     const pos = n => { const i = SERIES.indexOf(n); return i < 0 ? 99 : i }   // série na ordem do ensino (1º ano ... 9º ano, EJAI); fora da lista, no fim
     D.turmas.sort((x, y) => pos(x.nome) - pos(y.nome) || nat(x.nome, y.nome))
@@ -134,6 +135,17 @@ const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).hre
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
 const incompletos = x => MINIMO[x.m.nome] ? x.times.filter(t => D.jog.filter(j => j.time_id === t.id).length < MINIMO[x.m.nome]).length : 0
+function linksTurmas() {
+  const sp = o => { const i = SERIES.findIndex(s => o.startsWith(s) || (s === 'EJAI' && /EJAI/.test(o))); return i < 0 ? 99 : i }
+  const lista = [...D.turmasLinks].sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem))
+  if (!lista.length) return '<p class="sub">Cadastre os times para gerar os links das turmas.</p>'
+  return lista.map(l => { const link = new URL('turma.html?t=' + l.token, location.href).href
+    return `<div class="row"><span><b>${esc(l.origem)}</b> <small class="sub">${l.times} time(s) · ${l.alunos} aluno(s) escolhido(s)</small><br>${l.professor ? `Professor: ${esc(l.professor)}` : '<span class="pill amber">professor ainda não preencheu</span>'}</span><span class="btns">
+      <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
+      <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Olá! Você é o professor responsável pela turma ' + l.origem + ' nos II Jogos Escolares. Escreva seu nome e monte os times da turma (alunos escolhidos para o futsal) por este link: ' + link)}">WhatsApp</a></span>
+      <form class="f" data-form="turmaprof" data-origem="${esc(l.origem)}" style="width:100%;margin-top:6px"><label>Nome do professor da turma<input name="nome" required minlength="3" maxlength="60" value="${esc(l.professor || '')}" placeholder="Opcional: a Secretaria pode preencher"></label><div><button class="btn ghost sm">Salvar nome</button></div></form></div>` }).join('')
+}
+
 function horarios() {
   const livres = D.partidas.filter(p => !p.data), marcados = D.partidas.length - livres.length, [m1, m2] = ag.janelas
   const form = `<form class="f" data-form="agenda"><label>Quadras ao mesmo tempo<input name="quadras" type="number" min="1" max="9" required value="${ag.quadras}"></label>
@@ -197,6 +209,7 @@ function secretaria() {
     <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
       <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
       ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
+    <div class="card"><h3>Links por turma <small>o professor da turma organiza os times A, B, C... (masculino e feminino) num link só</small></h3>${linksTurmas()}</div>
     <div class="card"><h3>3. Times e links dos professores <small>${D.times.filter(t => D.profs[t.id]).length} de ${D.times.length} com professor responsável</small></h3><form class="f" data-form="time">
       <label>Série (grupo)<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
       <label>Turma de origem<input name="origem" required maxlength="30" list="origens" placeholder="Ex.: 1º ano 01"></label><datalist id="origens">${ORIGENS.map(o => `<option value="${o}">`).join('')}</datalist>
@@ -275,6 +288,7 @@ const ACOES = {
   agenda: async d => { const q1 = Math.max(1, Math.min(9, +d.quadras || 1))
     ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], previa: null}
     ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1}); return 'Prévia pronta. Confira abaixo e aplique.' },
+  turmaprof: async (d, f) => q(sb.from('esc_times').update({professor: d.nome.trim().replace(/\s+/g, ' ')}).eq('campeonato_id', D.c.id).like('nome', f.dataset.origem + ' - %')),
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
   login: async d => { const {error} = await sb.auth.signInWithPassword({email: d.email, password: d.senha}); if (error) throw new Error('E-mail ou senha incorretos.') },

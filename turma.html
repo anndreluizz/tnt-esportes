@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Times da turma · TNT Esportes</title>
+<meta name="description" content="Página do professor da turma: organiza os times de futsal da turma no campeonato interno da escola">
+<meta name="theme-color" content="#0d2f73">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .insc{max-width:720px;margin:18px auto 40px}
+  .insc .hero{margin-bottom:12px}
+  .insc .f{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end}
+  .insc .f .span2{grid-column:1/-1}
+  .insc .chips{display:flex;flex-wrap:wrap;gap:6px}
+</style>
+</head>
+<body class="escuro">
+<a class="skip" href="#app">Pular para o conteúdo</a>
+<header class="top"><div class="wrap brand"><img class="logo" src="img/marca.svg" alt="" width="44" height="44">
+  <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div></div></header>
+<main id="app" tabindex="-1" class="wrap insc"><div class="card empty">Carregando…</div></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/turma.js"></script>
+</body>
+</html>

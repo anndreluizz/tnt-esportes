@@ -16,7 +16,7 @@ const rows = {
   esc_juizes: [{id: 'z1', campeonato_id: 'c1', nome: 'Carlos <u>Silva'}],
   perfis: [{papel: 'secretaria'}],
 }
-const rpcs = {esc_candidatos_time: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
+const rpcs = {esc_links_turmas: [{origem: '1º ano 01', token: 'TURMATOK', professor: 'Prof <b>', times: 2, alunos: 3}], esc_turma_meu: [{origem: '1º ano 01', professor: null, inscricoes_abertas: true}], esc_turma_times: [{time_id: 'a', time_nome: '1º ano 01 - A', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 15}, {time_id: 'q', time_nome: '1º ano 01 - A', modalidade_nome: 'Queimada', genero: 'masculino', vagas: 10}], esc_turma_candidatos: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_candidatos_time: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
 
 function roda(arquivos, {logado}) {
   const els = {}, el = () => ({innerHTML: '', textContent: '', classList: {add() {}, remove() {}}, addEventListener() {}})
@@ -54,6 +54,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
   ok(h.includes('com menos de 5 alunos') && h.includes('campeão direto: Solo'), 'Secretaria: aviso de futsal com menos de 5 alunos e campeão direto no sorteio')
   ok(!h.includes('data-act="sortear" data-key="t2|'), 'grupo de time único não tem sorteio')
+  ok(h.includes('turma.html?t=TURMATOK') && h.includes('Links por turma') && h.includes('data-form="turmaprof"') && h.includes('Prof &lt;b&gt;') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
   ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
@@ -62,6 +63,10 @@ function roda(arquivos, {logado}) {
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   ok(h.includes('Alunos da turma') && h.includes('data-add="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor de futsal vê a lista da turma para escolher (nome escapado)')
+  els = roda(['js/config.js', 'js/turma.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
+  ok(h.includes('1º ano 01') && h.includes('Futsal masculino') && !h.includes('Queimada') && h.includes('data-add="a"') && h.includes('data-nome="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor da turma vê os times de futsal e a lista da turma (nomes escapados)')
+  ok(h.includes('Professor responsável') && h.includes('name="prof"') && h.includes('faltam 4 para o mínimo'), 'professor da turma escreve o nome e vê o que falta para o mínimo')
+  els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Professor responsável') && h.includes('name="prof"'), 'professor sem nome cadastrado vê o campo para preencher')
   // juízes: distribuição igual, sem mexer em quem já foi escalado
   const rj = (js, ps) => [...vm.runInContext(`reparteJuizes(${JSON.stringify(js)}, ${JSON.stringify(ps)})`, ctxEscola).entries()]
