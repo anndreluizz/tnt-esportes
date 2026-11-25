@@ -16,10 +16,12 @@ async function escolarCamps() {
     const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano']
     const pos = n => { const i = SERIES.indexOf(n); return i < 0 ? 99 : i }
     turmas.sort((x, y) => pos(x.nome) - pos(y.nome) || escNat(x.nome, y.nome)); times.sort((x, y) => escNat(x.nome, y.nome)); mod.sort((x, y) => escNat(x.nome, y.nome))
+    let profs = 0   // só a Secretaria enxerga quem já preencheu o nome de professor responsável
+    if (role() === 'secretaria') try { profs = (await sb.rpc('esc_links_times', {p_campeonato: e.id})).data.filter(l => l.professor).length } catch {}
     out.push({teams: [], players: [], matches: [], punishments: [], draw: null, log: [], escolar: true, id: 'esc-' + e.id, name: e.nome, sport: 'Futsal', category: 'Escolar',
       minAge: 6, maxAge: null, start: e.inicio, end: e.fim, venue: e.local, status: partidas.some(p => p.placar_a != null) ? 'andamento' : e.inscricoes_abertas ? 'inscricoes' : 'andamento',
       logo: escMarca(e.logo_path), responsible: e.responsavel, sponsors: (e.patrocinadores || []).map(s => ({name: s.nome, logo: escMarca(s.logo_path)})),
-      esc: {mod, turmas, times, jog, partidas}})
+      esc: {mod, turmas, times, jog, partidas, profs}})
   }
   return out
 }
@@ -54,7 +56,7 @@ const ESC_VIEWS = {
   painel: c => { const e = c.esc, feitos = e.partidas.filter(p => p.placar_a != null).length
     return escHead(c, 'Painel', 'Jogos Escolares', escGerir()) + `<div class="grid g4">${stat(e.turmas.length, 'séries (grupos)')}${stat(e.times.length, 'times')}${stat(e.jog.length, 'alunos inscritos')}${stat(e.partidas.length, 'jogos sorteados')}</div>
       <div class="grid g4 mt">${stat(e.partidas.length - feitos, 'jogos a jogar')}${stat(feitos, 'jogos decididos')}${stat(e.mod.length, 'modalidades')}${stat(e.partidas.filter(p => p.fase === 'final' && p.vencedor_id).length, 'campeões')}</div>
-      <div class="card mt"><h3>Campeões</h3>${escCampeoes(c) || '<p class="sub">Os campeões aparecem aqui quando as finais forem decididas.</p>'}</div>${sponsorsBar(c)}` },
+      ${role() === 'secretaria' ? escPassos(c) : ''}<div class="card mt"><h3>Campeões</h3>${escCampeoes(c) || '<p class="sub">Os campeões aparecem aqui quando as finais forem decididas.</p>'}</div>${sponsorsBar(c)}` },
   inscricoes: c => escHead(c, 'Equipes', 'Times e alunos', escGerir()) + c.esc.mod.map(m => {
     const ts = c.esc.times.filter(t => t.modalidade_id === m.id)
     return ts.length ? escPasta(m.nome, `${ts.length} times`, c.esc.turmas.map(u => { const l = ts.filter(t => t.turma_id === u.id); if (!l.length) return ''
@@ -64,8 +66,10 @@ const ESC_VIEWS = {
   jogos: c => escHead(c, 'Jogos', 'Jogos e resultados', escGerir()) + escListaJogos(c),
   sumula: c => escHead(c, 'Súmula', 'Resultado dos jogos') + `<div class="card"><p class="sub">Nos Jogos Escolares o juiz lança o placar e os pênaltis direto, pelo link da mesa do juiz.</p>${escGerir()}</div>`,
   sorteio: c => escHead(c, 'Sorteio', 'Sorteio dos jogos') + `<div class="card"><p class="sub">Os confrontos são sorteados pelo sistema (mata-mata, por série), na aba Jogos Escolares.</p>${escGerir()}</div>`,
-  relatorios: c => escHead(c, 'Relatórios', 'Relatórios') + `<div class="card"><h3>Resultados e campeões</h3>${escCampeoes(c) || '<p class="sub">Sem campeões ainda.</p>'}</div><p class="note">Relatórios impressos (lista de times e alunos, resultados) chegam na próxima etapa.</p>`,
-  divulgacao: c => escHead(c, 'Divulgação', 'Divulgação') + '<div class="card"><p class="sub">Os cards de resultado e de próximos jogos do campeonato escolar chegam na próxima etapa.</p></div>',
+  relatorios: c => escRelatorio(c),
+  divulgacao: c => `<div class="head"><div><div class="eyebrow">Divulgação · ${esc(c.name)}</div><h2>Imagens prontas para o WhatsApp</h2><p class="sub">Geradas na hora com os dados oficiais. No celular, “Compartilhar” abre direto o WhatsApp. Só aparecem nomes de times, nunca de alunos.</p></div></div>`
+    + (c.esc.partidas.length ? `<div class="grid g3">${ESC_CARDS.map((n, i) => `<div class="card"><div class="cv" id="cv${i}"></div><div class="btns" style="margin-top:10px"><button class="btn" data-act="share" data-i="${i}">Compartilhar</button><button class="btn ghost" data-act="dl" data-i="${i}">Baixar</button></div></div>`).join('')}</div>`
+      : '<div class="card empty">As imagens ficam disponíveis depois do sorteio dos jogos.</div>'),
   portal: c => `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>
     <div class="phero"><div><div class="eyebrow">Portal público · sem login</div><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<h2>${esc(c.name)}</h2></div>
     <p>${dmy(c.start)} a ${dmy(c.end)} · ${esc(c.venue)}${c.responsible ? ` · Responsável: ${esc(c.responsible)}` : ''}</p></div></div>${sponsorsBar(c)}
@@ -81,4 +85,73 @@ function escolarCards() {   // cartões em Campeonatos (a lista normal não rece
     <p class="sub">${c.esc.times.length} times · ${c.esc.jog.length} alunos · ${c.esc.partidas.length} jogos sorteados</p>${sponsorsBar(c)}
     <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="champ" data-id="${c.id}">${c.id === S.champId ? 'Abrir painel' : 'Selecionar'}</button>
       ${role() === 'secretaria' ? '<button class="btn ghost sm" data-act="tab" data-tab="escolar">Editar identidade e gerenciar</button>' : ''}</div></div></div>`).join('')
+}
+
+/* ---------- Relatórios (imprimir / salvar PDF) ---------- */
+function escRelatorio(c) {
+  const e = c.esc, feitos = e.partidas.filter(p => p.placar_a != null).length
+  const linhas = e.mod.flatMap(m => e.turmas.flatMap(u => ['masculino', 'feminino'].map(g => {
+    const ts = e.times.filter(t => t.turma_id === u.id && t.modalidade_id === m.id && t.genero === g); if (!ts.length) return ''
+    const ps = e.partidas.filter(p => p.turma_id === u.id && p.modalidade_id === m.id && p.genero === g), fin = ps.find(p => p.fase === 'final' && p.vencedor_id)
+    return `<tr><td class="l">${esc(u.nome)}</td><td class="l">${esc(m.nome)} ${g}</td><td>${ts.length}</td><td>${e.jog.filter(j => ts.some(t => t.id === j.time_id)).length}</td><td>${ps.filter(p => p.placar_a != null).length}/${ps.length}</td><td class="l">${fin ? `<b>${esc(escTime(c, fin.vencedor_id)?.nome)}</b>` : '—'}</td></tr>` }))).join('')
+  const lista = e.mod.map(m => { const ts = e.times.filter(t => t.modalidade_id === m.id)
+    return ts.length ? escPasta(m.nome, `${ts.length} times`, e.turmas.map(u => { const l = ts.filter(t => t.turma_id === u.id); if (!l.length) return ''
+      return `<h4>${esc(u.nome)}</h4>` + l.map(t => `<div class="row"><span><b>${esc(t.nome)}</b> · ${t.genero}<br><small class="sub">${e.jog.filter(j => j.time_id === t.id).map(j => esc(j.nome)).join(', ') || 'sem alunos inscritos'}</small></span></div>`).join('') }).join('')) : '' }).join('')
+  return `<div class="head"><div><div class="eyebrow">Prestação de contas</div><h2>Relatório · ${esc(c.name)}</h2></div><div class="btns noprint"><button class="btn ghost" data-act="print">Imprimir / salvar PDF</button></div></div>
+  <div class="grid g4">${stat(e.turmas.length, 'séries (grupos)')}${stat(e.times.length, 'times')}${stat(e.jog.length, 'alunos inscritos')}${stat(`${feitos}/${e.partidas.length}`, 'jogos decididos')}</div>
+  <div class="card mt"><h3>Por série e modalidade</h3><div class="scroll"><table class="st"><thead><tr><th class="l">Série</th><th class="l">Modalidade</th><th>Times</th><th>Alunos</th><th>Jogos</th><th class="l">Campeão</th></tr></thead><tbody>${linhas || '<tr><td colspan="6">Sem times.</td></tr>'}</tbody></table></div></div>
+  <div class="card mt"><h3>Lista de times e alunos <small>abra a modalidade antes de imprimir</small></h3>${lista || '<p class="sub">Sem times.</p>'}</div>
+  <p class="note">Gerado em ${new Date().toLocaleString('pt-BR')} · ${esc(c.responsible ? 'Responsável: ' + c.responsible + ' · ' : '')}os nomes dos alunos só devem circular com autorização da escola.</p>`
+}
+
+/* ---------- Divulgação: imagens (mesmo desenho do sistema, só nomes de times) ---------- */
+const ESC_CARDS = ['proximos-jogos', 'resultados', 'campeoes']
+async function buildCardsEscolar() {
+  const c = C(); if (!c?.escolar) return
+  if (c.logo || c.sponsors?.length) await marcasImg(c).catch(() => {})
+  const pat = ui.marcas?.id === c.id && ui.marcas.sponsors.length ? 1 : 0, e = c.esc
+  const ordem = (x, y) => ESC_ORDEM.indexOf(x.fase) - ESC_ORDEM.indexOf(y.fase) || escNat(escSerie(c, x.turma_id), escSerie(c, y.turma_id))
+  const rotulo = p => `${p.fase.toUpperCase()} · ${escMod(c, p.modalidade_id).toUpperCase()} ${p.genero.toUpperCase()} · ${escSerie(c, p.turma_id).toUpperCase()}`
+  ui.cardNomes = ESC_CARDS.map(n => 'tnt-escolar-' + n)
+  ui.cards = [
+    canvasCard(c, 'PRÓXIMOS JOGOS', (x, F) => {
+      const ps = e.partidas.filter(p => p.placar_a == null).sort(ordem).slice(0, 6 - pat); let y = 320
+      if (!ps.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Todos os jogos foram realizados.', 60, 400) }
+      ps.forEach(p => { x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 132); x.textAlign = 'left'
+        x.fillStyle = '#00E676'; fit(x, rotulo(p), 76, y + 42, 930, 700, 28, F.C)
+        x.fillStyle = '#fff'; fit(x, `${escTime(c, p.time_a_id)?.nome} × ${escTime(c, p.time_b_id)?.nome}`.toUpperCase(), 76, y + 90, 930, 700, 44, F.C)
+        x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(`Colete ${p.colete_a} × ${p.colete_a === 'azul' ? 'vermelho' : 'azul'}`, 76, y + 120); y += 152 })
+    }),
+    canvasCard(c, 'ÚLTIMOS RESULTADOS', (x, F) => {
+      const ps = e.partidas.filter(p => p.placar_a != null).sort((a, b) => ordem(b, a)).slice(0, 6 - pat); let y = 320
+      if (!ps.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Os resultados aparecem aqui conforme os jogos terminam.', 60, 400) }
+      ps.forEach(p => { x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 132); x.textAlign = 'left'
+        x.fillStyle = '#a9bfe6'; fit(x, rotulo(p), 76, y + 36, 930, 600, 24, F.B)
+        x.fillStyle = '#fff'; x.font = `700 36px ${F.C}`; x.textAlign = 'right'; fit(x, (escTime(c, p.time_a_id)?.nome || '').toUpperCase(), 450, y + 92, 380, 700, 36, F.C)
+        x.textAlign = 'left'; fit(x, (escTime(c, p.time_b_id)?.nome || '').toUpperCase(), 630, y + 92, 390, 700, 36, F.C)
+        x.textAlign = 'center'; x.fillStyle = '#00E676'; x.font = `700 46px ${F.C}`; x.fillText(`${p.placar_a} × ${p.placar_b}`, 540, y + 94)
+        if (p.penaltis_a != null) { x.fillStyle = '#a9bfe6'; x.font = `400 22px ${F.B}`; x.fillText(`pên. ${p.penaltis_a} × ${p.penaltis_b}`, 540, y + 122) }; y += 148 })
+    }),
+    canvasCard(c, 'CAMPEÕES', (x, F) => {
+      const fins = e.partidas.filter(p => p.fase === 'final' && p.vencedor_id).sort(ordem).slice(0, 7 - pat); let y = 330
+      if (!fins.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Os campeões serão conhecidos após as finais.', 60, 400) }
+      fins.forEach(p => { x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 112); x.textAlign = 'left'
+        x.fillStyle = '#a9bfe6'; fit(x, `${escMod(c, p.modalidade_id)} ${p.genero} · ${escSerie(c, p.turma_id)}`.toUpperCase(), 76, y + 38, 930, 600, 24, F.B)
+        x.fillStyle = '#00E676'; fit(x, escTime(c, p.vencedor_id)?.nome.toUpperCase() || '', 76, y + 90, 930, 700, 44, F.C); y += 128 })
+    }),
+  ]
+  ui.cards.forEach((cv, i) => { const el = document.getElementById('cv' + i); if (el) el.replaceChildren(cv) })
+}
+
+/* ---------- Passo a passo do campeonato (Secretaria) ---------- */
+function escPassos(c) {
+  const e = c.esc, ok = (v, t) => `<span class="pill ${v ? 'green' : 'amber'}">${t}</span>`
+  const passo = (n, titulo, estado, dica) => `<div class="row"><span><b>${n}. ${titulo}</b><br><small class="sub">${dica}</small></span>${estado}</div>`
+  return `<div class="card mt"><h3>Passo a passo <small>para o campeonato acontecer</small></h3>
+    ${passo(1, 'Identidade do campeonato', ok(c.logo && c.responsible, c.logo && c.responsible ? 'pronta' : 'falta logo ou responsável'), 'Logo, responsável e patrocinadores aparecem no portal e nas imagens.')}
+    ${passo(2, 'Times e links dos professores', ok(e.times.length, `${e.times.length} times`), 'Cada professor recebe um link secreto para se identificar e inscrever os alunos.')}
+    ${passo(3, 'Professores identificados', ok(e.profs >= e.times.length && e.times.length, `${e.profs} de ${e.times.length}`), 'Quem ainda não preencheu o nome aparece pendente em Jogos Escolares.')}
+    ${passo(4, 'Alunos inscritos', ok(e.jog.length, `${e.jog.length} alunos`), 'Os nomes aparecem no portal público: só com autorização da escola.')}
+    ${passo(5, 'Sorteio dos jogos', ok(e.partidas.length, e.partidas.length ? `${e.partidas.length} jogos` : 'ainda não sorteado'), 'O sistema sorteia os confrontos e os coletes. Depois disso o juiz já pode lançar os resultados.')}
+    <div class="btns" style="margin-top:12px"><button class="btn sm" data-act="tab" data-tab="escolar">Abrir Jogos Escolares</button></div></div>`
 }

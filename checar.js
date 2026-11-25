@@ -75,6 +75,14 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   ok(els['#app'].innerHTML.includes('1º ano 01 - A') && els['#app'].innerHTML.includes('2 x 1'), 'Jogos mostra os jogos escolares')
   run(`ui.tab='campeonatos'; render()`); ok(els['#app'].innerHTML.includes('Jogos Escolares') || els['#app'].innerHTML.includes('II Jogos Escolares'), 'Campeonatos lista o escolar')
   run(`ui.tab='portal'; render()`); ok(els['#app'].innerHTML.includes('Mercado Bom') && els['#app'].innerHTML.includes('Prof. Carlos'), 'Portal mostra patrocínio e responsável')
+  run(`S.session = {role: 'secretaria'}; ui.tab='painel'; render()`); ok(els['#app'].innerHTML.includes('Passo a passo'), 'Painel escolar da Secretaria traz o passo a passo')
+  run(`S.session = {role: 'publico'}; ui.tab='portal'; render()`); ok(!els['#app'].innerHTML.includes('Passo a passo'), 'passo a passo é só da Secretaria')
+  run(`S.session = {role: 'secretaria'}; ui.tab='relatorios'; render()`)
+  ok(els['#app'].innerHTML.includes('Por série e modalidade') && els['#app'].innerHTML.includes('1º ano 01 - A') && els['#app'].innerHTML.includes('Imprimir'), 'Relatório escolar: tabela por série e lista de times')
+  run(`ui.tab='divulgacao'; render()`)
+  ok(els['#app'].innerHTML.includes('id="cv2"') && !els['#app'].innerHTML.includes('Aluno <i>'), 'Divulgação escolar: 3 imagens')
+  run(`ui.tab='divulgacao'; render()`)
+  await run(`buildCardsEscolar().then(() => ui.cards.length)`).then(n => ok(n === 3, 'Divulgação escolar monta as 3 imagens'))
   run(`S.champs = S.champs.filter(c => !c.escolar); S.champId = S.champs[0].id`)
 
 

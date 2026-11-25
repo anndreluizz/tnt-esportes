@@ -960,6 +960,8 @@ async function marcasImg(c) {   // logo e patrocinadores como imagem para as art
   ui.marcas = {id: c.id, logo: await img(c.logo), sponsors: await Promise.all((c.sponsors || []).map(async s => ({name: s.name, img: await img(s.logo)})))}
 }
 async function buildCards() {
+  if (C().escolar) return buildCardsEscolar()
+  ui.cardNomes = null
   if (C().logo || C().sponsors?.length) await marcasImg(C()).catch(() => {})
   const pat = ui.marcas?.id === C().id && ui.marcas.sponsors.length ? 1 : 0   // com patrocínio, uma linha a menos
   const c = C(), lastRound = Math.max(0, ...c.matches.filter(m => isDone(m) && m.phase === 'grupos').map(m => m.round))
@@ -1027,7 +1029,7 @@ async function buildCards() {
   ]
   ui.cards.forEach((cv, i) => { const el = document.getElementById('cv' + i); if (el) el.replaceChildren(cv) })
 }
-function download(i) { const a = document.createElement('a'); a.href = ui.cards[i].toDataURL('image/png'); a.download = `tnt-${CARDS[i]}.png`; a.click() }
+function download(i) { const a = document.createElement('a'); a.href = ui.cards[i].toDataURL('image/png'); a.download = `${ui.cardNomes ? ui.cardNomes[i] : 'tnt-' + CARDS[i]}.png`; a.click() }
 
 /* ---------- ações ---------- */
 function addEv(team, type, player) {
@@ -1171,7 +1173,7 @@ const A = {
   print: () => { print(); return 'stay' },
   dl: d => { download(+d.i); return 'stay' },
   share: d => { ui.cards[+d.i].toBlob(b => {
-      const f = new File([b], `tnt-${CARDS[+d.i]}.png`, {type: 'image/png'})
+      const f = new File([b], `${ui.cardNomes ? ui.cardNomes[+d.i] : 'tnt-' + CARDS[+d.i]}.png`, {type: 'image/png'})
       if (navigator.canShare?.({files: [f]})) navigator.share({files: [f], title: 'TNT Esportes'}).catch(() => {})
       else { download(+d.i); toast('O compartilhamento direto funciona no celular. A imagem foi baixada.') } })
     return 'stay' },
@@ -1416,7 +1418,7 @@ function render() {
   doc.hidden = !(ui.doc || ui.reg); doc.innerHTML = ui.doc ? vDoc() : ui.reg ? vReg() : ''
   document.body.classList.toggle('doc-open', !!(ui.doc || ui.reg))
   if (ui.tab === 'sumula') hookPads()
-  if (ui.tab === 'divulgacao' && c?.matches.length)
+  if (ui.tab === 'divulgacao' && (c?.matches.length || (c?.escolar && c.esc.partidas.length)))
     Promise.all([document.fonts.load('700 40px "Barlow Condensed"'), document.fonts.load('600 30px Barlow')]).catch(() => {}).finally(buildCards)
 }
 
