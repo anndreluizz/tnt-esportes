@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesa do juiz · TNT Esportes</title>
+<meta name="description" content="Página do juiz: lança o placar e os pênaltis dos jogos do campeonato interno da escola">
+<meta name="theme-color" content="#0d2f73">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .mesa{max-width:680px;margin:18px auto 40px}
+  .mesa .hero,.mesa .chips{margin-bottom:12px}
+  .jogo{margin-bottom:12px}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .vs input,.pen input{width:100%;font:700 28px "Barlow Condensed";text-align:center;margin-top:6px}
+  .pen{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  .pen input{width:72px;font-size:20px;margin:0}
+</style>
+</head>
+<body>
+<a class="skip" href="#app">Pular para o conteúdo</a>
+<header class="top"><div class="wrap brand"><img class="logo" src="img/marca.svg" alt="" width="44" height="44">
+  <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div></div></header>
+<main id="app" tabindex="-1" class="wrap mesa"><div class="card empty">Carregando…</div></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/juiz.js"></script>
+</body>
+</html>

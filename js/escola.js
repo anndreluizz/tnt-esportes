@@ -47,7 +47,8 @@ const grupos = () => D.turmas.flatMap(t => D.mod.flatMap(m => GENEROS.map(g => {
   return {t, m, g, times, partidas, chave: `${t.id}|${m.id}|${g}`, r: times.length ? proximaRodada(times, partidas) : null}
 }))).filter(x => x.times.length >= 2)
 // Pasta por modalidade (Futsal, Queimada): abre/fecha e lembra o que estava aberto entre as atualizações da tela
-const abertas = new Set()
+const abertas = new Set(['ja']); let fm = ''   // 'ja' = pasta "Jogos a jogar" já aberta; fm = filtro de modalidade do portal
+const nat = (a, b) => a.localeCompare(b, 'pt', {numeric: true})
 const pasta = (k, titulo, resumo, corpo) => `<details class="pasta" data-k="${k}"${abertas.has(k) ? ' open' : ''}><summary><b>${esc(titulo)}</b> <small>${esc(resumo)}</small></summary><div class="pasta-corpo">${corpo}</div></details>`
 document.addEventListener('toggle', e => { const k = e.target.dataset?.k; if (k) e.target.open ? abertas.add(k) : abertas.delete(k) }, true)
 let D = {}, sec = false, aviso = ''
@@ -64,9 +65,9 @@ async function carregar() {
     const ids = D.times.map(t => t.id), tid = D.turmas.map(t => t.id)
     D.jog = ids.length ? await q(sb.from('esc_jogadores').select('id,time_id,nome').in('time_id', ids).order('nome')) : []
     D.partidas = tid.length ? await q(sb.from('esc_partidas').select('*').in('turma_id', tid).order('fase').order('id')) : []
+    if (sec) D.juiz = await q(sb.rpc('esc_juiz_link', {p_campeonato: c.id}))
     if (sec) for (const l of await q(sb.rpc('esc_links_times', {p_campeonato: c.id}))) { D.links[l.time_id] = l.token; D.profs[l.time_id] = l.professor }
     const pos = n => { const i = SERIES.indexOf(n); return i < 0 ? 99 : i }   // série na ordem do ensino (1º ano ... 9º ano, EJAI); fora da lista, no fim
-    const nat = (a, b) => a.localeCompare(b, 'pt', {numeric: true})
     D.turmas.sort((x, y) => pos(x.nome) - pos(y.nome) || nat(x.nome, y.nome))
     D.times.sort((x, y) => nat(x.nome, y.nome))
     D.mod.sort((x, y) => nat(x.nome, y.nome))
@@ -102,6 +103,9 @@ function secretaria() {
   return resumo + `<div class="card"><h3>Painel da Secretaria <small><button class="btn ghost sm" data-act="sair">Sair</button></small></h3>
     <div class="row"><span><b>Inscrições dos professores:</b> ${c.inscricoes_abertas ? '<span class="pill green">abertas</span>' : '<span class="pill red">encerradas</span>'}</span>
       <button class="btn ghost sm" data-act="inscricoes">${c.inscricoes_abertas ? 'Encerrar inscrições' : 'Reabrir inscrições'}</button></div></div>
+    <div class="card"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
+      return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
+      <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Mesa do juiz - Jogos Escolares. Lance o placar e os pênaltis por este link: ' + lk)}">WhatsApp</a></div>` })()}</div>
     <div class="card"><h3>1. Modalidades</h3><div class="btns">${Object.keys(PRESETS).map(n => `<button class="btn ${temMod(n) ? 'ghost' : ''}" data-act="mod" data-nome="${n}" ${temMod(n) ? 'disabled' : ''}>${temMod(n) ? '✓ ' : '+ '}${n}</button>`).join('')}</div>
       <p class="sub" style="margin-top:6px">Futsal: 5 em quadra + até 5 reservas, 2 tempos de 10 min. Queimada: 10 participantes, 10 min. Masculino e feminino em ambas. Sem pontos: mata-mata, empate vai a pênaltis.</p></div>
     <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
@@ -127,10 +131,10 @@ function publico() {
   const c = D.c
   if (!c) return '<div class="card empty">O campeonato ainda não foi criado.</div>'
   const campeoes = new Map(D.partidas.filter(p => p.fase === 'final' && p.vencedor_id).map(p => [`${p.turma_id}|${p.modalidade_id}|${p.genero}`, p.vencedor_id]))
-  const jogo = p => { const a = timeDe(p.time_a_id), b = timeDe(p.time_b_id), cb = p.colete_a === 'azul' ? 'vermelho' : 'azul'
+  const jogo = (p, leitura) => { const a = timeDe(p.time_a_id), b = timeDe(p.time_b_id), cb = p.colete_a === 'azul' ? 'vermelho' : 'azul'
     const lado = (t, cor) => `<b>${esc(t?.nome)}</b> <span class="pill ${cor === 'azul' ? 'blue' : 'red'}">${cor}</span>`
     const res = p.placar_a == null ? '<span class="pill">a jogar</span>' : `<b>${p.placar_a} x ${p.placar_b}</b>${p.penaltis_a != null ? ` <small class="sub">(pên. ${p.penaltis_a} x ${p.penaltis_b})</small>` : ''}`
-    const edit = sec ? `<form class="placar" data-form="placar" data-id="${p.id}"><input name="pa" type="number" min="0" value="${p.placar_a ?? ''}" aria-label="Placar A"><input name="pb" type="number" min="0" value="${p.placar_b ?? ''}" aria-label="Placar B">
+    const edit = sec && !leitura ? `<form class="placar" data-form="placar" data-id="${p.id}"><input name="pa" type="number" min="0" value="${p.placar_a ?? ''}" aria-label="Placar A"><input name="pb" type="number" min="0" value="${p.placar_b ?? ''}" aria-label="Placar B">
       <input name="ea" type="number" min="0" value="${p.penaltis_a ?? ''}" placeholder="pên. A" aria-label="Pênaltis A"><input name="eb" type="number" min="0" value="${p.penaltis_b ?? ''}" placeholder="pên. B" aria-label="Pênaltis B">
       <button class="btn sm">Salvar</button><button type="button" class="btn danger sm" data-act="del" data-tab="esc_partidas" data-id="${p.id}">Excluir</button></form>` : ''
     return `<div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(timeDe(p.vencedor_id)?.nome)}</span>` : ''}</span>${edit}</div>` }
@@ -140,12 +144,18 @@ function publico() {
       const camp = campeoes.get(`${t.id}|${m.id}|${g}`), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
       return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
         ${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="elenco"><b>${esc(x.nome)}</b> (${js.length}/${m.jogadores_por_time + m.reservas_max}): ${js.length ? js.map(j => esc(j.nome)).join(', ') : 'sem alunos inscritos'}</div>` }).join('')}
-        ${ps.map(jogo).join('')}</div>` }).join('')
+        ${ps.map(p => jogo(p)).join('')}</div>` }).join('')
     return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3><div class="blocos">${blocos}</div></div>` : '' }).join('')
     const nt = D.times.filter(x => x.modalidade_id === m.id).length
     return corpo ? pasta('p' + m.id, m.nome, `${nt} times`, corpo) : '' }).join('')
+  // Portal dos jogos: todos os jogos juntos (a jogar primeiro), com filtro por modalidade. A página se atualiza sozinha.
+  const lista = D.partidas.filter(p => !fm || p.modalidade_id === fm).sort((x, y) => ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase) || nat(nomeTurma(x.turma_id), nomeTurma(y.turma_id)))
+  const linhaJogo = p => `<div class="sub" style="margin-top:8px">${esc(nomeMod(p.modalidade_id))} ${p.genero} · ${esc(nomeTurma(p.turma_id))}</div>${jogo(p, true)}`
+  const aJogar = lista.filter(p => p.placar_a == null), feitos = lista.filter(p => p.placar_a != null)
+  const portal = D.partidas.length ? `<div class="btns chips"><button class="btn ${fm ? 'ghost' : ''}" data-act="fm" data-m="">Todas</button>${D.mod.map(m => `<button class="btn ${fm === m.id ? '' : 'ghost'}" data-act="fm" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div>
+    ${pasta('ja', 'Jogos a jogar', `${aJogar.length}`, aJogar.map(linhaJogo).join('') || '<p class="sub">Nenhum jogo pendente.</p>')}${pasta('jr', 'Resultados', `${feitos.length}`, feitos.map(linhaJogo).join('') || '<p class="sub">Ainda sem resultados.</p>')}` : ''
   return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><h2>${esc(c.nome)}</h2>
-    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}</div></div></div>${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
+    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}</div></div></div>${portal}${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
 }
 
 function login() {
@@ -176,6 +186,7 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
+    if (act === 'fm') { fm = b.dataset.m; return render() }
     if (act === 'sair') { await sb.auth.signOut(); return carregar() }
     if (act === 'sortear' || act === 'todos' || act === 'refazer') {
       if (act === 'refazer') { if (!confirm('Apagar os jogos sorteados deste grupo e sortear de novo?')) return
@@ -195,3 +206,4 @@ document.addEventListener('click', async e => {
 })
 
 carregar().catch(err => { $('#app').innerHTML = `<div class="card empty">Não foi possível carregar (${esc(err.message)}). Confira a internet.</div>` })
+setInterval(() => { if (!sec && !document.hidden) carregar().catch(() => {}) }, 30000)   // público: placar novo aparece sozinho
