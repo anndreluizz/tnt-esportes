@@ -64,7 +64,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   ok(h.includes('Alunos da turma') && h.includes('data-add="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor de futsal vê a lista da turma para escolher (nome escapado)')
   els = roda(['js/config.js', 'js/turma.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
-  ok(h.includes('1º ano 01') && h.includes('Futsal masculino') && !h.includes('Queimada') && h.includes('data-add="a"') && h.includes('data-nome="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor da turma vê os times de futsal e a lista da turma (nomes escapados)')
+  ok(h.includes('1º ano 01') && h.includes('Futsal masculino') && h.includes('Queimada masculino') && h.includes('data-add="q"') && h.includes('data-add="a"') && h.includes('data-nome="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor da turma vê os times de futsal e queimada e a lista da turma (nomes escapados)')
   ok(h.includes('Professor responsável') && h.includes('name="prof"') && h.includes('faltam 4 para o mínimo'), 'professor da turma escreve o nome e vê o que falta para o mínimo')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Professor responsável') && h.includes('name="prof"'), 'professor sem nome cadastrado vê o campo para preencher')
