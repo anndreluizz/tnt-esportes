@@ -207,3 +207,5 @@ document.addEventListener('click', async e => {
 
 carregar().catch(err => { $('#app').innerHTML = `<div class="card empty">Não foi possível carregar (${esc(err.message)}). Confira a internet.</div>` })
 setInterval(() => { if (!sec && !document.hidden) carregar().catch(() => {}) }, 30000)   // público: placar novo aparece sozinho
+
+if (/[?&]embed/.test(location.search) && window.ResizeObserver) new ResizeObserver(() => parent.postMessage({escolaAltura: document.documentElement.scrollHeight}, location.origin)).observe(document.body)   // dentro do sistema: a moldura acompanha a altura

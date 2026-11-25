@@ -608,7 +608,8 @@ async function startReal() {
   try {
     const {data: {session}} = await sb.auth.getSession()
     if (session) await enter(session.user)
-    if (!S.session && location.hash === '#portal') S.session = {role: 'publico'}
+    if (S.session && location.hash === '#escolar') ui.tab = 'escolar'
+    if (!S.session && (location.hash === '#portal' || location.hash === '#escolar')) { S.session = {role: 'publico'}; if (location.hash === '#escolar') ui.tab = 'escolar' }
     await loadAll()
   } catch (e) { toast('Sem conexão com o banco: ' + e.message) }
   render()
