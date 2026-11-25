@@ -24,6 +24,13 @@
   .resumo span{font-size:12px;color:var(--muted)}
   .blocos{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px 20px}
   .bloco{min-width:0}
+  .pasta{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:12px 0;overflow:hidden}
+  .pasta>summary{cursor:pointer;padding:14px 16px;font:600 20px "Barlow Condensed";list-style:none;display:flex;gap:10px;align-items:center}
+  .pasta>summary::-webkit-details-marker{display:none}
+  .pasta>summary::after{content:"▸";color:var(--muted);transition:transform .15s}
+  .pasta[open]>summary::after{transform:rotate(90deg)}
+  .pasta>summary small{font:500 13px Barlow;color:var(--muted);margin-left:auto}
+  .pasta-corpo{padding:0 12px 12px}
   .grupo{font:600 13px Barlow;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 2px}
   .placar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%}
   .placar input{width:64px}
