@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interclasse · TNT Esportes</title>
+<meta name="description" content="Campeonato interno da escola: turmas, times, jogos e campeões">
+<meta name="theme-color" content="#0d2f73">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .esc{max-width:900px;margin:18px auto 40px;display:grid;gap:14px}
+  .esc .f{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end}
+  .esc .f .span2{grid-column:1/-1}
+  .esc textarea{min-height:110px}
+  .placar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .placar input{width:64px}
+  .elenco{font-size:13px;color:var(--muted);margin-top:4px}
+</style>
+</head>
+<body>
+<a class="skip" href="#app">Pular para o conteúdo</a>
+<header class="top"><div class="wrap brand"><img class="logo" src="img/marca.svg" alt="" width="44" height="44">
+  <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div></div></header>
+<main id="app" tabindex="-1" class="wrap esc"><div class="card empty">Carregando…</div></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/escola.js"></script>
+</body>
+</html>
