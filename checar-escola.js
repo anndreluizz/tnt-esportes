@@ -43,6 +43,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
   ok(h.includes('Professor: Maria da Silva') && h.includes('professor ainda não preencheu') && h.includes('1 de 2 com professor responsável'), 'Secretaria vê quem é o professor de cada time e quem falta')
   const pos = t => h.indexOf(t + ' <small class="sub">'); ok(pos('2º ano') > 0 && pos('2º ano') < pos('9º ano') && pos('9º ano') < pos('6ª etapa / 7º ano - EJAI'), 'séries em ordem numérica (1º ao 9º ano, depois EJAI), não alfabética')
+  ok(h.includes('class="resumo"') && h.includes('professores responsáveis'), 'painel mostra o resumo (séries, times, professores, alunos, jogos)')
   ok(h.includes('Sorteio dos jogos') && !h.includes('data-form="partida"') && h.includes('campeão: Time A'), 'jogos são sorteados pelo sistema (sem escolher confronto à mão)')
   ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
