@@ -13,6 +13,39 @@ const PRESETS = {Futsal: {jogadores_por_time: 5, reservas_max: 5, tempos: 2, tem
 const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']
 const ORIGENS = ['1º ano 01', '1º ano 02', '2º ano 01', '2º ano 02', '3º ano 01', '3º ano 02', '4º ano 01', '4º ano 02', '5º ano 01', '5º ano 02', '6º ano 01', '6º ano 02',
   '7º ano', '8º ano 01', '8º ano 02', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']
+// Sorteio: o sistema sorteia os confrontos (mata-mata). Grupo = serie + modalidade + genero. Numero impar de times: um folga (quem ainda nao folgou).
+const ORDEM = ['oitavas', 'quartas', 'semifinal', 'final']
+const nomeFase = k => k <= 2 ? 'final' : k <= 4 ? 'semifinal' : k <= 8 ? 'quartas' : 'oitavas'
+function embaralha(lista) {   // Fisher-Yates com sorteio do proprio navegador (crypto), nao escolha de ninguem
+  const a = [...lista], r = crypto.getRandomValues(new Uint32Array(a.length))
+  for (let i = a.length - 1; i > 0; i--) { const j = r[i] % (i + 1); [a[i], a[j]] = [a[j], a[i]] }
+  return a
+}
+// Devolve {campeao} | {pendente} | {erro} | {fase, jogos: [{a, b, colete}], folga}
+function proximaRodada(times, partidas) {
+  let vivos = times.map(t => t.id); const folgou = new Set()
+  if (vivos.length < 2) return {erro: 'Precisa de pelo menos 2 times.'}
+  if (vivos.length > 16) return {erro: 'O sorteio aceita até 16 times por grupo.'}
+  for (const fase of ORDEM) {
+    const ps = partidas.filter(p => p.fase === fase); if (!ps.length) continue
+    if (ps.some(p => !p.vencedor_id)) return {pendente: ps.filter(p => !p.vencedor_id).length}
+    const jogaram = new Set(ps.flatMap(p => [p.time_a_id, p.time_b_id]))
+    vivos.filter(id => !jogaram.has(id)).forEach(id => folgou.add(id))
+    vivos = [...vivos.filter(id => !jogaram.has(id)), ...ps.map(p => p.vencedor_id)]
+  }
+  if (vivos.length === 1) return {campeao: vivos[0]}
+  let ordem = embaralha(vivos), folga = null
+  if (ordem.length % 2) { const cand = ordem.filter(id => !folgou.has(id)); folga = (cand.length ? cand : ordem)[0]; ordem = ordem.filter(id => id !== folga) }
+  const jogos = []
+  for (let i = 0; i < ordem.length; i += 2) jogos.push({a: ordem[i], b: ordem[i + 1], colete: embaralha(['azul', 'vermelho'])[0]})
+  return {fase: nomeFase(vivos.length), jogos, folga}
+}
+const GENEROS = ['masculino', 'feminino']
+const grupos = () => D.turmas.flatMap(t => D.mod.flatMap(m => GENEROS.map(g => {
+  const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g)
+  const partidas = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
+  return {t, m, g, times, partidas, chave: `${t.id}|${m.id}|${g}`, r: times.length ? proximaRodada(times, partidas) : null}
+}))).filter(x => x.times.length >= 2)
 let D = {}, sec = false, aviso = ''
 
 async function carregar() {
@@ -66,12 +99,13 @@ function secretaria() {
       <label>Gênero<select name="genero"><option value="masculino">Masculino</option><option value="feminino">Feminino</option></select></label>
       <label>Time<input name="nome" required minlength="1" maxlength="8" placeholder="Ex.: A"></label><div><button class="btn">Criar time</button></div></form>
       <div style="margin-top:10px">${tabela || '<p class="sub">Nenhum time ainda.</p>'}</div></div>
-    <div class="card"><h3>4. Jogos</h3><form class="f" data-form="partida">
-      <label class="span2">Time A<select name="a" required>${opcoes(D.times, rotuloTime)}</select></label>
-      <label class="span2">Time B (mesma turma, modalidade e gênero)<select name="b" required>${opcoes(D.times, rotuloTime)}</select></label>
-      <label>Fase<input name="fase" required minlength="3" maxlength="30" value="final" list="fases"></label><datalist id="fases"><option>quartas</option><option>semifinal</option><option>final</option></datalist>
-      <label>Colete do time A<select name="colete"><option value="azul">Azul (B usa vermelho)</option><option value="vermelho">Vermelho (B usa azul)</option></select></label>
-      <div><button class="btn">Marcar jogo</button></div></form></div>`
+    <div class="card"><h3>4. Sorteio dos jogos</h3><p class="sub" style="margin-bottom:6px">Os confrontos e os coletes são sorteados pelo sistema, não escolhidos. Mata-mata: cada fase só sai quando a anterior estiver toda decidida.</p>
+      ${grupos().map(x => `<div class="row"><span><b>${esc(x.t.nome)}</b> · ${esc(x.m.nome)} ${x.g} <small class="sub">${x.times.length} times</small></span><span>${
+        x.r.erro ? `<small class="sub">${esc(x.r.erro)}</small>`
+        : x.r.campeao ? `<span class="pill green">campeão: ${esc(timeDe(x.r.campeao)?.nome)}</span>`
+        : x.r.pendente ? `<span class="pill amber">aguardando ${x.r.pendente} resultado(s)</span> ${x.partidas.every(p => p.placar_a == null) ? `<button class="btn ghost sm" data-act="refazer" data-key="${x.chave}">Refazer sorteio</button>` : ''}`
+        : `<button class="btn sm" data-act="sortear" data-key="${x.chave}">${x.partidas.length ? 'Sortear próxima fase' : 'Sortear jogos'}</button>`}</span></div>`).join('') || '<p class="sub">Crie pelo menos 2 times no mesmo grupo.</p>'}
+      ${grupos().filter(x => !x.partidas.length && !x.r.erro).length > 1 ? '<div style="margin-top:10px"><button class="btn gold" data-act="todos">Sortear todos os grupos que ainda não têm jogos</button></div>' : ''}</div>`
 }
 
 function publico() {
@@ -111,8 +145,6 @@ const ACOES = {
   turmas: async d => { const novas = [...new Set(d.nomes.split('\n').map(x => x.trim()).filter(Boolean))].filter(n => !D.turmas.some(t => t.nome === n))
     if (novas.length) await q(sb.from('esc_turmas').insert(novas.map(nome => ({campeonato_id: D.c.id, nome})))) },
   time: async d => q(sb.from('esc_times').insert({campeonato_id: D.c.id, turma_id: d.turma, modalidade_id: d.mod, genero: d.genero, nome: `${d.origem.trim()} - ${d.nome.trim()}`})),
-  partida: async d => { const a = timeDe(d.a); if (!a) throw new Error('Escolha o time A.')
-    await q(sb.from('esc_partidas').insert({turma_id: a.turma_id, modalidade_id: a.modalidade_id, genero: a.genero, time_a_id: d.a, time_b_id: d.b, fase: d.fase.trim(), colete_a: d.colete})) },
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
   login: async d => { const {error} = await sb.auth.signInWithPassword({email: d.email, password: d.senha}); if (error) throw new Error('E-mail ou senha incorretos.') },
@@ -128,6 +160,15 @@ document.addEventListener('click', async e => {
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
     if (act === 'sair') { await sb.auth.signOut(); return carregar() }
+    if (act === 'sortear' || act === 'todos' || act === 'refazer') {
+      if (act === 'refazer') { if (!confirm('Apagar os jogos sorteados deste grupo e sortear de novo?')) return
+        const x = grupos().find(g => g.chave === b.dataset.key)
+        await q(sb.from('esc_partidas').delete().eq('turma_id', x.t.id).eq('modalidade_id', x.m.id).eq('genero', x.g)); await carregar() }   // recarrega: o novo sorteio parte do grupo limpo
+      const alvo = grupos().filter(x => act === 'todos' ? !x.partidas.length : x.chave === b.dataset.key)
+      const linhas = alvo.flatMap(x => (x.r.jogos || []).map(j => ({turma_id: x.t.id, modalidade_id: x.m.id, genero: x.g, time_a_id: j.a, time_b_id: j.b, fase: x.r.fase, colete_a: j.colete})))
+      if (!linhas.length) return toast('Nada para sortear agora.')
+      await q(sb.from('esc_partidas').insert(linhas)); toast(`${linhas.length} jogo(s) sorteado(s).`)
+    }
     if (act === 'inscricoes') await q(sb.from('esc_campeonatos').update({inscricoes_abertas: !D.c.inscricoes_abertas}).eq('id', D.c.id))
     if (act === 'mod') await q(sb.from('esc_modalidades').insert({campeonato_id: D.c.id, nome: b.dataset.nome, ...PRESETS[b.dataset.nome]}))
     if (act === 'del') { if (!confirm('Excluir? Isso não pode ser desfeito (jogos e alunos ligados também somem).')) return
