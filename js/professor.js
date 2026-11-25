@@ -8,7 +8,7 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 const MSG = {'elenco cheio': 'O time já está completo (titulares + reservas).', 'duplicate': 'Esse nome já está no time.', 'link invalido': 'Link inválido ou inscrições encerradas.'}
 const erroAmigavel = m => Object.entries(MSG).find(([k]) => m.includes(k))?.[1] || (/fetch/i.test(m) ? 'Sem internet. Confira a conexão e tente de novo.' : m)
 
-let time = null, jogadores = []
+let time = null, jogadores = [], editandoProf = false
 
 async function carregar() {
   if (!/^[0-9a-f-]{36}$/i.test(token)) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
@@ -24,8 +24,11 @@ const aviso = msg => { $('#app').innerHTML = `<div class="card empty">${esc(msg)
 
 function render() {
   const t = time, cheio = jogadores.length >= t.vagas
-  $('#app').innerHTML = `<div class="hero"><div><div class="eyebrow">Interclasse · ${esc(t.modalidade_nome)} ${esc(t.genero)}</div>
+  $('#app').innerHTML = `<div class="hero"><div><div class="eyebrow">II Jogos Escolares · ${esc(t.modalidade_nome)} ${esc(t.genero)}</div>
     <h2>${esc(t.turma_nome)}</h2><div style="color:#d6e2f7;font-size:14px;margin-top:4px">Time: ${esc(t.time_nome)}</div></div></div>
+    <div class="card"><h3>Professor responsável</h3>${t.professor && !editandoProf ? `<div class="row"><span><b>${esc(t.professor)}</b></span>${t.inscricoes_abertas ? '<button class="btn ghost sm" id="trocaprof">Alterar</button>' : ''}</div>`
+      : t.inscricoes_abertas ? `<form class="f" id="formprof"><label class="span2">Seu nome completo<input name="prof" required minlength="3" maxlength="60" autocomplete="name" value="${esc(t.professor || '')}"></label>
+          <div class="span2"><button class="btn">Salvar meu nome</button></div></form>` : '<p class="sub">Não informado.</p>'}</div>
     <div class="card"><h3>Alunos do time <small>${jogadores.length} de ${t.vagas}</small></h3>
       ${jogadores.length ? jogadores.map(j => `<div class="row"><span>${esc(j.nome)}</span>${t.inscricoes_abertas ? `<button class="btn ghost sm" data-del="${j.id}" aria-label="Remover ${esc(j.nome)}">Remover</button>` : ''}</div>`).join('')
         : '<p class="sub">Nenhum aluno ainda.</p>'}</div>
@@ -35,6 +38,8 @@ function render() {
           <div class="span2"><button class="btn block" id="enviar">Inscrever aluno</button></div>
           <p class="note span2">Os nomes dos alunos aparecem na página pública do campeonato. Só inscreva quem a escola autorizou.</p></form>`}`
   $('#form')?.addEventListener('submit', inscrever)
+  $('#formprof')?.addEventListener('submit', salvarProf)
+  $('#trocaprof')?.addEventListener('click', () => { editandoProf = true; render() })
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => remover(b.dataset.del))
 }
 
@@ -46,6 +51,15 @@ async function inscrever(e) {
   const {error} = await sb.rpc('esc_inscrever_jogador', {p_token: token, p_nome: nome})
   if (error) { toast(erroAmigavel(error.message)); btn.disabled = false; return }
   toast(`${nome} inscrito.`); await carregar(); $('#form')?.nome.focus()
+}
+
+async function salvarProf(e) {
+  e.preventDefault()
+  const nome = e.target.prof.value.trim().replace(/\s+/g, ' ')
+  if (nome.length < 3) return toast('Digite seu nome completo.')
+  const {error} = await sb.rpc('esc_definir_professor', {p_token: token, p_nome: nome})
+  if (error) return toast(erroAmigavel(error.message))
+  editandoProf = false; toast('Nome salvo.'); await carregar()
 }
 
 async function remover(id) {
