@@ -16,11 +16,11 @@ async function carregar() {
   if (!/^[0-9a-f-]{36}$/i.test(token)) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
   const cid = await q(sb.rpc('esc_juiz_valido', {p_token: token}))
   if (!cid) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
-  const [c, mod, turmas, times] = await Promise.all([
+  const [c, mod, turmas, times, juizes] = await Promise.all([
     q(sb.from('esc_campeonatos').select('nome').eq('id', cid).single()), q(sb.from('esc_modalidades').select('id,nome').eq('campeonato_id', cid)),
-    q(sb.from('esc_turmas').select('id,nome').eq('campeonato_id', cid)), q(sb.from('esc_times').select('id,nome').eq('campeonato_id', cid))])
+    q(sb.from('esc_turmas').select('id,nome').eq('campeonato_id', cid)), q(sb.from('esc_times').select('id,nome').eq('campeonato_id', cid)), q(sb.from('esc_juizes').select('id,nome').eq('campeonato_id', cid))])
   const partidas = turmas.length ? await q(sb.from('esc_partidas').select('*').in('turma_id', turmas.map(t => t.id))) : []
-  D = {c, mod, turmas, times, partidas}
+  D = {c, mod, turmas, times, juizes, partidas}
   render()
 }
 
@@ -29,7 +29,7 @@ function render() {
   const lista = D.partidas.filter(p => !filtro || p.modalidade_id === filtro)
     .sort((x, y) => (x.placar_a == null ? 0 : 1) - (y.placar_a == null ? 0 : 1) || ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase) || nome(D.turmas, x.turma_id).localeCompare(nome(D.turmas, y.turma_id), 'pt', {numeric: true}))
   const jogo = p => { const cb = p.colete_a === 'azul' ? 'vermelho' : 'azul', lado = (id, cor) => `<b>${esc(nome(D.times, id))}</b> <span class="pill ${cor === 'azul' ? 'blue' : 'red'}">${cor}</span>`
-    return `<form class="card jogo" data-id="${p.id}"><div class="sub">${esc(nome(D.mod, p.modalidade_id))} ${p.genero} · ${esc(nome(D.turmas, p.turma_id))} · <span class="pill">${esc(p.fase)}</span>${p.vencedor_id ? ` <span class="pill green">vence ${esc(nome(D.times, p.vencedor_id))}</span>` : p.placar_a != null ? ' <span class="pill amber">empate: falta pênaltis</span>' : ''}</div>
+    return `<form class="card jogo" data-id="${p.id}"><div class="sub">${esc(nome(D.mod, p.modalidade_id))} ${p.genero} · ${esc(nome(D.turmas, p.turma_id))} · <span class="pill">${esc(p.fase)}</span>${p.juiz_id ? ` · Juiz: ${esc(nome(D.juizes, p.juiz_id))}` : ''}${p.vencedor_id ? ` <span class="pill green">vence ${esc(nome(D.times, p.vencedor_id))}</span>` : p.placar_a != null ? ' <span class="pill amber">empate: falta pênaltis</span>' : ''}</div>
       <div class="vs"><div>${lado(p.time_a_id, p.colete_a)}<input name="pa" type="number" inputmode="numeric" min="0" value="${p.placar_a ?? ''}" aria-label="Gols do primeiro time"></div>
         <div>${lado(p.time_b_id, cb)}<input name="pb" type="number" inputmode="numeric" min="0" value="${p.placar_b ?? ''}" aria-label="Gols do segundo time"></div></div>
       <div class="pen"><span class="sub">Pênaltis (só se empatar)</span><input name="ea" type="number" inputmode="numeric" min="0" value="${p.penaltis_a ?? ''}" aria-label="Pênaltis do primeiro time"><input name="eb" type="number" inputmode="numeric" min="0" value="${p.penaltis_b ?? ''}" aria-label="Pênaltis do segundo time"></div>

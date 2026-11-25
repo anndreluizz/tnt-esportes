@@ -12,7 +12,8 @@ const rows = {
   esc_turmas: [{id: 't9', campeonato_id: 'c1', nome: '9º ano'}, {id: 't10', campeonato_id: 'c1', nome: '6ª etapa / 7º ano - EJAI'}, {id: 't2', campeonato_id: 'c1', nome: '2º ano'}, {id: 't1', campeonato_id: 'c1', nome: '1º ano 01'}],
   esc_times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time B'}],
   esc_jogadores: [{id: 'j1', time_id: 'a', nome: 'Aluno <i>1</i>'}],
-  esc_partidas: [{id: 'p1', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', placar_a: 2, placar_b: 2, penaltis_a: 4, penaltis_b: 3, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}],
+  esc_partidas: [{id: 'p1', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', juiz_id: 'z1', placar_a: 2, placar_b: 2, penaltis_a: 4, penaltis_b: 3, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}],
+  esc_juizes: [{id: 'z1', campeonato_id: 'c1', nome: 'Carlos <u>Silva'}],
   perfis: [{papel: 'secretaria'}],
 }
 const rpcs = {esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
@@ -49,6 +50,7 @@ function roda(arquivos, {logado}) {
   ok(h.includes('Sorteio dos jogos') && !h.includes('data-form="partida"') && h.includes('campeão: Time A'), 'jogos são sorteados pelo sistema (sem escolher confronto à mão)')
   ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
+  ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
   els = roda(['js/config.js', 'js/juiz.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Mesa do juiz') && h.includes('name="pa"') && h.includes('name="ea"') && h.includes('Corrigir resultado'), 'juiz vê os jogos com campos de placar e pênaltis')

@@ -11,6 +11,7 @@ async function escolarCamps() {
   for (const e of await ler('esc_campeonatos', [['inicio', false], ['id', true]])) {
     const por = (t, cols = '*') => ler(t, POR, cols, q => q.eq('campeonato_id', e.id))
     const [mod, turmas, times] = await Promise.all([por('esc_modalidades'), por('esc_turmas'), por('esc_times', 'id,campeonato_id,turma_id,modalidade_id,genero,nome')])
+    const juizes = await por('esc_juizes')
     const ids = new Set(times.map(t => t.id)), jog = (await ler('esc_jogadores', POR, 'id,time_id,nome')).filter(j => ids.has(j.time_id))
     const tids = new Set(turmas.map(t => t.id)), partidas = (await ler('esc_partidas', POR)).filter(p => tids.has(p.turma_id))
     const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano']
@@ -21,7 +22,7 @@ async function escolarCamps() {
     out.push({teams: [], players: [], matches: [], punishments: [], draw: null, log: [], escolar: true, id: 'esc-' + e.id, name: e.nome, sport: 'Futsal', category: 'Escolar',
       minAge: 6, maxAge: null, start: e.inicio, end: e.fim, venue: e.local, status: partidas.some(p => p.placar_a != null) ? 'andamento' : e.inscricoes_abertas ? 'inscricoes' : 'andamento',
       logo: escMarca(e.logo_path), responsible: e.responsavel, sponsors: (e.patrocinadores || []).map(s => ({name: s.nome, logo: escMarca(s.logo_path)})),
-      esc: {mod, turmas, times, jog, partidas, profs}})
+      esc: {mod, turmas, times, jog, partidas, profs, juizes}})
   }
   return out
 }
@@ -38,7 +39,7 @@ function escJogo(c, p) {
   const lado = (t, cor) => `<b>${esc(t?.nome)}</b> <span class="pill ${cor === 'azul' ? 'blue' : 'red'}">${cor}</span>`
   const res = p.placar_a == null ? '<span class="pill">a jogar</span>' : `<b>${p.placar_a} x ${p.placar_b}</b>${p.penaltis_a != null ? ` <small class="sub">(pên. ${p.penaltis_a} x ${p.penaltis_b})</small>` : ''}`
   return `<div class="sub" style="margin-top:8px">${esc(escMod(c, p.modalidade_id))} ${p.genero} · ${esc(escSerie(c, p.turma_id))}</div>
-    <div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(escTime(c, p.vencedor_id)?.nome)}</span>` : ''}</span></div>`
+    <div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(c.esc.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(escTime(c, p.vencedor_id)?.nome)}</span>` : ''}</span></div>`
 }
 function escListaJogos(c) {
   const fm = ui.escfm || '', ps = c.esc.partidas.filter(p => !fm || p.modalidade_id === fm)
@@ -153,5 +154,6 @@ function escPassos(c) {
     ${passo(3, 'Professores identificados', ok(e.profs >= e.times.length && e.times.length, `${e.profs} de ${e.times.length}`), 'Quem ainda não preencheu o nome aparece pendente em Jogos Escolares.')}
     ${passo(4, 'Alunos inscritos', ok(e.jog.length, `${e.jog.length} alunos`), 'Os nomes aparecem no portal público: só com autorização da escola.')}
     ${passo(5, 'Sorteio dos jogos', ok(e.partidas.length, e.partidas.length ? `${e.partidas.length} jogos` : 'ainda não sorteado'), 'O sistema sorteia os confrontos e os coletes. Depois disso o juiz já pode lançar os resultados.')}
+    ${passo(6, 'Juízes escalados', ok(e.partidas.length && e.partidas.every(p => p.juiz_id), `${e.partidas.filter(p => p.juiz_id).length} de ${e.partidas.length} jogos`), `${e.juizes.length} juiz(es) cadastrado(s). A Secretaria escala um juiz em cada jogo; o placar sai pelo link do juiz.`)}
     <div class="btns" style="margin-top:12px"><button class="btn sm" data-act="tab" data-tab="escolar">Abrir Jogos Escolares</button></div></div>`
 }

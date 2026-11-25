@@ -131,6 +131,24 @@ await erro(`select esc_juiz_placar($1, $2, 2, 1, 4, 3)`, [tokJ, pj], 'check', 'p
 await q(`select esc_juiz_placar($1, $2, null, null, null, null)`, [tokJ, pj])
 ok((await q(`select placar_a from esc_partidas where id = $1`, [pj]))[0].placar_a === null, 'juiz limpa o resultado')
 
+console.log('Juízes (nomes)')
+await como(SEC)
+const jz = (await q(`insert into esc_juizes (campeonato_id, nome) values ($1, 'Carlos Silva') returning id`, [C]))[0].id
+await erro(`insert into esc_juizes (campeonato_id, nome) values ($1, 'Carlos Silva')`, [C], 'duplicate', 'juiz repetido no campeonato')
+await erro(`insert into esc_juizes (campeonato_id, nome) values ($1, 'Jo')`, [C], 'check', 'nome de juiz curto demais')
+await q(`update esc_partidas set juiz_id = $1 where id = $2`, [jz, pj])
+ok((await q(`select juiz_id from esc_partidas where id = $1`, [pj]))[0].juiz_id === jz, 'Secretaria escala o juiz no jogo')
+const outroC = (await q(`insert into esc_campeonatos (nome, inicio, fim) values ('Outro campeonato', '2026-12-07', '2026-12-09') returning id`))[0].id
+const jzOutro = (await q(`insert into esc_juizes (campeonato_id, nome) values ($1, 'Juiz de Fora') returning id`, [outroC]))[0].id
+await erro(`update esc_partidas set juiz_id = $1 where id = $2`, [jzOutro, pj], 'outro campeonato', 'juiz de outro campeonato não vale')
+await como(null)
+ok((await q(`select count(*)::int n from esc_juizes`))[0].n >= 1, 'público vê os juízes escalados')
+await erro(`insert into esc_juizes (campeonato_id, nome) values ($1, 'Intruso Silva')`, [C], 'permission', 'público não cadastra juiz')
+await como(SEC)
+await q(`delete from esc_juizes where id = $1`, [jz])
+ok((await q(`select juiz_id from esc_partidas where id = $1`, [pj]))[0].juiz_id === null, 'apagar o juiz solta o jogo (sem apagar o jogo)')
+await como(null)
+
 console.log('Permissões')
 await como(null)
 ok((await q(`select count(*)::int n from esc_turmas`))[0].n === 3, 'público lê as turmas')

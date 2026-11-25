@@ -57,10 +57,11 @@ async function carregar() {
   const {data: {session}} = await sb.auth.getSession()
   sec = !!session && (await sb.from('perfis').select('papel').eq('id', session.user.id)).data?.[0]?.papel === 'secretaria'
   const [c] = await q(sb.from('esc_campeonatos').select('*').order('inicio', {ascending: false}).limit(1))
-  D = {c, mod: [], turmas: [], times: [], jog: [], partidas: [], links: {}, profs: {}}
+  D = {c, mod: [], turmas: [], times: [], jog: [], partidas: [], juizes: [], links: {}, profs: {}}
   if (c) {
     const por = t => q(sb.from(t).select('*').eq('campeonato_id', c.id))
     ;[D.mod, D.turmas] = await Promise.all([por('esc_modalidades'), por('esc_turmas')])
+    D.juizes = (await por('esc_juizes')).sort((x, y) => nat(x.nome, y.nome))
     D.times = await q(sb.from('esc_times').select('id,campeonato_id,turma_id,modalidade_id,genero,nome').eq('campeonato_id', c.id))   // sem a coluna token
     const ids = D.times.map(t => t.id), tid = D.turmas.map(t => t.id)
     D.jog = ids.length ? await q(sb.from('esc_jogadores').select('id,time_id,nome').in('time_id', ids).order('nome')) : []
@@ -123,6 +124,9 @@ function secretaria() {
       <div class="span2"><h4>Patrocinadores <small class="sub">(opcional)</small></h4><div class="pats" id="pats">${(c.patrocinadores || []).map(s => patRow(s)).join('')}</div>
         <button type="button" class="btn ghost sm" data-act="addpat" style="margin-top:8px">+ Adicionar patrocinador</button></div>
       <div class="span2"><button class="btn">Salvar identidade</button></div></form></div>
+    <div class="card"><h3>Juízes <small>${D.juizes.length} cadastrado(s) · escale em cada jogo, no passo 4</small></h3>
+      <form class="f" data-form="juiz"><label class="span2">Nome do juiz<input name="nome" required minlength="3" maxlength="60" autocomplete="off" placeholder="Nome e sobrenome"></label><div class="span2"><button class="btn">Adicionar juiz</button></div></form>
+      ${D.juizes.map(j => `<div class="row"><span>${esc(j.nome)} <small class="sub">${D.partidas.filter(p => p.juiz_id === j.id).length} jogo(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_juizes" data-id="${j.id}">Excluir</button></div>`).join('')}</div>
     <div class="card"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
       return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
       <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Mesa do juiz - Jogos Escolares. Lance o placar e os pênaltis por este link: ' + lk)}">WhatsApp</a></div>` })()}</div>
@@ -154,10 +158,10 @@ function publico() {
   const jogo = (p, leitura) => { const a = timeDe(p.time_a_id), b = timeDe(p.time_b_id), cb = p.colete_a === 'azul' ? 'vermelho' : 'azul'
     const lado = (t, cor) => `<b>${esc(t?.nome)}</b> <span class="pill ${cor === 'azul' ? 'blue' : 'red'}">${cor}</span>`
     const res = p.placar_a == null ? '<span class="pill">a jogar</span>' : `<b>${p.placar_a} x ${p.placar_b}</b>${p.penaltis_a != null ? ` <small class="sub">(pên. ${p.penaltis_a} x ${p.penaltis_b})</small>` : ''}`
-    const edit = sec && !leitura ? `<form class="placar" data-form="placar" data-id="${p.id}"><input name="pa" type="number" min="0" value="${p.placar_a ?? ''}" aria-label="Placar A"><input name="pb" type="number" min="0" value="${p.placar_b ?? ''}" aria-label="Placar B">
+    const edit = sec && !leitura ? `<form class="placar" data-form="placar" data-id="${p.id}"><select data-juiz="${p.id}" aria-label="Juiz do jogo"><option value="">Sem juiz</option>${D.juizes.map(j => `<option value="${j.id}"${j.id === p.juiz_id ? ' selected' : ''}>${esc(j.nome)}</option>`).join('')}</select><input name="pa" type="number" min="0" value="${p.placar_a ?? ''}" aria-label="Placar A"><input name="pb" type="number" min="0" value="${p.placar_b ?? ''}" aria-label="Placar B">
       <input name="ea" type="number" min="0" value="${p.penaltis_a ?? ''}" placeholder="pên. A" aria-label="Pênaltis A"><input name="eb" type="number" min="0" value="${p.penaltis_b ?? ''}" placeholder="pên. B" aria-label="Pênaltis B">
       <button class="btn sm">Salvar</button><button type="button" class="btn danger sm" data-act="del" data-tab="esc_partidas" data-id="${p.id}">Excluir</button></form>` : ''
-    return `<div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(timeDe(p.vencedor_id)?.nome)}</span>` : ''}</span>${edit}</div>` }
+    return `<div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(D.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(timeDe(p.vencedor_id)?.nome)}</span>` : ''}</span>${edit}</div>` }
   const grupos = D.mod.map(m => { const corpo = D.turmas.map(t => {
     const blocos = ['masculino', 'feminino'].map(g => {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
@@ -200,10 +204,15 @@ const ACOES = {
     const upd = {nome: d.nome.trim(), responsavel: t(d.responsavel), local: t(d.local) || 'A definir', inicio: d.inicio, fim: d.fim, patrocinadores}
     const logo = await envia(d.logo, 'logo'); if (logo) upd.logo_path = logo
     await q(sb.from('esc_campeonatos').update(upd).eq('id', D.c.id)) },
+  juiz: async d => q(sb.from('esc_juizes').insert({campeonato_id: D.c.id, nome: d.nome.trim().replace(/\s+/g, ' ')})),
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
   login: async d => { const {error} = await sb.auth.signInWithPassword({email: d.email, password: d.senha}); if (error) throw new Error('E-mail ou senha incorretos.') },
 }
+document.addEventListener('change', async e => {   // escalar o juiz num jogo
+  if (e.target.dataset?.juiz === undefined) return
+  try { await q(sb.from('esc_partidas').update({juiz_id: e.target.value || null}).eq('id', e.target.dataset.juiz)); toast('Juiz escalado.'); await carregar() } catch (err) { toast(err.message) }
+})
 document.addEventListener('submit', async e => {
   const f = e.target.closest('[data-form]'); if (!f) return
   e.preventDefault()
