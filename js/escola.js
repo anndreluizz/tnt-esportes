@@ -90,9 +90,11 @@ function secretaria() {
       <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Olá! Você é o professor responsável pelo time ' + t.nome + ' (' + nomeTurma(t.turma_id) + ' · ' + nomeMod(t.modalidade_id) + ' ' + t.genero + '). Preencha seu nome e inscreva os alunos por este link: ' + link)}">WhatsApp</a>
       <button class="btn danger sm" data-act="del" data-tab="esc_times" data-id="${t.id}">Excluir</button></span></div>` }
   const tabela = D.turmas.map(u => { const ts = D.times.filter(t => t.turma_id === u.id); if (!ts.length) return ''
-    return `<h4 style="margin-top:12px">${esc(u.nome)}</h4>` + D.mod.flatMap(m => GENEROS.map(g => { const l = ts.filter(t => t.modalidade_id === m.id && t.genero === g)
-      return l.length ? `<div class="sub" style="margin-top:6px">${esc(m.nome)} ${g}</div>${l.map(linha).join('')}` : '' })).join('') }).join('')
-  return `<div class="card"><h3>Painel da Secretaria <small><button class="btn ghost sm" data-act="sair">Sair</button></small></h3>
+    return `<h4>${esc(u.nome)}</h4>` + D.mod.flatMap(m => GENEROS.map(g => { const l = ts.filter(t => t.modalidade_id === m.id && t.genero === g)
+      return l.length ? `<div class="grupo">${esc(m.nome)} ${g}</div>${l.map(linha).join('')}` : '' })).join('') }).join('')
+  const resumo = `<div class="resumo"><div><b>${D.turmas.length}</b><span>séries (grupos)</span></div><div><b>${D.times.length}</b><span>times</span></div>
+    <div><b>${D.times.filter(t => D.profs[t.id]).length}/${D.times.length}</b><span>professores responsáveis</span></div><div><b>${D.jog.length}</b><span>alunos inscritos</span></div><div><b>${D.partidas.length}</b><span>jogos sorteados</span></div></div>`
+  return resumo + `<div class="card"><h3>Painel da Secretaria <small><button class="btn ghost sm" data-act="sair">Sair</button></small></h3>
     <div class="row"><span><b>Inscrições dos professores:</b> ${c.inscricoes_abertas ? '<span class="pill green">abertas</span>' : '<span class="pill red">encerradas</span>'}</span>
       <button class="btn ghost sm" data-act="inscricoes">${c.inscricoes_abertas ? 'Encerrar inscrições' : 'Reabrir inscrições'}</button></div></div>
     <div class="card"><h3>1. Modalidades</h3><div class="btns">${Object.keys(PRESETS).map(n => `<button class="btn ${temMod(n) ? 'ghost' : ''}" data-act="mod" data-nome="${n}" ${temMod(n) ? 'disabled' : ''}>${temMod(n) ? '✓ ' : '+ '}${n}</button>`).join('')}</div>
@@ -131,10 +133,10 @@ function publico() {
     const blocos = D.mod.flatMap(m => ['masculino', 'feminino'].map(g => {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
       const camp = campeoes.get(`${t.id}|${m.id}|${g}`), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
-      return `<h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
+      return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
         ${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="elenco"><b>${esc(x.nome)}</b> (${js.length}/${m.jogadores_por_time + m.reservas_max}): ${js.length ? js.map(j => esc(j.nome)).join(', ') : 'sem alunos inscritos'}</div>` }).join('')}
-        ${ps.map(jogo).join('')}` })).join('')
-    return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3>${blocos}</div>` : '' }).join('')
+        ${ps.map(jogo).join('')}</div>` })).join('')
+    return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3><div class="blocos">${blocos}</div></div>` : '' }).join('')
   return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><h2>${esc(c.nome)}</h2>
     <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}</div></div></div>${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
 }
