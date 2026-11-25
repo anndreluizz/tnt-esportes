@@ -57,12 +57,17 @@ function escListaJogos(c) {
     + escPasta('Resultados', String(feitos.length), feitos.map(p => escJogo(c, p)).join('') || '<p class="sub">Ainda sem resultados.</p>')
 }
 const escHead = (c, olho, titulo, extra = '') => `<div class="head"><div><div class="eyebrow">${olho}</div><h2>${titulo}</h2><p class="sub">${esc(c.name)}</p></div>${extra}</div>`
-const escCampeoes = c => c.esc.partidas.filter(p => p.fase === 'final' && p.vencedor_id).map(p => `<div class="row"><span>${esc(escMod(c, p.modalidade_id))} ${p.genero} · ${esc(escSerie(c, p.turma_id))}</span><span class="pill green">campeão: ${esc(escTime(c, p.vencedor_id)?.nome)}</span></div>`).join('')
+// campeões: quem venceu a final + time único do grupo (campeão direto, sem jogo)
+const escLista = c => [
+  ...c.esc.partidas.filter(p => p.fase === 'final' && p.vencedor_id).map(p => ({mdl: escMod(c, p.modalidade_id), genero: p.genero, serie: escSerie(c, p.turma_id), nome: escTime(c, p.vencedor_id)?.nome, direto: false})),
+  ...c.esc.turmas.flatMap(u => c.esc.mod.flatMap(m => ['masculino', 'feminino'].map(g => ({u, m, g, ts: c.esc.times.filter(t => t.turma_id === u.id && t.modalidade_id === m.id && t.genero === g)})))).filter(x => x.ts.length === 1)
+    .map(x => ({mdl: x.m.nome, genero: x.g, serie: x.u.nome, nome: x.ts[0].nome, direto: true}))]
+const escCampeoes = c => escLista(c).map(x => `<div class="row"><span>${esc(x.mdl)} ${x.genero} · ${esc(x.serie)}</span><span class="pill green">${x.direto ? 'campeão direto' : 'campeão'}: ${esc(x.nome)}</span></div>`).join('')
 
 const ESC_VIEWS = {
   painel: c => { const e = c.esc, feitos = e.partidas.filter(p => p.placar_a != null).length
     return escHead(c, 'Painel', 'Jogos Escolares', escGerir()) + `<div class="grid g4">${stat(e.turmas.length, 'séries (grupos)')}${stat(e.times.length, 'times')}${stat(e.jog.length, 'alunos inscritos')}${stat(e.partidas.length, 'jogos sorteados')}</div>
-      <div class="grid g4 mt">${stat(e.partidas.length - feitos, 'jogos a jogar')}${stat(feitos, 'jogos decididos')}${stat(e.mod.length, 'modalidades')}${stat(e.partidas.filter(p => p.fase === 'final' && p.vencedor_id).length, 'campeões')}</div>
+      <div class="grid g4 mt">${stat(e.partidas.length - feitos, 'jogos a jogar')}${stat(feitos, 'jogos decididos')}${stat(e.mod.length, 'modalidades')}${stat(escLista(c).length, 'campeões')}</div>
       ${role() === 'secretaria' ? escPassos(c) : ''}<div class="card mt"><h3>Campeões</h3>${escCampeoes(c) || '<p class="sub">Os campeões aparecem aqui quando as finais forem decididas.</p>'}</div>${sponsorsBar(c)}` },
   inscricoes: c => escHead(c, 'Equipes', 'Times e alunos', escGerir()) + c.esc.mod.map(m => {
     const ts = c.esc.times.filter(t => t.modalidade_id === m.id)
@@ -140,17 +145,18 @@ async function buildCardsEscolar() {
         if (p.penaltis_a != null) { x.fillStyle = '#a9bfe6'; x.font = `400 22px ${F.B}`; x.fillText(`pên. ${p.penaltis_a} × ${p.penaltis_b}`, 540, y + 122) }; y += 148 })
     }),
     canvasCard(c, 'CAMPEÕES', (x, F) => {
-      const fins = e.partidas.filter(p => p.fase === 'final' && p.vencedor_id).sort(ordem).slice(0, 7 - pat); let y = 330
+      const fins = escLista(c).slice(0, 7 - pat); let y = 330
       if (!fins.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Os campeões serão conhecidos após as finais.', 60, 400) }
       fins.forEach(p => { x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 112); x.textAlign = 'left'
-        x.fillStyle = '#a9bfe6'; fit(x, `${escMod(c, p.modalidade_id)} ${p.genero} · ${escSerie(c, p.turma_id)}`.toUpperCase(), 76, y + 38, 930, 600, 24, F.B)
-        x.fillStyle = '#00E676'; fit(x, escTime(c, p.vencedor_id)?.nome.toUpperCase() || '', 76, y + 90, 930, 700, 44, F.C); y += 128 })
+        x.fillStyle = '#a9bfe6'; fit(x, `${p.mdl} ${p.genero} · ${p.serie}${p.direto ? ' · campeão direto' : ''}`.toUpperCase(), 76, y + 38, 930, 600, 24, F.B)
+        x.fillStyle = '#00E676'; fit(x, (p.nome || '').toUpperCase(), 76, y + 90, 930, 700, 44, F.C); y += 128 })
     }),
   ]
   ui.cards.forEach((cv, i) => { const el = document.getElementById('cv' + i); if (el) el.replaceChildren(cv) })
 }
 
 /* ---------- Passo a passo do campeonato (Secretaria) ---------- */
+const incompFut = c => c.esc.times.filter(t => escMod(c, t.modalidade_id) === 'Futsal' && c.esc.jog.filter(j => j.time_id === t.id).length < 5).length
 function escPassos(c) {
   const e = c.esc, ok = (v, t) => `<span class="pill ${v ? 'green' : 'amber'}">${t}</span>`
   const passo = (n, titulo, estado, dica) => `<div class="row"><span><b>${n}. ${titulo}</b><br><small class="sub">${dica}</small></span>${estado}</div>`
@@ -159,7 +165,8 @@ function escPassos(c) {
     ${passo(2, 'Times e links dos professores', ok(e.times.length, `${e.times.length} times`), 'Cada professor recebe um link secreto para se identificar e inscrever os alunos.')}
     ${passo(3, 'Professores identificados', ok(e.profs >= e.times.length && e.times.length, `${e.profs} de ${e.times.length}`), 'Quem ainda não preencheu o nome aparece pendente em Jogos Escolares.')}
     ${passo(4, 'Alunos inscritos', ok(e.jog.length, `${e.jog.length} alunos`), 'Os nomes aparecem no portal público: só com autorização da escola.')}
-    ${passo(5, 'Sorteio dos jogos', ok(e.partidas.length, e.partidas.length ? `${e.partidas.length} jogos` : 'ainda não sorteado'), 'O sistema sorteia os confrontos e os coletes. Depois disso o juiz já pode lançar os resultados.')}
-    ${passo(6, 'Juízes escalados', ok(e.partidas.length && e.partidas.every(p => p.juiz_id), `${e.partidas.filter(p => p.juiz_id).length} de ${e.partidas.length} jogos`), `${e.juizes.length} juiz(es) cadastrado(s). A Secretaria escala um juiz em cada jogo; o placar sai pelo link do juiz.`)}
+    ${passo(5, 'Futsal: mínimo de 5 alunos por time', ok(!incompFut(c), incompFut(c) ? `${incompFut(c)} time(s) com menos de 5` : 'todos completos'), 'Time de futsal com menos de 5 alunos inscritos não consegue jogar.')}
+    ${passo(6, 'Sorteio dos jogos', ok(e.partidas.length, e.partidas.length ? `${e.partidas.length} jogos` : 'ainda não sorteado'), 'O sistema sorteia os confrontos e os coletes. Depois disso o juiz já pode lançar os resultados.')}
+    ${passo(7, 'Juízes escalados', ok(e.partidas.length && e.partidas.every(p => p.juiz_id), `${e.partidas.filter(p => p.juiz_id).length} de ${e.partidas.length} jogos`), `${e.juizes.length} juiz(es) cadastrado(s). A Secretaria escala um juiz em cada jogo; o placar sai pelo link do juiz.`)}
     <div class="btns" style="margin-top:12px"><button class="btn sm" data-act="tab" data-tab="escolar">Abrir Jogos Escolares</button></div></div>`
 }

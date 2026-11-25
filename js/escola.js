@@ -10,7 +10,7 @@ async function q(p) { const {data, error} = await p; if (error) throw new Error(
 // Regras de cada modalidade (a Secretaria pode editar no banco). Futsal: 5 + reservas, 2x10. Queimada: 10 participantes, 10 min.
 const PRESETS = {Futsal: {jogadores_por_time: 5, reservas_max: 5, tempos: 2, tempo_min: 10}, Queimada: {jogadores_por_time: 10, reservas_max: 0, tempos: 1, tempo_min: 10}}
 // Grupo = SERIE: as turmas da serie (ex.: 1º ano 01 e 1º ano 02) viram times que se enfrentam num mini campeonato. Portal 2026.
-const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']
+const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano', 'EJAI']
 const ORIGENS = ['1º ano 01', '1º ano 02', '2º ano 01', '2º ano 02', '3º ano 01', '3º ano 02', '4º ano 01', '4º ano 02', '5º ano 01', '5º ano 02', '6º ano 01', '6º ano 02',
   '7º ano', '8º ano 01', '8º ano 02', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']
 // Sorteio: o sistema sorteia os confrontos (mata-mata). Grupo = serie + modalidade + genero. Numero impar de times: um folga (quem ainda nao folgou).
@@ -74,11 +74,12 @@ function montaAgenda(partidas, mods, o) {
   return {linhas, sobra, precisa: livres.reduce((s, p) => s + (dur[p.modalidade_id] || 30), 0), tem: jan.reduce((s, j) => s + j.b - j.a, 0) * o.quadras}
 }
 const GENEROS = ['masculino', 'feminino']
+const MINIMO = {Futsal: 5}   // mínimo de alunos inscritos para o time poder jogar (futsal: 5 em quadra)
 const grupos = () => D.turmas.flatMap(t => D.mod.flatMap(m => GENEROS.map(g => {
   const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g)
   const partidas = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
-  return {t, m, g, times, partidas, chave: `${t.id}|${m.id}|${g}`, r: times.length ? proximaRodada(times, partidas) : null}
-}))).filter(x => x.times.length >= 2)
+  return {t, m, g, times, partidas, chave: `${t.id}|${m.id}|${g}`, r: times.length === 1 ? {campeao: times[0].id, direto: true} : times.length ? proximaRodada(times, partidas) : null}   // time único: campeão direto
+}))).filter(x => x.times.length >= 1)
 // Pasta por modalidade (Futsal, Queimada): abre/fecha e lembra o que estava aberto entre as atualizações da tela
 const abertas = new Set(['ja']); let fm = ''   // 'ja' = pasta "Jogos a jogar" já aberta; fm = filtro de modalidade do portal
 const nat = (a, b) => a.localeCompare(b, 'pt', {numeric: true})
@@ -132,6 +133,7 @@ const sponsorsBar = c => (c.patrocinadores || []).length ? `<div class="sponsors
 const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).href
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
+const incompletos = x => MINIMO[x.m.nome] ? x.times.filter(t => D.jog.filter(j => j.time_id === t.id).length < MINIMO[x.m.nome]).length : 0
 function horarios() {
   const livres = D.partidas.filter(p => !p.data), marcados = D.partidas.length - livres.length, [m1, m2] = ag.janelas
   const form = `<form class="f" data-form="agenda"><label>Quadras ao mesmo tempo<input name="quadras" type="number" min="1" max="9" required value="${ag.quadras}"></label>
@@ -203,12 +205,12 @@ function secretaria() {
       <label>Time<input name="nome" required minlength="1" maxlength="8" placeholder="Ex.: A"></label><div><button class="btn">Criar time</button></div></form>
       <div style="margin-top:10px">${tabela || '<p class="sub">Nenhum time ainda.</p>'}</div></div>
     <div class="card"><h3>4. Sorteio dos jogos</h3><p class="sub" style="margin-bottom:6px">Os confrontos e os coletes são sorteados pelo sistema, não escolhidos. Mata-mata: cada fase só sai quando a anterior estiver toda decidida.</p>
-      ${D.mod.map(m => { const gs = grupos().filter(x => x.m.id === m.id); return gs.length ? pasta('s' + m.id, m.nome, `${gs.length} grupos · ${gs.filter(x => x.partidas.length).length} sorteados`, gs.map(x => `<div class="row"><span><b>${esc(x.t.nome)}</b> ${x.g} <small class="sub">${x.times.length} times</small></span><span>${
+      ${D.mod.map(m => { const gs = grupos().filter(x => x.m.id === m.id); return gs.length ? pasta('s' + m.id, m.nome, `${gs.length} grupos · ${gs.filter(x => x.partidas.length).length} sorteados`, gs.map(x => `<div class="row"><span><b>${esc(x.t.nome)}</b> ${x.g} <small class="sub">${x.times.length} time(s)</small> ${incompletos(x) ? `<span class="pill amber">${incompletos(x)} time(s) com menos de ${MINIMO[x.m.nome]} alunos</span>` : ''}</span><span>${
         x.r.erro ? `<small class="sub">${esc(x.r.erro)}</small>`
-        : x.r.campeao ? `<span class="pill green">campeão: ${esc(timeDe(x.r.campeao)?.nome)}</span>`
+        : x.r.campeao ? `<span class="pill green">${x.r.direto ? 'campeão direto' : 'campeão'}: ${esc(timeDe(x.r.campeao)?.nome)}</span>`
         : x.r.pendente ? `<span class="pill amber">aguardando ${x.r.pendente} resultado(s)</span> ${x.partidas.every(p => p.placar_a == null) ? `<button class="btn ghost sm" data-act="refazer" data-key="${x.chave}">Refazer sorteio</button>` : ''}`
         : `<button class="btn sm" data-act="sortear" data-key="${x.chave}">${x.partidas.length ? 'Sortear próxima fase' : 'Sortear jogos'}</button>`}</span></div>`).join('')) : '' }).join('') || '<p class="sub">Crie pelo menos 2 times no mesmo grupo.</p>'}
-      ${grupos().filter(x => !x.partidas.length && !x.r.erro).length > 1 ? '<div style="margin-top:10px"><button class="btn gold" data-act="todos">Sortear todos os grupos que ainda não têm jogos</button></div>' : ''}</div>`
+      ${grupos().filter(x => !x.partidas.length && x.r.jogos).length > 1 ? '<div style="margin-top:10px"><button class="btn gold" data-act="todos">Sortear todos os grupos que ainda não têm jogos</button></div>' : ''}</div>`
 }
 
 function publico() {
@@ -230,8 +232,8 @@ function publico() {
   const grupos = D.mod.map(m => { const corpo = D.turmas.map(t => {
     const blocos = ['masculino', 'feminino'].map(g => {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
-      const camp = campeoes.get(`${t.id}|${m.id}|${g}`), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
-      return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
+      const camp = campeoes.get(`${t.id}|${m.id}|${g}`) || (times.length === 1 ? times[0].id : null), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
+      return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão${times.length === 1 ? ' direto' : ''}: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
         ${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="elenco"><b>${esc(x.nome)}</b> (${js.length}/${m.jogadores_por_time + m.reservas_max}): ${js.length ? js.map(j => esc(j.nome)).join(', ') : 'sem alunos inscritos'}</div>` }).join('')}
         ${ps.map(p => jogo(p)).join('')}</div>` }).join('')
     return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3><div class="blocos">${blocos}</div></div>` : '' }).join('')
