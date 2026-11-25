@@ -16,10 +16,12 @@ async function escolarCamps() {
     const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano']
     const pos = n => { const i = SERIES.indexOf(n); return i < 0 ? 99 : i }
     turmas.sort((x, y) => pos(x.nome) - pos(y.nome) || escNat(x.nome, y.nome)); times.sort((x, y) => escNat(x.nome, y.nome)); mod.sort((x, y) => escNat(x.nome, y.nome))
+    let profs = 0   // só a Secretaria enxerga quem já preencheu o nome de professor responsável
+    if (role() === 'secretaria') try { profs = (await sb.rpc('esc_links_times', {p_campeonato: e.id})).data.filter(l => l.professor).length } catch {}
     out.push({teams: [], players: [], matches: [], punishments: [], draw: null, log: [], escolar: true, id: 'esc-' + e.id, name: e.nome, sport: 'Futsal', category: 'Escolar',
       minAge: 6, maxAge: null, start: e.inicio, end: e.fim, venue: e.local, status: partidas.some(p => p.placar_a != null) ? 'andamento' : e.inscricoes_abertas ? 'inscricoes' : 'andamento',
       logo: escMarca(e.logo_path), responsible: e.responsavel, sponsors: (e.patrocinadores || []).map(s => ({name: s.nome, logo: escMarca(s.logo_path)})),
-      esc: {mod, turmas, times, jog, partidas}})
+      esc: {mod, turmas, times, jog, partidas, profs}})
   }
   return out
 }
@@ -54,7 +56,7 @@ const ESC_VIEWS = {
   painel: c => { const e = c.esc, feitos = e.partidas.filter(p => p.placar_a != null).length
     return escHead(c, 'Painel', 'Jogos Escolares', escGerir()) + `<div class="grid g4">${stat(e.turmas.length, 'séries (grupos)')}${stat(e.times.length, 'times')}${stat(e.jog.length, 'alunos inscritos')}${stat(e.partidas.length, 'jogos sorteados')}</div>
       <div class="grid g4 mt">${stat(e.partidas.length - feitos, 'jogos a jogar')}${stat(feitos, 'jogos decididos')}${stat(e.mod.length, 'modalidades')}${stat(e.partidas.filter(p => p.fase === 'final' && p.vencedor_id).length, 'campeões')}</div>
-      <div class="card mt"><h3>Campeões</h3>${escCampeoes(c) || '<p class="sub">Os campeões aparecem aqui quando as finais forem decididas.</p>'}</div>${sponsorsBar(c)}` },
+      ${role() === 'secretaria' ? escPassos(c) : ''}<div class="card mt"><h3>Campeões</h3>${escCampeoes(c) || '<p class="sub">Os campeões aparecem aqui quando as finais forem decididas.</p>'}</div>${sponsorsBar(c)}` },
   inscricoes: c => escHead(c, 'Equipes', 'Times e alunos', escGerir()) + c.esc.mod.map(m => {
     const ts = c.esc.times.filter(t => t.modalidade_id === m.id)
     return ts.length ? escPasta(m.nome, `${ts.length} times`, c.esc.turmas.map(u => { const l = ts.filter(t => t.turma_id === u.id); if (!l.length) return ''
@@ -139,4 +141,17 @@ async function buildCardsEscolar() {
     }),
   ]
   ui.cards.forEach((cv, i) => { const el = document.getElementById('cv' + i); if (el) el.replaceChildren(cv) })
+}
+
+/* ---------- Passo a passo do campeonato (Secretaria) ---------- */
+function escPassos(c) {
+  const e = c.esc, ok = (v, t) => `<span class="pill ${v ? 'green' : 'amber'}">${t}</span>`
+  const passo = (n, titulo, estado, dica) => `<div class="row"><span><b>${n}. ${titulo}</b><br><small class="sub">${dica}</small></span>${estado}</div>`
+  return `<div class="card mt"><h3>Passo a passo <small>para o campeonato acontecer</small></h3>
+    ${passo(1, 'Identidade do campeonato', ok(c.logo && c.responsible, c.logo && c.responsible ? 'pronta' : 'falta logo ou responsável'), 'Logo, responsável e patrocinadores aparecem no portal e nas imagens.')}
+    ${passo(2, 'Times e links dos professores', ok(e.times.length, `${e.times.length} times`), 'Cada professor recebe um link secreto para se identificar e inscrever os alunos.')}
+    ${passo(3, 'Professores identificados', ok(e.profs >= e.times.length && e.times.length, `${e.profs} de ${e.times.length}`), 'Quem ainda não preencheu o nome aparece pendente em Jogos Escolares.')}
+    ${passo(4, 'Alunos inscritos', ok(e.jog.length, `${e.jog.length} alunos`), 'Os nomes aparecem no portal público: só com autorização da escola.')}
+    ${passo(5, 'Sorteio dos jogos', ok(e.partidas.length, e.partidas.length ? `${e.partidas.length} jogos` : 'ainda não sorteado'), 'O sistema sorteia os confrontos e os coletes. Depois disso o juiz já pode lançar os resultados.')}
+    <div class="btns" style="margin-top:12px"><button class="btn sm" data-act="tab" data-tab="escolar">Abrir Jogos Escolares</button></div></div>`
 }
