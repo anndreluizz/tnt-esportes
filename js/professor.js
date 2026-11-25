@@ -29,7 +29,7 @@ function render() {
     <div class="card"><h3>Professor responsável</h3>${t.professor && !editandoProf ? `<div class="row"><span><b>${esc(t.professor)}</b></span>${t.inscricoes_abertas ? '<button class="btn ghost sm" id="trocaprof">Alterar</button>' : ''}</div>`
       : t.inscricoes_abertas ? `<form class="f" id="formprof"><label class="span2">Seu nome completo<input name="prof" required minlength="3" maxlength="60" autocomplete="name" value="${esc(t.professor || '')}"></label>
           <div class="span2"><button class="btn">Salvar meu nome</button></div></form>` : '<p class="sub">Não informado.</p>'}</div>
-    <div class="card"><h3>Alunos do time <small>${jogadores.length} de ${t.vagas}</small></h3>
+    <div class="card"><h3>Alunos do time <small>${jogadores.length} de ${t.vagas}${t.modalidade_nome === 'Futsal' ? ' · mínimo 5 para jogar' : ''}</small></h3>
       ${jogadores.length ? jogadores.map(j => `<div class="row"><span>${esc(j.nome)}</span>${t.inscricoes_abertas ? `<button class="btn ghost sm" data-del="${j.id}" aria-label="Remover ${esc(j.nome)}">Remover</button>` : ''}</div>`).join('')
         : '<p class="sub">Nenhum aluno ainda.</p>'}</div>
     ${!t.inscricoes_abertas ? '<div class="card empty">As inscrições estão encerradas. Procure a Secretaria para qualquer ajuste.</div>'

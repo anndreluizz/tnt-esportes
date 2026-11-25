@@ -10,7 +10,7 @@ const rows = {
   esc_campeonatos: [{id: 'c1', nome: 'II Jogos Escolares Internos', inicio: '2026-12-07', fim: '2026-12-09', local: 'Quadra <b>x</b>', inscricoes_abertas: true, responsavel: 'Prof. Carlos <b>', logo_path: 'escola/c1/logo.png', patrocinadores: [{nome: 'Mercado Bom', logo_path: 'escola/c1/p0.png'}, {nome: 'Sem Logo', logo_path: null}]}],
   esc_modalidades: [{id: 'm1', campeonato_id: 'c1', nome: 'Futsal', jogadores_por_time: 5, reservas_max: 5}, {id: 'm2', campeonato_id: 'c1', nome: 'Queimada', jogadores_por_time: 10, reservas_max: 0}],
   esc_turmas: [{id: 't9', campeonato_id: 'c1', nome: '9º ano'}, {id: 't10', campeonato_id: 'c1', nome: '6ª etapa / 7º ano - EJAI'}, {id: 't2', campeonato_id: 'c1', nome: '2º ano'}, {id: 't1', campeonato_id: 'c1', nome: '1º ano 01'}],
-  esc_times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time B'}],
+  esc_times: [{id: 'solo', turma_id: 't2', modalidade_id: 'm1', genero: 'feminino', nome: 'Solo <b>'}, {id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time B'}],
   esc_jogadores: [{id: 'j1', time_id: 'a', nome: 'Aluno <i>1</i>'}],
   esc_partidas: [{id: 'p1', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', juiz_id: 'z1', data: '2026-12-07', hora: '08:00:00', quadra: 1, placar_a: 2, placar_b: 2, penaltis_a: 4, penaltis_b: 3, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}],
   esc_juizes: [{id: 'z1', campeonato_id: 'c1', nome: 'Carlos <u>Silva'}],
@@ -42,15 +42,18 @@ function roda(arquivos, {logado}) {
   ok(h.includes('Resultados') && h.includes('Jogos a jogar') && h.includes('data-act="fm"') && !h.includes('JUIZTOK'), 'portal público lista os jogos (a jogar e resultados), com filtro, sem o link do juiz')
   ok(h.includes('Respons') && h.includes('Prof. Carlos &lt;b&gt;') && h.includes('marcas/escola/c1/logo.png') && h.includes('class="sponsors"') && h.includes('Mercado Bom') && h.includes('<b>Sem Logo</b>'), 'portal mostra logo, responsável (escapado) e patrocinadores')
   ok(h.includes('seg 07/12') && h.includes('08:00') && h.includes('Quadra 1'), 'portal mostra o dia, a hora e a quadra do jogo')
+  ok(h.includes('campeão direto: Solo &lt;b&gt;') && !h.includes('Solo <b>'), 'portal: time único é campeão direto (nome escapado)')
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
-  ok(h.includes('Professor: Maria da Silva') && h.includes('professor ainda não preencheu') && h.includes('1 de 2 com professor responsável'), 'Secretaria vê quem é o professor de cada time e quem falta')
+  ok(h.includes('Professor: Maria da Silva') && h.includes('professor ainda não preencheu') && h.includes('1 de 3 com professor responsável'), 'Secretaria vê quem é o professor de cada time e quem falta')
   const pos = t => h.indexOf(t + ' <small class="sub">'); ok(pos('2º ano') > 0 && pos('2º ano') < pos('9º ano') && pos('9º ano') < pos('6ª etapa / 7º ano - EJAI'), 'séries em ordem numérica (1º ao 9º ano, depois EJAI), não alfabética')
   ok(h.includes('class="resumo"') && h.includes('professores responsáveis'), 'painel mostra o resumo (séries, times, professores, alunos, jogos)')
   ok(h.includes('Sorteio dos jogos') && !h.includes('data-form="partida"') && h.includes('campeão: Time A'), 'jogos são sorteados pelo sistema (sem escolher confronto à mão)')
   ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
+  ok(h.includes('com menos de 5 alunos') && h.includes('campeão direto: Solo'), 'Secretaria: aviso de futsal com menos de 5 alunos e campeão direto no sorteio')
+  ok(!h.includes('data-act="sortear" data-key="t2|'), 'grupo de time único não tem sorteio')
   ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
