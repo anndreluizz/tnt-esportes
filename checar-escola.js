@@ -57,6 +57,12 @@ function roda(arquivos, {logado}) {
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   ok(h.includes('Professor responsável') && h.includes('name="prof"'), 'professor sem nome cadastrado vê o campo para preencher')
+  // juízes: distribuição igual, sem mexer em quem já foi escalado
+  const rj = (js, ps) => [...vm.runInContext(`reparteJuizes(${JSON.stringify(js)}, ${JSON.stringify(ps)})`, ctxEscola).entries()]
+  const jz = n => Array.from({length: n}, (_, i) => ({id: 'j' + i})), jg2 = n => Array.from({length: n}, (_, i) => ({id: 'g' + i, fase: 'quartas'}))
+  let rp = rj(jz(3), jg2(10)); ok(rp.length === 3 && rp.every(([, l]) => l.length >= 3 && l.length <= 4) && rp.flatMap(([, l]) => l).length === 10, '10 jogos entre 3 juízes: 3 ou 4 para cada')
+  rp = rj(jz(2), [{id: 'a', fase: 'final', juiz_id: 'j0'}, {id: 'b', fase: 'final', juiz_id: 'j0'}, {id: 'c', fase: 'final'}]); ok(rp.length === 1 && rp[0][0] === 'j1' && rp[0][1].join() === 'c', 'quem tem menos jogos recebe; escalado à mão não muda')
+  ok(rj([], jg2(3)).length === 0 && rj(jz(2), [{id: 'a', fase: 'final', juiz_id: 'j0'}]).length === 0, 'sem juiz cadastrado ou sem jogo livre: nada a distribuir')
   // sorteio: o sistema monta os confrontos (mata-mata, com folga quando o numero e impar)
   const pr = (n, ps = []) => vm.runInContext(`proximaRodada(${JSON.stringify(Array.from({length: n}, (_, i) => ({id: 't' + i})))}, ${JSON.stringify(ps)})`, ctxEscola)
   const usados = r => [...r.jogos.flatMap(j => [j.a, j.b]), ...(r.folga ? [r.folga] : [])].sort().join()

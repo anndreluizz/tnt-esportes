@@ -40,6 +40,16 @@ function proximaRodada(times, partidas) {
   for (let i = 0; i < ordem.length; i += 2) jogos.push({a: ordem[i], b: ordem[i + 1], colete: embaralha(['azul', 'vermelho'])[0]})
   return {fase: nomeFase(vivos.length), jogos, folga}
 }
+// Reparte os jogos sem juiz de forma igual: sempre o juiz com menos jogos (empate sorteado). Devolve Map juizId -> [partidaId]. Quem já foi escalado não muda.
+function reparteJuizes(juizes, partidas) {
+  const carga = new Map(juizes.map(j => [j.id, partidas.filter(p => p.juiz_id === j.id).length])), por = new Map()
+  if (!juizes.length) return por
+  for (const p of partidas.filter(p => !p.juiz_id).sort((x, y) => ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase))) {
+    const min = Math.min(...carga.values()), j = embaralha(juizes.filter(x => carga.get(x.id) === min))[0]
+    carga.set(j.id, min + 1); if (!por.has(j.id)) por.set(j.id, []); por.get(j.id).push(p.id)
+  }
+  return por
+}
 const GENEROS = ['masculino', 'feminino']
 const grupos = () => D.turmas.flatMap(t => D.mod.flatMap(m => GENEROS.map(g => {
   const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g)
@@ -126,6 +136,7 @@ function secretaria() {
       <div class="span2"><button class="btn">Salvar identidade</button></div></form></div>
     <div class="card"><h3>Juízes <small>${D.juizes.length} cadastrado(s) · escale em cada jogo, no passo 4</small></h3>
       <form class="f" data-form="juiz"><label class="span2">Nome do juiz<input name="nome" required minlength="3" maxlength="60" autocomplete="off" placeholder="Nome e sobrenome"></label><div class="span2"><button class="btn">Adicionar juiz</button></div></form>
+      ${D.juizes.length && D.partidas.some(p => !p.juiz_id) ? `<div style="margin:8px 0"><button class="btn gold" data-act="distribuir">Distribuir os juízes nos ${D.partidas.filter(p => !p.juiz_id).length} jogos sem juiz</button><p class="sub" style="margin-top:4px">O sistema reparte igualmente, sorteando quem fica com cada jogo. Quem já foi escalado à mão não muda.</p></div>` : ''}
       ${D.juizes.map(j => `<div class="row"><span>${esc(j.nome)} <small class="sub">${D.partidas.filter(p => p.juiz_id === j.id).length} jogo(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_juizes" data-id="${j.id}">Excluir</button></div>`).join('')}</div>
     <div class="card"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
       return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
@@ -223,6 +234,13 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
+    if (act === 'distribuir') {   // reparte os jogos sem juiz de forma igual (sempre o juiz com menos jogos; empate sorteado)
+      if (!D.juizes.length) return toast('Cadastre os juízes primeiro.')
+      const por = reparteJuizes(D.juizes, D.partidas), n = [...por.values()].reduce((s, l) => s + l.length, 0)
+      if (!n) return toast('Todos os jogos já têm juiz.')
+      for (const [jid, ids] of por) for (let i = 0; i < ids.length; i += 40) await q(sb.from('esc_partidas').update({juiz_id: jid}).in('id', ids.slice(i, i + 40)))
+      toast(`${n} jogo(s) distribuídos entre ${por.size} juiz(es).`)
+    }
     if (act === 'addpat') { document.querySelector('#pats').insertAdjacentHTML('beforeend', patRow()); return }
     if (act === 'rmpat') { b.closest('.pat').remove(); return }
     if (act === 'fm') { fm = b.dataset.m; return render() }
