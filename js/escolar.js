@@ -5,6 +5,9 @@
 const escMarca = p => p ? `${SUPABASE_URL}/storage/v1/object/public/marcas/${p}` : null
 const ESC_ORDEM = ['oitavas', 'quartas', 'semifinal', 'final']
 const escNat = (a, b) => String(a).localeCompare(String(b), 'pt', {numeric: true})
+const escHora = h => String(h || '').slice(0, 5), escDm = d => d.slice(8) + '/' + d.slice(5, 7)
+const escDia = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00:00').getDay()]
+const escCmpH = (x, y) => (x.data ? x.data + escHora(x.hora) : '9').localeCompare(y.data ? y.data + escHora(y.hora) : '9')   // com horário primeiro
 
 async function escolarCamps() {
   const POR = [['id', true]], out = []
@@ -39,15 +42,18 @@ function escJogo(c, p) {
   const lado = (t, cor) => `<b>${esc(t?.nome)}</b> <span class="pill ${cor === 'azul' ? 'blue' : 'red'}">${cor}</span>`
   const res = p.placar_a == null ? '<span class="pill">a jogar</span>' : `<b>${p.placar_a} x ${p.placar_b}</b>${p.penaltis_a != null ? ` <small class="sub">(pên. ${p.penaltis_a} x ${p.penaltis_b})</small>` : ''}`
   return `<div class="sub" style="margin-top:8px">${esc(escMod(c, p.modalidade_id))} ${p.genero} · ${esc(escSerie(c, p.turma_id))}</div>
-    <div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(c.esc.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(escTime(c, p.vencedor_id)?.nome)}</span>` : ''}</span></div>`
+    <div class="row"><span>${p.data ? `<span class="pill blue">${escDia(p.data)} ${escDm(p.data)} · ${escHora(p.hora)} · Quadra ${p.quadra}</span> ` : ''}<span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(c.esc.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(escTime(c, p.vencedor_id)?.nome)}</span>` : ''}</span></div>`
 }
 function escListaJogos(c) {
   const fm = ui.escfm || '', ps = c.esc.partidas.filter(p => !fm || p.modalidade_id === fm)
-    .sort((x, y) => ESC_ORDEM.indexOf(x.fase) - ESC_ORDEM.indexOf(y.fase) || escNat(escSerie(c, x.turma_id), escSerie(c, y.turma_id)))
+    .sort((x, y) => escCmpH(x, y) || ESC_ORDEM.indexOf(x.fase) - ESC_ORDEM.indexOf(y.fase) || escNat(escSerie(c, x.turma_id), escSerie(c, y.turma_id)))
   const ja = ps.filter(p => p.placar_a == null), feitos = ps.filter(p => p.placar_a != null)
   const chips = `<div class="chips"><button class="${fm ? '' : 'on'}" data-act="escfm" data-m="">Todas</button>${c.esc.mod.map(m => `<button class="${fm === m.id ? 'on' : ''}" data-act="escfm" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div>`
   if (!c.esc.partidas.length) return '<div class="card empty mt">Os jogos ainda não foram sorteados.</div>'
-  return chips + escPasta('Jogos a jogar', String(ja.length), ja.map(p => escJogo(c, p)).join('') || '<p class="sub">Nenhum jogo pendente.</p>', true)
+  const dias = [...new Set(ps.filter(p => p.data).map(p => p.data))].sort(), hoje = new Date().toISOString().slice(0, 10), alvo = dias.find(d => d >= hoje) || dias[0]
+  const programacao = dias.map(d => { const js = ps.filter(p => p.data === d)
+    return escPasta(`${escDia(d)} ${escDm(d)}`, `${js.length} jogo(s) · ${escHora(js[0].hora)} às ${escHora(js[js.length - 1].hora)}`, js.map(p => escJogo(c, p)).join(''), d === alvo) }).join('')
+  return chips + programacao + escPasta('Jogos a jogar', String(ja.length), ja.map(p => escJogo(c, p)).join('') || '<p class="sub">Nenhum jogo pendente.</p>', true)
     + escPasta('Resultados', String(feitos.length), feitos.map(p => escJogo(c, p)).join('') || '<p class="sub">Ainda sem resultados.</p>')
 }
 const escHead = (c, olho, titulo, extra = '') => `<div class="head"><div><div class="eyebrow">${olho}</div><h2>${titulo}</h2><p class="sub">${esc(c.name)}</p></div>${extra}</div>`
@@ -116,12 +122,12 @@ async function buildCardsEscolar() {
   ui.cardNomes = ESC_CARDS.map(n => 'tnt-escolar-' + n)
   ui.cards = [
     canvasCard(c, 'PRÓXIMOS JOGOS', (x, F) => {
-      const ps = e.partidas.filter(p => p.placar_a == null).sort(ordem).slice(0, 6 - pat); let y = 320
+      const ps = e.partidas.filter(p => p.placar_a == null).sort((a, b) => escCmpH(a, b) || ordem(a, b)).slice(0, 6 - pat); let y = 320
       if (!ps.length) { x.fillStyle = '#fff'; x.font = `600 36px ${F.B}`; x.fillText('Todos os jogos foram realizados.', 60, 400) }
       ps.forEach(p => { x.fillStyle = '#0e2547'; x.fillRect(48, y, 984, 132); x.textAlign = 'left'
         x.fillStyle = '#00E676'; fit(x, rotulo(p), 76, y + 42, 930, 700, 28, F.C)
         x.fillStyle = '#fff'; fit(x, `${escTime(c, p.time_a_id)?.nome} × ${escTime(c, p.time_b_id)?.nome}`.toUpperCase(), 76, y + 90, 930, 700, 44, F.C)
-        x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(`Colete ${p.colete_a} × ${p.colete_a === 'azul' ? 'vermelho' : 'azul'}`, 76, y + 120); y += 152 })
+        x.fillStyle = '#a9bfe6'; x.font = `400 24px ${F.B}`; x.fillText(p.data ? `${escDia(p.data)} ${escDm(p.data)} · ${escHora(p.hora)} · Quadra ${p.quadra} · colete ${p.colete_a}` : `Colete ${p.colete_a} × ${p.colete_a === 'azul' ? 'vermelho' : 'azul'}`, 76, y + 120); y += 152 })
     }),
     canvasCard(c, 'ÚLTIMOS RESULTADOS', (x, F) => {
       const ps = e.partidas.filter(p => p.placar_a != null).sort((a, b) => ordem(b, a)).slice(0, 6 - pat); let y = 320

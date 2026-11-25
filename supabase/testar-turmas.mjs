@@ -149,6 +149,18 @@ await q(`delete from esc_juizes where id = $1`, [jz])
 ok((await q(`select juiz_id from esc_partidas where id = $1`, [pj]))[0].juiz_id === null, 'apagar o juiz solta o jogo (sem apagar o jogo)')
 await como(null)
 
+console.log('Horários')
+await como(SEC)
+await q(`update esc_partidas set data = '2026-12-07', hora = '08:00', quadra = 1 where id = $1`, [pj])
+ok((await q(`select to_char(hora, 'HH24:MI') h from esc_partidas where id = $1`, [pj]))[0].h === '08:00', 'Secretaria marca dia, hora e quadra')
+await erro(`update esc_partidas set hora = null where id = $1`, [pj], 'check', 'dia sem hora não vale')
+const p2 = (await q(`insert into esc_partidas (turma_id, modalidade_id, genero, time_a_id, time_b_id, fase) values ($1,$2,'masculino',$3,$4,'semifinal') returning id`, [T1, FUT, b, a]))[0]
+await erro(`update esc_partidas set data = '2026-12-07', hora = '08:00', quadra = 1 where id = $1`, [p2.id], 'duplicate', 'dois jogos no mesmo horário e quadra')
+await q(`update esc_partidas set data = '2026-12-07', hora = '08:00', quadra = 2 where id = $1`, [p2.id])
+ok(true, 'mesma hora em outra quadra pode')
+await como(null)
+await erro(`update esc_partidas set hora = '09:00' where id = $1`, [pj], 'permission', 'público não mexe no horário')
+
 console.log('Permissões')
 await como(null)
 ok((await q(`select count(*)::int n from esc_turmas`))[0].n === 3, 'público lê as turmas')

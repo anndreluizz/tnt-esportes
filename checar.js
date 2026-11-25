@@ -63,7 +63,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
   run(`S.champs.push({teams: [], players: [], matches: [], punishments: [], draw: null, log: [], escolar: true, id: 'esc-1', name: 'II Jogos Escolares <b>', sport: 'Futsal', category: 'Escolar', minAge: 6, maxAge: null,
     start: '2026-12-07', end: '2026-12-09', venue: 'Quadra', status: 'andamento', logo: 'https://x/l.png', responsible: 'Prof. Carlos', sponsors: [{name: 'Mercado Bom', logo: null}],
     esc: {mod: [{id: 'm1', nome: 'Futsal'}], turmas: [{id: 't1', nome: '1º ano'}], times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: '1º ano 01 - A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: '1º ano 02 - C'}],
-      jog: [{id: 'j', time_id: 'a', nome: 'Aluno <i>'}], juizes: [{id: 'z', nome: 'Carlos Silva'}], partidas: [{id: 'p', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', juiz_id: 'z', placar_a: 2, placar_b: 1, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}]}})`)
+      jog: [{id: 'j', time_id: 'a', nome: 'Aluno <i>'}], juizes: [{id: 'z', nome: 'Carlos Silva'}], partidas: [{id: 'p', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', juiz_id: 'z', data: '2026-12-07', hora: '08:30:00', quadra: 1, placar_a: 2, placar_b: 1, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}]}})`)
   run(`S.champId = 'esc-1'`)
   for (const [r, tabs] of Object.entries(run('ROLE_TABS')).filter(([r]) => r !== 'equipe'))
     for (const [t] of tabs.filter(([k]) => k !== 'escolar')) {
@@ -72,7 +72,7 @@ const ok = (cond, msg) => { if (!cond) { console.error('FALHOU:', msg); process.
       if (t !== 'auditoria') ok(h.length > 150 && !h.includes('Aluno <i>') && !h.includes('II Jogos Escolares <b>'), `escolar ${r}/${t}`)
     }
   run(`S.session = {role: 'secretaria'}; ui.tab='jogos'; render()`)
-  ok(els['#app'].innerHTML.includes('1º ano 01 - A') && els['#app'].innerHTML.includes('2 x 1') && els['#app'].innerHTML.includes('Juiz: Carlos Silva'), 'Jogos mostra os jogos escolares e o juiz')
+  ok(els['#app'].innerHTML.includes('1º ano 01 - A') && els['#app'].innerHTML.includes('2 x 1') && els['#app'].innerHTML.includes('Juiz: Carlos Silva') && els['#app'].innerHTML.includes('08:30 · Quadra 1'), 'Jogos mostra os jogos escolares, o juiz e o horário')
   run(`ui.tab='campeonatos'; render()`); ok(els['#app'].innerHTML.includes('Jogos Escolares') || els['#app'].innerHTML.includes('II Jogos Escolares'), 'Campeonatos lista o escolar')
   run(`ui.tab='portal'; render()`); ok(els['#app'].innerHTML.includes('Mercado Bom') && els['#app'].innerHTML.includes('Prof. Carlos'), 'Portal mostra patrocínio e responsável')
   run(`S.session = {role: 'secretaria'}; ui.tab='painel'; render()`); ok(els['#app'].innerHTML.includes('Passo a passo'), 'Painel escolar da Secretaria traz o passo a passo')

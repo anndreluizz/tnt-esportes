@@ -40,6 +40,39 @@ function proximaRodada(times, partidas) {
   for (let i = 0; i < ordem.length; i += 2) jogos.push({a: ordem[i], b: ordem[i + 1], colete: embaralha(['azul', 'vermelho'])[0]})
   return {fase: nomeFase(vivos.length), jogos, folga}
 }
+// Reparte os jogos sem juiz de forma igual: sempre o juiz com menos jogos (empate sorteado). Devolve Map juizId -> [partidaId]. Quem já foi escalado não muda.
+function reparteJuizes(juizes, partidas) {
+  const carga = new Map(juizes.map(j => [j.id, partidas.filter(p => p.juiz_id === j.id).length])), por = new Map()
+  if (!juizes.length) return por
+  for (const p of partidas.filter(p => !p.juiz_id).sort((x, y) => ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase))) {
+    const min = Math.min(...carga.values()), j = embaralha(juizes.filter(x => carga.get(x.id) === min))[0]
+    carga.set(j.id, min + 1); if (!por.has(j.id)) por.set(j.id, []); por.get(j.id).push(p.id)
+  }
+  return por
+}
+// Agenda: coloca os jogos SEM horário, em ordem de fase, nas janelas de cada dia, sempre na quadra que fica livre mais cedo.
+// Duração de um jogo = tempos x minutos + 5 de intervalo (se tiver 2 tempos) + 5 de troca. Devolve {linhas: [{id, data, hora, quadra}], sobra: [ids], precisa, tem} (minutos).
+const diasEntre = (a, b) => { const out = []; for (let d = new Date(a + 'T12:00:00Z'); d <= new Date(b + 'T12:00:00Z') && out.length < 31; d.setUTCDate(d.getUTCDate() + 1)) out.push(d.toISOString().slice(0, 10)); return out }
+function montaAgenda(partidas, mods, o) {
+  const mins = h => +h.slice(0, 2) * 60 + +h.slice(3, 5), hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
+  const dur = Object.fromEntries(mods.map(m => [m.id, m.tempos * m.tempo_min + (m.tempos > 1 ? 5 : 0) + 5]))
+  const jan = o.dias.flatMap(d => o.janelas.map(([a, b]) => ({d, a: mins(a), b: mins(b)}))).filter(j => j.b > j.a)
+  const cur = Array.from({length: o.quadras}, () => ({w: 0, t: jan[0]?.a ?? 0}))
+  for (const p of partidas.filter(p => p.data)) {   // já marcados: a quadra só continua depois deles
+    const w = jan.findIndex(j => j.d === p.data && j.a <= mins(hh(p.hora)) && mins(hh(p.hora)) < j.b), c = cur[(p.quadra || 1) - 1], fim = mins(hh(p.hora)) + (dur[p.modalidade_id] || 30)
+    if (c && w >= 0 && (w > c.w || (w === c.w && fim > c.t))) { c.w = w; c.t = fim }
+  }
+  const linhas = [], sobra = []
+  const livres = partidas.filter(p => !p.data).sort((x, y) => ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase))
+  for (const p of livres) {
+    const d = dur[p.modalidade_id] || 30
+    for (const c of cur) while (c.w < jan.length && c.t + d > jan[c.w].b) { c.w++; if (c.w < jan.length) c.t = jan[c.w].a }
+    const k = cur.reduce((best, c, i) => c.w < cur[best].w || (c.w === cur[best].w && c.t < cur[best].t) ? i : best, 0), c = cur[k]
+    if (c.w >= jan.length) { sobra.push(p.id); continue }
+    linhas.push({id: p.id, data: jan[c.w].d, hora: hm(c.t), quadra: k + 1}); c.t += d
+  }
+  return {linhas, sobra, precisa: livres.reduce((s, p) => s + (dur[p.modalidade_id] || 30), 0), tem: jan.reduce((s, j) => s + j.b - j.a, 0) * o.quadras}
+}
 const GENEROS = ['masculino', 'feminino']
 const grupos = () => D.turmas.flatMap(t => D.mod.flatMap(m => GENEROS.map(g => {
   const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g)
@@ -51,6 +84,11 @@ const abertas = new Set(['ja']); let fm = ''   // 'ja' = pasta "Jogos a jogar" j
 const nat = (a, b) => a.localeCompare(b, 'pt', {numeric: true})
 const pasta = (k, titulo, resumo, corpo) => `<details class="pasta" data-k="${k}"${abertas.has(k) ? ' open' : ''}><summary><b>${esc(titulo)}</b> <small>${esc(resumo)}</small></summary><div class="pasta-corpo">${corpo}</div></details>`
 document.addEventListener('toggle', e => { const k = e.target.dataset?.k; if (k) e.target.open ? abertas.add(k) : abertas.delete(k) }, true)
+const hh = h => String(h || '').slice(0, 5)
+const dmCurto = d => d.slice(8) + '/' + d.slice(5, 7)
+const diaSemana = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00:00').getDay()]
+const cmpHorario = (x, y) => (x.data ? x.data + hh(x.hora) : '9').localeCompare(y.data ? y.data + hh(y.hora) : '9')   // com horário primeiro, por data e hora
+let ag = {quadras: 1, janelas: [['08:00', '11:30'], ['13:30', '17:00']], previa: null}   // parâmetros e prévia da agenda (só na tela até "Aplicar")
 let D = {}, sec = false, aviso = ''
 
 async function carregar() {
@@ -94,6 +132,26 @@ const sponsorsBar = c => (c.patrocinadores || []).length ? `<div class="sponsors
 const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).href
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
+function horarios() {
+  const livres = D.partidas.filter(p => !p.data), marcados = D.partidas.length - livres.length, [m1, m2] = ag.janelas
+  const form = `<form class="f" data-form="agenda"><label>Quadras ao mesmo tempo<input name="quadras" type="number" min="1" max="9" required value="${ag.quadras}"></label>
+    <label>Manhã: início<input name="a1" type="time" required value="${m1[0]}"></label><label>Manhã: fim<input name="b1" type="time" required value="${m1[1]}"></label>
+    <label>Tarde: início<input name="a2" type="time" required value="${m2[0]}"></label><label>Tarde: fim<input name="b2" type="time" required value="${m2[1]}"></label>
+    <div class="span2"><button class="btn">Ver como fica</button> <button type="button" class="btn danger sm" data-act="limpar">Limpar horários</button></div></form>`
+  const info = `<p class="sub" style="margin-bottom:8px">Dias: ${diasEntre(D.c.inicio, D.c.fim).map(dmCurto).join(', ')}. Futsal: 2 tempos + 5 min de intervalo + 5 de troca. Queimada: 10 min + 5 de troca. ${marcados} jogo(s) já têm horário, ${livres.length} ainda não.</p>`
+  if (!D.partidas.length) return info + '<p class="sub">Sorteie os jogos primeiro (passo 4).</p>' + form
+  const pv = ag.previa; let corpo = ''
+  if (pv) {
+    const h = m => `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`, dias = [...new Set(pv.linhas.map(l => l.data))].sort()
+    corpo = `<div class="btns" style="margin:10px 0"><span class="pill ${pv.sobra.length ? 'amber' : 'green'}">${pv.linhas.length} jogo(s) cabem${pv.sobra.length ? ` · ${pv.sobra.length} NÃO cabem` : ''}</span><span class="pill">precisa de ${h(pv.precisa)} · há ${h(pv.tem)}</span>
+      ${pv.linhas.length ? '<button class="btn gold" data-act="aplicar">Aplicar estes horários</button>' : ''}</div>
+      ${pv.sobra.length ? `<p class="note">Não cabem no tempo informado. Aumente as quadras ou as janelas de horário e veja de novo.</p>` : ''}
+      ${dias.map(d => `<h4>${diaSemana(d)} ${dmCurto(d)}</h4>${pv.linhas.filter(l => l.data === d).sort((x, y) => x.hora.localeCompare(y.hora) || x.quadra - y.quadra).map(l => { const p = D.partidas.find(x => x.id === l.id)
+        return `<div class="row"><span><span class="pill blue">${l.hora} · Quadra ${l.quadra}</span> <small class="sub">${esc(nomeMod(p.modalidade_id))} ${p.genero} · ${esc(nomeTurma(p.turma_id))} · ${esc(p.fase)}</small><br><b>${esc(timeDe(p.time_a_id)?.nome)}</b> × <b>${esc(timeDe(p.time_b_id)?.nome)}</b></span></div>` }).join('')}`).join('')}`
+  }
+  return info + form + corpo
+}
+
 function secretaria() {
   const c = D.c
   if (!c) return `<div class="card"><h3>Criar o campeonato</h3><form class="f" data-form="camp">
@@ -124,8 +182,10 @@ function secretaria() {
       <div class="span2"><h4>Patrocinadores <small class="sub">(opcional)</small></h4><div class="pats" id="pats">${(c.patrocinadores || []).map(s => patRow(s)).join('')}</div>
         <button type="button" class="btn ghost sm" data-act="addpat" style="margin-top:8px">+ Adicionar patrocinador</button></div>
       <div class="span2"><button class="btn">Salvar identidade</button></div></form></div>
+    <div class="card"><h3>5. Horários dos jogos <small>veja como fica antes de aplicar</small></h3>${horarios()}</div>
     <div class="card"><h3>Juízes <small>${D.juizes.length} cadastrado(s) · escale em cada jogo, no passo 4</small></h3>
       <form class="f" data-form="juiz"><label class="span2">Nome do juiz<input name="nome" required minlength="3" maxlength="60" autocomplete="off" placeholder="Nome e sobrenome"></label><div class="span2"><button class="btn">Adicionar juiz</button></div></form>
+      ${D.juizes.length && D.partidas.some(p => !p.juiz_id) ? `<div style="margin:8px 0"><button class="btn gold" data-act="distribuir">Distribuir os juízes nos ${D.partidas.filter(p => !p.juiz_id).length} jogos sem juiz</button><p class="sub" style="margin-top:4px">O sistema reparte igualmente, sorteando quem fica com cada jogo. Quem já foi escalado à mão não muda.</p></div>` : ''}
       ${D.juizes.map(j => `<div class="row"><span>${esc(j.nome)} <small class="sub">${D.partidas.filter(p => p.juiz_id === j.id).length} jogo(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_juizes" data-id="${j.id}">Excluir</button></div>`).join('')}</div>
     <div class="card"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
       return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
@@ -161,7 +221,12 @@ function publico() {
     const edit = sec && !leitura ? `<form class="placar" data-form="placar" data-id="${p.id}"><select data-juiz="${p.id}" aria-label="Juiz do jogo"><option value="">Sem juiz</option>${D.juizes.map(j => `<option value="${j.id}"${j.id === p.juiz_id ? ' selected' : ''}>${esc(j.nome)}</option>`).join('')}</select><input name="pa" type="number" min="0" value="${p.placar_a ?? ''}" aria-label="Placar A"><input name="pb" type="number" min="0" value="${p.placar_b ?? ''}" aria-label="Placar B">
       <input name="ea" type="number" min="0" value="${p.penaltis_a ?? ''}" placeholder="pên. A" aria-label="Pênaltis A"><input name="eb" type="number" min="0" value="${p.penaltis_b ?? ''}" placeholder="pên. B" aria-label="Pênaltis B">
       <button class="btn sm">Salvar</button><button type="button" class="btn danger sm" data-act="del" data-tab="esc_partidas" data-id="${p.id}">Excluir</button></form>` : ''
-    return `<div class="row"><span><span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(D.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(timeDe(p.vencedor_id)?.nome)}</span>` : ''}</span>${edit}</div>` }
+    return `<div class="row"><span>${p.data ? `<span class="pill blue">${diaSemana(p.data)} ${dmCurto(p.data)} · ${hh(p.hora)} · Quadra ${p.quadra}</span> ` : ''}<span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(D.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(timeDe(p.vencedor_id)?.nome)}</span>` : ''}</span>${edit}</div>` }
+  const programacao = ls => {   // programação por dia e hora (só jogos com horário)
+    const dias = [...new Set(ls.filter(p => p.data).map(p => p.data))].sort(); if (!dias.length) return ''
+    if (!programacao.vista) { programacao.vista = true; abertas.add('d' + (dias.find(d => d >= new Date().toISOString().slice(0, 10)) || dias[0])) }
+    return dias.map(d => { const js = ls.filter(p => p.data === d).sort(cmpHorario)
+      return pasta('d' + d, `${diaSemana(d)} ${dmCurto(d)}`, `${js.length} jogo(s) · ${hh(js[0].hora)} às ${hh(js[js.length - 1].hora)}`, js.map(p => `<div class="sub" style="margin-top:8px">${esc(nomeMod(p.modalidade_id))} ${p.genero} · ${esc(nomeTurma(p.turma_id))}</div>${jogo(p, true)}`).join('')) }).join('') }
   const grupos = D.mod.map(m => { const corpo = D.turmas.map(t => {
     const blocos = ['masculino', 'feminino'].map(g => {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
@@ -173,11 +238,11 @@ function publico() {
     const nt = D.times.filter(x => x.modalidade_id === m.id).length
     return corpo ? pasta('p' + m.id, m.nome, `${nt} times`, corpo) : '' }).join('')
   // Portal dos jogos: todos os jogos juntos (a jogar primeiro), com filtro por modalidade. A página se atualiza sozinha.
-  const lista = D.partidas.filter(p => !fm || p.modalidade_id === fm).sort((x, y) => ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase) || nat(nomeTurma(x.turma_id), nomeTurma(y.turma_id)))
+  const lista = D.partidas.filter(p => !fm || p.modalidade_id === fm).sort((x, y) => cmpHorario(x, y) || ORDEM.indexOf(x.fase) - ORDEM.indexOf(y.fase) || nat(nomeTurma(x.turma_id), nomeTurma(y.turma_id)))
   const linhaJogo = p => `<div class="sub" style="margin-top:8px">${esc(nomeMod(p.modalidade_id))} ${p.genero} · ${esc(nomeTurma(p.turma_id))}</div>${jogo(p, true)}`
   const aJogar = lista.filter(p => p.placar_a == null), feitos = lista.filter(p => p.placar_a != null)
   const portal = D.partidas.length ? `<div class="btns chips"><button class="btn ${fm ? 'ghost' : ''}" data-act="fm" data-m="">Todas</button>${D.mod.map(m => `<button class="btn ${fm === m.id ? '' : 'ghost'}" data-act="fm" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div>
-    ${pasta('ja', 'Jogos a jogar', `${aJogar.length}`, aJogar.map(linhaJogo).join('') || '<p class="sub">Nenhum jogo pendente.</p>')}${pasta('jr', 'Resultados', `${feitos.length}`, feitos.map(linhaJogo).join('') || '<p class="sub">Ainda sem resultados.</p>')}` : ''
+    ${programacao(lista)}${pasta('ja', 'Jogos a jogar', `${aJogar.length}`, aJogar.map(linhaJogo).join('') || '<p class="sub">Nenhum jogo pendente.</p>')}${pasta('jr', 'Resultados', `${feitos.length}`, feitos.map(linhaJogo).join('') || '<p class="sub">Ainda sem resultados.</p>')}` : ''
   return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><div style="display:flex;gap:14px;align-items:center">${c.logo_path ? `<img class="clogo" src="${esc(marca(c.logo_path))}" alt="" style="width:64px;height:64px">` : ''}<h2>${esc(c.nome)}</h2></div>
     <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}${c.responsavel ? ` · Responsável: ${esc(c.responsavel)}` : ''}</div></div></div>${sponsorsBar(c)}${portal}${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
 }
@@ -205,6 +270,9 @@ const ACOES = {
     const logo = await envia(d.logo, 'logo'); if (logo) upd.logo_path = logo
     await q(sb.from('esc_campeonatos').update(upd).eq('id', D.c.id)) },
   juiz: async d => q(sb.from('esc_juizes').insert({campeonato_id: D.c.id, nome: d.nome.trim().replace(/\s+/g, ' ')})),
+  agenda: async d => { const q1 = Math.max(1, Math.min(9, +d.quadras || 1))
+    ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], previa: null}
+    ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1}); return 'Prévia pronta. Confira abaixo e aplique.' },
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
   login: async d => { const {error} = await sb.auth.signInWithPassword({email: d.email, password: d.senha}); if (error) throw new Error('E-mail ou senha incorretos.') },
@@ -216,13 +284,25 @@ document.addEventListener('change', async e => {   // escalar o juiz num jogo
 document.addEventListener('submit', async e => {
   const f = e.target.closest('[data-form]'); if (!f) return
   e.preventDefault()
-  try { await ACOES[f.dataset.form](Object.fromEntries(new FormData(f)), f); toast('Salvo.'); await carregar() } catch (err) { toast(err.message) }
+  try { const r = await ACOES[f.dataset.form](Object.fromEntries(new FormData(f)), f); toast(typeof r === 'string' ? r : 'Salvo.'); await carregar() } catch (err) { toast(err.message) }
 })
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return
   const act = b.dataset.act
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
+    if (act === 'distribuir') {   // reparte os jogos sem juiz de forma igual (sempre o juiz com menos jogos; empate sorteado)
+      if (!D.juizes.length) return toast('Cadastre os juízes primeiro.')
+      const por = reparteJuizes(D.juizes, D.partidas), n = [...por.values()].reduce((s, l) => s + l.length, 0)
+      if (!n) return toast('Todos os jogos já têm juiz.')
+      for (const [jid, ids] of por) for (let i = 0; i < ids.length; i += 40) await q(sb.from('esc_partidas').update({juiz_id: jid}).in('id', ids.slice(i, i + 40)))
+      toast(`${n} jogo(s) distribuídos entre ${por.size} juiz(es).`)
+    }
+    if (act === 'aplicar') { const l = ag.previa?.linhas || []; if (!l.length) return toast('Nada para aplicar.')
+      for (let i = 0; i < l.length; i += 10) await Promise.all(l.slice(i, i + 10).map(x => q(sb.from('esc_partidas').update({data: x.data, hora: x.hora, quadra: x.quadra}).eq('id', x.id))))
+      ag.previa = null; toast(`${l.length} jogo(s) com horário.`) }
+    if (act === 'limpar') { if (!confirm('Tirar o horário de todos os jogos? Os jogos e resultados continuam.')) return
+      await q(sb.from('esc_partidas').update({data: null, hora: null, quadra: null}).not('data', 'is', null)); ag.previa = null; toast('Horários removidos.') }
     if (act === 'addpat') { document.querySelector('#pats').insertAdjacentHTML('beforeend', patRow()); return }
     if (act === 'rmpat') { b.closest('.pat').remove(); return }
     if (act === 'fm') { fm = b.dataset.m; return render() }
