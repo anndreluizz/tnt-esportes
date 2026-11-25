@@ -9,8 +9,10 @@ async function q(p) { const {data, error} = await p; if (error) throw new Error(
 
 // Regras de cada modalidade (a Secretaria pode editar no banco). Futsal: 5 + reservas, 2x10. Queimada: 10 participantes, 10 min.
 const PRESETS = {Futsal: {jogadores_por_time: 5, reservas_max: 5, tempos: 2, tempo_min: 10}, Queimada: {jogadores_por_time: 10, reservas_max: 0, tempos: 1, tempo_min: 10}}
-const TURMAS = ['1º ano 01', '1º ano 02', '2º ano 01', '2º ano 02', '3º ano 01', '3º ano 02', '4º ano 01', '4º ano 02', '5º ano 01', '5º ano 02',
-  '6º ano 01', '6º ano 02', '7º ano', '8º ano 01', '8º ano 02', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']   // portal 2026
+// Grupo = SERIE: as turmas da serie (ex.: 1º ano 01 e 1º ano 02) viram times que se enfrentam num mini campeonato. Portal 2026.
+const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']
+const ORIGENS = ['1º ano 01', '1º ano 02', '2º ano 01', '2º ano 02', '3º ano 01', '3º ano 02', '4º ano 01', '4º ano 02', '5º ano 01', '5º ano 02', '6º ano 01', '6º ano 02',
+  '7º ano', '8º ano 01', '8º ano 02', '9º ano', '6ª etapa / 7º ano - EJAI', '8ª etapa / 9º ano - EJAI']
 let D = {}, sec = false, aviso = ''
 
 async function carregar() {
@@ -54,13 +56,15 @@ function secretaria() {
       <button class="btn ghost sm" data-act="inscricoes">${c.inscricoes_abertas ? 'Encerrar inscrições' : 'Reabrir inscrições'}</button></div></div>
     <div class="card"><h3>1. Modalidades</h3><div class="btns">${Object.keys(PRESETS).map(n => `<button class="btn ${temMod(n) ? 'ghost' : ''}" data-act="mod" data-nome="${n}" ${temMod(n) ? 'disabled' : ''}>${temMod(n) ? '✓ ' : '+ '}${n}</button>`).join('')}</div>
       <p class="sub" style="margin-top:6px">Futsal: 5 em quadra + até 5 reservas, 2 tempos de 10 min. Queimada: 10 participantes, 10 min. Masculino e feminino em ambas. Sem pontos: mata-mata, empate vai a pênaltis.</p></div>
-    <div class="card"><h3>2. Turmas <small>${D.turmas.length} cadastrada(s)</small></h3><form data-form="turmas"><label>Uma turma por linha (as que já existem são ignoradas)
-      <textarea name="nomes">${esc(TURMAS.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar turmas</button></form></div>
+    <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
+      <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
+      ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
     <div class="card"><h3>3. Times</h3><form class="f" data-form="time">
-      <label>Turma<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
+      <label>Série (grupo)<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
+      <label>Turma de origem<input name="origem" required maxlength="30" list="origens" placeholder="Ex.: 1º ano 01"></label><datalist id="origens">${ORIGENS.map(o => `<option value="${o}">`).join('')}</datalist>
       <label>Modalidade<select name="mod" required>${opcoes(D.mod, m => m.nome)}</select></label>
       <label>Gênero<select name="genero"><option value="masculino">Masculino</option><option value="feminino">Feminino</option></select></label>
-      <label>Nome do time<input name="nome" required minlength="2" maxlength="40" placeholder="Ex.: Time A"></label><div><button class="btn">Criar time</button></div></form>
+      <label>Time<input name="nome" required minlength="1" maxlength="8" placeholder="Ex.: A"></label><div><button class="btn">Criar time</button></div></form>
       <div style="margin-top:10px">${tabela || '<p class="sub">Nenhum time ainda.</p>'}</div></div>
     <div class="card"><h3>4. Jogos</h3><form class="f" data-form="partida">
       <label class="span2">Time A<select name="a" required>${opcoes(D.times, rotuloTime)}</select></label>
@@ -106,7 +110,7 @@ const ACOES = {
   camp: async d => q(sb.from('esc_campeonatos').insert({nome: d.nome, inicio: d.inicio, fim: d.fim, local: d.local || 'A definir'})),
   turmas: async d => { const novas = [...new Set(d.nomes.split('\n').map(x => x.trim()).filter(Boolean))].filter(n => !D.turmas.some(t => t.nome === n))
     if (novas.length) await q(sb.from('esc_turmas').insert(novas.map(nome => ({campeonato_id: D.c.id, nome})))) },
-  time: async d => q(sb.from('esc_times').insert({campeonato_id: D.c.id, turma_id: d.turma, modalidade_id: d.mod, genero: d.genero, nome: d.nome})),
+  time: async d => q(sb.from('esc_times').insert({campeonato_id: D.c.id, turma_id: d.turma, modalidade_id: d.mod, genero: d.genero, nome: `${d.origem.trim()} - ${d.nome.trim()}`})),
   partida: async d => { const a = timeDe(d.a); if (!a) throw new Error('Escolha o time A.')
     await q(sb.from('esc_partidas').insert({turma_id: a.turma_id, modalidade_id: a.modalidade_id, genero: a.genero, time_a_id: d.a, time_b_id: d.b, fase: d.fase.trim(), colete_a: d.colete})) },
   placar: async (d, f) => { const n = v => v === '' ? null : +v

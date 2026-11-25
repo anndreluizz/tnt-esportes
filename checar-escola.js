@@ -40,6 +40,7 @@ function roda(arquivos, {logado}) {
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
+  ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   console.log('ok: telas do campeonato escolar (público, Secretaria e professor)')
