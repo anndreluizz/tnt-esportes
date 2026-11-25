@@ -75,7 +75,7 @@ const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot
 function secretaria() {
   const c = D.c
   if (!c) return `<div class="card"><h3>Criar o campeonato</h3><form class="f" data-form="camp">
-    <label class="span2">Nome<input name="nome" required minlength="5" maxlength="80" value="Interclasse 2026"></label>
+    <label class="span2">Nome<input name="nome" required minlength="5" maxlength="80" value="II Jogos Escolares Internos da Escola Municipal São Francisco de Assis"></label>
     <label>Início<input name="inicio" type="date" required value="2026-12-07"></label><label>Fim<input name="fim" type="date" required value="2026-12-09"></label>
     <label class="span2">Local<input name="local" maxlength="80" value="Quadra da escola"></label><div class="span2"><button class="btn">Criar</button></div></form></div>`
   const temMod = n => D.mod.some(m => m.nome === n)

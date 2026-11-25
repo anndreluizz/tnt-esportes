@@ -24,7 +24,7 @@ const aviso = msg => { $('#app').innerHTML = `<div class="card empty">${esc(msg)
 
 function render() {
   const t = time, cheio = jogadores.length >= t.vagas
-  $('#app').innerHTML = `<div class="hero"><div><div class="eyebrow">Interclasse · ${esc(t.modalidade_nome)} ${esc(t.genero)}</div>
+  $('#app').innerHTML = `<div class="hero"><div><div class="eyebrow">II Jogos Escolares · ${esc(t.modalidade_nome)} ${esc(t.genero)}</div>
     <h2>${esc(t.turma_nome)}</h2><div style="color:#d6e2f7;font-size:14px;margin-top:4px">Time: ${esc(t.time_nome)}</div></div></div>
     <div class="card"><h3>Alunos do time <small>${jogadores.length} de ${t.vagas}</small></h3>
       ${jogadores.length ? jogadores.map(j => `<div class="row"><span>${esc(j.nome)}</span>${t.inscricoes_abertas ? `<button class="btn ghost sm" data-del="${j.id}" aria-label="Remover ${esc(j.nome)}">Remover</button>` : ''}</div>`).join('')

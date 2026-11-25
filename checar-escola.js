@@ -7,7 +7,7 @@ const espera = () => new Promise(r => setTimeout(r, 30))
 
 const TOK = '11111111-1111-4111-8111-111111111111'
 const rows = {
-  esc_campeonatos: [{id: 'c1', nome: 'Interclasse 2026', inicio: '2026-12-07', fim: '2026-12-09', local: 'Quadra <b>x</b>', inscricoes_abertas: true}],
+  esc_campeonatos: [{id: 'c1', nome: 'II Jogos Escolares Internos', inicio: '2026-12-07', fim: '2026-12-09', local: 'Quadra <b>x</b>', inscricoes_abertas: true}],
   esc_modalidades: [{id: 'm1', campeonato_id: 'c1', nome: 'Futsal', jogadores_por_time: 5, reservas_max: 5}, {id: 'm2', campeonato_id: 'c1', nome: 'Queimada', jogadores_por_time: 10, reservas_max: 0}],
   esc_turmas: [{id: 't1', campeonato_id: 'c1', nome: '1º ano 01'}],
   esc_times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time B'}],
@@ -33,7 +33,7 @@ function roda(arquivos, {logado}) {
 ;(async () => {
   let els = roda(['js/config.js', 'js/escola.js'], {logado: false}); await espera()
   let h = els['#app'].innerHTML
-  ok(h.includes('Interclasse 2026') && h.includes('1º ano 01') && h.includes('Time A'), 'público vê campeonato, turma e times')
+  ok(h.includes('II Jogos Escolares Internos') && h.includes('1º ano 01') && h.includes('Time A'), 'público vê campeonato, turma e times')
   ok(h.includes('campeão: Time A') && h.includes('pên. 4 x 3'), 'campeão = vencedor da final, com pênaltis')
   ok(h.includes('azul') && h.includes('vermelho'), 'mostra os coletes dos dois lados')
   ok(h.includes('Aluno &lt;i&gt;1&lt;/i&gt;') && h.includes('Quadra &lt;b&gt;x&lt;/b&gt;') && !h.includes('<i>1</i>'), 'nomes e textos do banco são escapados (sem HTML injetado)')
