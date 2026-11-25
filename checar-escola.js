@@ -9,13 +9,13 @@ const TOK = '11111111-1111-4111-8111-111111111111'
 const rows = {
   esc_campeonatos: [{id: 'c1', nome: 'II Jogos Escolares Internos', inicio: '2026-12-07', fim: '2026-12-09', local: 'Quadra <b>x</b>', inscricoes_abertas: true}],
   esc_modalidades: [{id: 'm1', campeonato_id: 'c1', nome: 'Futsal', jogadores_por_time: 5, reservas_max: 5}, {id: 'm2', campeonato_id: 'c1', nome: 'Queimada', jogadores_por_time: 10, reservas_max: 0}],
-  esc_turmas: [{id: 't1', campeonato_id: 'c1', nome: '1º ano 01'}],
+  esc_turmas: [{id: 't9', campeonato_id: 'c1', nome: '9º ano'}, {id: 't10', campeonato_id: 'c1', nome: '6ª etapa / 7º ano - EJAI'}, {id: 't2', campeonato_id: 'c1', nome: '2º ano'}, {id: 't1', campeonato_id: 'c1', nome: '1º ano 01'}],
   esc_times: [{id: 'a', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time A'}, {id: 'b', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', nome: 'Time B'}],
   esc_jogadores: [{id: 'j1', time_id: 'a', nome: 'Aluno <i>1</i>'}],
   esc_partidas: [{id: 'p1', turma_id: 't1', modalidade_id: 'm1', genero: 'masculino', time_a_id: 'a', time_b_id: 'b', placar_a: 2, placar_b: 2, penaltis_a: 4, penaltis_b: 3, vencedor_id: 'a', fase: 'final', colete_a: 'azul'}],
   perfis: [{papel: 'secretaria'}],
 }
-const rpcs = {esc_links_times: [{time_id: 'a', token: TOK}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true}]}
+const rpcs = {esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
 
 function roda(arquivos, {logado}) {
   const els = {}, el = () => ({innerHTML: '', textContent: '', classList: {add() {}, remove() {}}, addEventListener() {}})
@@ -41,10 +41,13 @@ function roda(arquivos, {logado}) {
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
+  ok(h.includes('Professor: Maria da Silva') && h.includes('professor ainda não preencheu') && h.includes('1 de 2 com professor responsável'), 'Secretaria vê quem é o professor de cada time e quem falta')
+  const pos = t => h.indexOf(t + ' <small class="sub">'); ok(pos('2º ano') > 0 && pos('2º ano') < pos('9º ano') && pos('9º ano') < pos('6ª etapa / 7º ano - EJAI'), 'séries em ordem numérica (1º ao 9º ano, depois EJAI), não alfabética')
   ok(h.includes('Sorteio dos jogos') && !h.includes('data-form="partida"') && h.includes('campeão: Time A'), 'jogos são sorteados pelo sistema (sem escolher confronto à mão)')
   ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
+  ok(h.includes('Professor responsável') && h.includes('name="prof"'), 'professor sem nome cadastrado vê o campo para preencher')
   // sorteio: o sistema monta os confrontos (mata-mata, com folga quando o numero e impar)
   const pr = (n, ps = []) => vm.runInContext(`proximaRodada(${JSON.stringify(Array.from({length: n}, (_, i) => ({id: 't' + i})))}, ${JSON.stringify(ps)})`, ctxEscola)
   const usados = r => [...r.jogos.flatMap(j => [j.a, j.b]), ...(r.folga ? [r.folga] : [])].sort().join()
