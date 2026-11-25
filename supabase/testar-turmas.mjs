@@ -115,6 +115,22 @@ await como(null)
 await erro(`select esc_inscrever_jogador($1, 'Tardio')`, [tokA], 'inscricoes encerradas', 'inscrição encerrada')
 await erro(`select esc_remover_jogador($1, $2)`, [tokA, ids[1]], 'inscricoes encerradas', 'remoção após encerrar')
 
+console.log('Juiz (link único)')
+await como(SEC)
+const tokJ = (await q(`select esc_juiz_link($1) t`, [C]))[0].t
+ok((await q(`select esc_juiz_link($1) t`, [C]))[0].t === tokJ, 'o link do juiz é estável')
+await como(null)
+await erro(`select esc_juiz_link($1)`, [C], 'permission', 'público não pega o link do juiz')
+await erro(`select token from esc_juiz`, [], 'permission', 'público não lê a tabela do juiz')
+const pj = (await q(`select id from esc_partidas where turma_id = $1 limit 1`, [T1]))[0].id
+await erro(`select esc_juiz_placar($1, $2, 1, 0, null, null)`, [randomUUID(), pj], 'link invalido', 'link de juiz inventado')
+await q(`select esc_juiz_placar($1, $2, 2, 2, 4, 3)`, [tokJ, pj])
+const pr = (await q(`select placar_a, penaltis_a, vencedor_id from esc_partidas where id = $1`, [pj]))[0]
+ok(pr.placar_a === 2 && pr.penaltis_a === 4 && pr.vencedor_id, 'juiz lança placar e pênaltis; o vencedor sai do banco')
+await erro(`select esc_juiz_placar($1, $2, 2, 1, 4, 3)`, [tokJ, pj], 'check', 'pênaltis sem empate')
+await q(`select esc_juiz_placar($1, $2, null, null, null, null)`, [tokJ, pj])
+ok((await q(`select placar_a from esc_partidas where id = $1`, [pj]))[0].placar_a === null, 'juiz limpa o resultado')
+
 console.log('Permissões')
 await como(null)
 ok((await q(`select count(*)::int n from esc_turmas`))[0].n === 3, 'público lê as turmas')
