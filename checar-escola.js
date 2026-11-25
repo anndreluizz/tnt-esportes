@@ -22,10 +22,11 @@ function roda(arquivos, {logado}) {
   const builder = r => { const b = new Proxy({}, {get: (_, k) => k === 'then' ? f => Promise.resolve({data: r, error: null}).then(f) : () => b}); return b }
   const sb = {auth: {getSession: async () => ({data: {session: logado ? {user: {id: 'u'}} : null}}), signOut: async () => {}, signInWithPassword: async () => ({})},
     from: t => builder(rows[t]), rpc: n => builder(rpcs[n])}
-  const ctx = vm.createContext({console, setTimeout, clearTimeout, URL, URLSearchParams, encodeURIComponent, confirm: () => true, navigator: {},
+  const ctx = vm.createContext({crypto: require('crypto').webcrypto, console, setTimeout, clearTimeout, URL, URLSearchParams, encodeURIComponent, confirm: () => true, navigator: {},
     location: {href: 'https://x.test/escola.html', search: '?t=' + TOK}, supabase: {createClient: () => sb},
     document: {querySelector: s => els[s] ??= el(), querySelectorAll: () => [], addEventListener() {}}})
   for (const f of arquivos) vm.runInContext(read(f), ctx, {filename: f})
+  els.__ctx = ctx
   return els
 }
 
@@ -37,11 +38,27 @@ function roda(arquivos, {logado}) {
   ok(h.includes('azul') && h.includes('vermelho'), 'mostra os coletes dos dois lados')
   ok(h.includes('Aluno &lt;i&gt;1&lt;/i&gt;') && h.includes('Quadra &lt;b&gt;x&lt;/b&gt;') && !h.includes('<i>1</i>'), 'nomes e textos do banco são escapados (sem HTML injetado)')
   ok(h.includes('Sou da Secretaria') && !h.includes('Painel da Secretaria') && !h.includes('data-form="placar"') && !h.includes(TOK), 'público não vê painel, edição de placar nem link do professor')
-  els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML
+  els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
+  ok(h.includes('Sorteio dos jogos') && !h.includes('data-form="partida"') && h.includes('campeão: Time A'), 'jogos são sorteados pelo sistema (sem escolher confronto à mão)')
   ok(h.includes('Séries (grupos)') && h.includes('name="origem"') && h.includes('1º ano 02'), 'time nasce de uma turma de origem dentro da série')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
+  // sorteio: o sistema monta os confrontos (mata-mata, com folga quando o numero e impar)
+  const pr = (n, ps = []) => vm.runInContext(`proximaRodada(${JSON.stringify(Array.from({length: n}, (_, i) => ({id: 't' + i})))}, ${JSON.stringify(ps)})`, ctxEscola)
+  const usados = r => [...r.jogos.flatMap(j => [j.a, j.b]), ...(r.folga ? [r.folga] : [])].sort().join()
+  let r = pr(2); ok(r.fase === 'final' && r.jogos.length === 1 && !r.folga, '2 times: direto a final')
+  r = pr(3); ok(r.fase === 'semifinal' && r.jogos.length === 1 && r.folga && usados(r) === 't0,t1,t2', '3 times: 1 jogo e 1 folga')
+  r = pr(4); ok(r.fase === 'semifinal' && r.jogos.length === 2 && !r.folga && usados(r) === 't0,t1,t2,t3', '4 times: 2 semifinais')
+  r = pr(5); ok(r.fase === 'quartas' && r.jogos.length === 2 && r.folga, '5 times: 2 jogos e 1 folga')
+  ok(r.jogos.every(j => ['azul', 'vermelho'].includes(j.colete) && j.a !== j.b), 'coletes e confrontos válidos')
+  ok(pr(17).erro && pr(1).erro, 'limites: 1 ou mais de 16 times não sorteia')
+  const jg = (a, b, fase, v) => ({time_a_id: a, time_b_id: b, fase, vencedor_id: v})
+  ok(pr(4, [jg('t0', 't1', 'semifinal', 't0'), jg('t2', 't3', 'semifinal', null)]).pendente === 1, 'fase com jogo sem vencedor: aguarda')
+  r = pr(4, [jg('t0', 't1', 'semifinal', 't0'), jg('t2', 't3', 'semifinal', 't3')]); ok(r.fase === 'final' && usados(r) === 't0,t3', 'vencedores seguem para a final')
+  r = pr(3, [jg('t0', 't1', 'semifinal', 't1')]); ok(r.fase === 'final' && usados(r) === 't1,t2', 'quem folgou entra na final')
+  ok(pr(4, [jg('t0', 't1', 'semifinal', 't0'), jg('t2', 't3', 'semifinal', 't3'), jg('t0', 't3', 'final', 't3')]).campeao === 't3', 'final decidida: campeão')
+  r = pr(5, [jg('t0', 't1', 'quartas', 't0'), jg('t2', 't3', 'quartas', 't2')]); ok(r.fase === 'semifinal' && r.jogos.length === 1 && r.folga, '5 times: quartas, depois semifinal com folga')
   console.log('ok: telas do campeonato escolar (público, Secretaria e professor)')
 })()
