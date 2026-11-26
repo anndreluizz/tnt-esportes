@@ -96,6 +96,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   // agenda por horário: 1 e 2 quadras, janelas, sobra, fase em ordem, jogos já marcados
   const mods = [{id: 'f', tempos: 2, tempo_min: 10}, {id: 'q', tempos: 1, tempo_min: 10}]
   const ag = (ps, o) => vm.runInContext(`montaAgenda(${JSON.stringify(ps)}, ${JSON.stringify(mods)}, ${JSON.stringify({dias: ['2026-12-07', '2026-12-08'], janelas: [['08:00', '09:00'], ['13:30', '14:30']], quadras: 1, ...o})})`, ctxEscola)
+  ok(ag([{id: 'x', data: null, modalidade_id: 'm2', fase: 'final'}], {dia1: '08:30'}).linhas[0].hora === '08:30' && ag([{id: 'x', data: null, modalidade_id: 'm2', fase: 'final'}], {dia1: '13:30'}).linhas[0].hora === '13:30', 'agenda: 1º jogo do 1º dia depois da abertura')
   const fut = (n, fase = 'quartas') => Array.from({length: n}, (_, i) => ({id: 'f' + i, modalidade_id: 'f', fase}))
   let a1 = ag(fut(5)); ok(a1.linhas.map(l => l.data + ' ' + l.hora).join() === '2026-12-07 08:00,2026-12-07 08:30,2026-12-07 13:30,2026-12-07 14:00,2026-12-08 08:00', 'agenda: 30 min por jogo de futsal, manhã depois tarde, depois o dia seguinte')
   a1 = ag(fut(10)); ok(a1.linhas.length === 8 && a1.sobra.length === 2 && a1.precisa === 300 && a1.tem === 240, 'agenda: o que não cabe vai para a sobra, com horas precisas e disponíveis')
