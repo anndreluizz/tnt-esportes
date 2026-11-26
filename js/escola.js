@@ -292,7 +292,7 @@ function publico() {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
       const camp = campeoes.get(`${t.id}|${m.id}|${g}`), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
       const cap = m.jogadores_por_time + m.reservas_max
-      return `<div class="bloco"><div class="pub-gen ${g}">${g}${camp ? ` <span class="pub-campeao">🏆 Campeão: ${esc(timeDe(camp)?.nome)}</span>` : times.length === 1 ? ' <small class="sub">· aguardando outros times</small>' : ''}</div>
+      return `<div class="bloco"><div class="pub-gen ${g}">${g}${camp && typeof role === 'function' && role() === 'secretaria' ? ` <span class="pub-campeao">🏆 Campeão: ${esc(timeDe(camp)?.nome)}</span>` : times.length === 1 ? ' <small class="sub">· aguardando outros times</small>' : ''}</div>
         <div class="pub-times">${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="pub-time"><h5><span>${esc(x.nome)}</span><span class="pill">${js.length}/${cap}</span></h5>${js.length ? `<ol>${js.map(j => `<li>${esc(j.nome)}</li>`).join('')}</ol>` : '<p class="vazio">Sem alunos inscritos ainda</p>'}</div>` }).join('')}</div>
         ${ps.map(p => jogo(p)).join('')}</div>` }).join('')
     return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3><div class="blocos">${blocos}</div></div>` : '' }).join('')

@@ -35,7 +35,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   let els = roda(['js/config.js', 'js/escola.js'], {logado: false}); await espera()
   let h = els['#app'].innerHTML
   ok(h.includes('II Jogos Escolares Internos') && h.includes('1º ano 01') && h.includes('Time A'), 'público vê campeonato, turma e times')
-  ok(h.includes('Campeão: Time A') && h.includes('pên. 4 x 3'), 'campeão = vencedor da final, com pênaltis')
+  ok(!h.includes('Campeão: Time A') && h.includes('pên. 4 x 3'), 'portal público não mostra campeão; resultado com pênaltis continua')
   ok(h.includes('azul') && h.includes('vermelho'), 'mostra os coletes dos dois lados')
   ok(h.includes('Aluno &lt;i&gt;1&lt;/i&gt;') && h.includes('Quadra &lt;b&gt;x&lt;/b&gt;') && !h.includes('<i>1</i>'), 'nomes e textos do banco são escapados (sem HTML injetado)')
   ok(h.includes('Sou da Secretaria') && !h.includes('Painel da Secretaria') && !h.includes('data-form="placar"') && !h.includes(TOK), 'público não vê painel, edição de placar nem link do professor')
