@@ -748,3 +748,17 @@ body .sponsors.pub-spons{display:block;text-align:center;padding:24px 18px 22px;
 .ec-vs .ec-t.vermelho:last-child{border-right-color:#ff4d4d}
 .ec-x{font:800 24px "Barlow Condensed",sans-serif;color:var(--muted)}.ec-pl{font:800 30px "Barlow Condensed",sans-serif;color:var(--tnt-neon)}
 .ec-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+
+/* Painel da Secretaria dos Jogos Escolares: uma seção por vez */
+.gestao[data-ativa="resumo"]>[data-aba]:not([data-aba="resumo"]){display:none}
+.gestao[data-ativa="identidade"]>[data-aba]:not([data-aba="identidade"]){display:none}
+.gestao[data-ativa="times"]>[data-aba]:not([data-aba="times"]){display:none}
+.gestao[data-ativa="professores"]>[data-aba]:not([data-aba="professores"]){display:none}
+.gestao[data-ativa="sorteio"]>[data-aba]:not([data-aba="sorteio"]){display:none}
+.gestao[data-ativa="horarios"]>[data-aba]:not([data-aba="horarios"]){display:none}
+.gestao[data-ativa="juizes"]>[data-aba]:not([data-aba="juizes"]){display:none}
+.avisos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.aviso{display:grid;gap:4px;text-align:left;color:inherit;font:inherit;cursor:pointer;background:var(--card);border:1px solid #5c4a14;border-radius:14px;padding:14px 16px}
+.aviso:hover,.aviso:focus-visible{border-color:var(--tnt-neon)}
+.aviso b{font:800 34px/1 "Barlow Condensed",sans-serif;color:#FFB800}.aviso small{color:var(--tnt-neon);font-weight:600}
+.gestao[data-ativa="resultados"]>[data-aba]:not([data-aba="resultados"]){display:none}

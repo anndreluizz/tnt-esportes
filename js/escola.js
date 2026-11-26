@@ -90,7 +90,8 @@ const dmCurto = d => d.slice(8) + '/' + d.slice(5, 7)
 const diaSemana = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00:00').getDay()]
 const cmpHorario = (x, y) => (x.data ? x.data + hh(x.hora) : '9').localeCompare(y.data ? y.data + hh(y.hora) : '9')   // com horário primeiro, por data e hora
 let ag = {quadras: 1, janelas: [['07:30', '11:00'], ['13:00', '17:00']], dia1: '', previa: null}   // parâmetros e prévia da agenda (só na tela até "Aplicar")
-let D = {}, sec = false, aviso = ''
+let D = {}, sec = false, aviso = '', aba = 'resumo'   // aba: seção aberta no painel da Secretaria
+const ABAS = [['resumo', 'Resumo'], ['identidade', 'Identidade'], ['times', 'Times'], ['professores', 'Professores'], ['sorteio', 'Sorteio'], ['horarios', 'Horários'], ['juizes', 'Juízes'], ['resultados', 'Resultados']]
 
 async function carregar() {
   const {data: {session}} = await sb.auth.getSession()
@@ -227,12 +228,17 @@ function secretaria() {
     return pasta('t' + m.id, m.nome, `${dela.length} times · ${dela.filter(t => D.profs[t.id]).length} com professor`, D.turmas.map(u => { const ts = dela.filter(t => t.turma_id === u.id); if (!ts.length) return ''
       return `<h4>${esc(u.nome)}</h4>` + GENEROS.map(g => { const l = ts.filter(t => t.genero === g)
         return l.length ? `<div class="grupo">${g}</div>${l.map(linha).join('')}` : '' }).join('') }).join('')) }).join('')
-  const resumo = `<div class="resumo"><div><b>${D.turmas.length}</b><span>séries (grupos)</span></div><div><b>${D.times.length}</b><span>times</span></div>
+  const resumo = `<div class="resumo" data-aba="resumo"><div><b>${D.turmas.length}</b><span>séries (grupos)</span></div><div><b>${D.times.length}</b><span>times</span></div>
     <div><b>${D.times.filter(t => D.profs[t.id]).length}/${D.times.length}</b><span>professores responsáveis</span></div><div><b>${D.jog.length}</b><span>alunos inscritos</span></div><div><b>${D.partidas.length}</b><span>jogos sorteados</span></div></div>`
-  return resumo + `<div class="card"><h3>Painel da Secretaria <small><button class="btn ghost sm" data-act="sair">Sair</button></small></h3>
+  const pend = [[D.partidas.filter(p => !p.data).length, 'jogos sem horário', 'horarios'], [D.partidas.filter(p => !p.juiz_id).length, 'jogos sem juiz', 'juizes'],
+    [D.times.filter(t => nomeMod(t.modalidade_id) === 'Futsal' && D.jog.filter(j => j.time_id === t.id).length < 5).length, 'times de Futsal com menos de 5 alunos', 'times'],
+    [D.times.filter(t => !D.profs[t.id]).length, 'times sem professor responsável', 'professores']].filter(x => x[0])
+  const avisos = `<div class="card" data-aba="resumo"><h3>Para resolver</h3>${pend.length ? `<div class="avisos">${pend.map(([n, t, a]) => `<button type="button" class="aviso" data-act="aba" data-aba="${a}"><b>${n}</b><span>${t}</span><small>Abrir →</small></button>`).join('')}</div>` : '<p class="sub"><span class="pill green">Tudo certo</span> Nenhuma pendência.</p>'}</div>`
+  const nav = `<nav class="chips" aria-label="Seções">${ABAS.map(([k, n]) => `<button type="button" class="${k === aba ? 'on' : ''}" data-act="aba" data-aba="${k}">${n}</button>`).join('')}</nav>`
+  return nav + `<div class="gestao" data-ativa="${aba}">${resumo}${avisos}<div class="card" data-aba="resumo"><h3>Painel da Secretaria <small><button class="btn ghost sm" data-act="sair">Sair</button></small></h3>
     <div class="row"><span><b>Inscrições dos professores:</b> ${c.inscricoes_abertas ? '<span class="pill green">abertas</span>' : '<span class="pill red">encerradas</span>'}</span>
       <button class="btn ghost sm" data-act="inscricoes">${c.inscricoes_abertas ? 'Encerrar inscrições' : 'Reabrir inscrições'}</button></div></div>
-    <div class="card"><h3>Identidade do campeonato <small>logo, responsável e patrocínio aparecem no portal público</small></h3><form class="f" data-form="identidade">
+    <div class="card" data-aba="identidade"><h3>Identidade do campeonato <small>logo, responsável e patrocínio aparecem no portal público</small></h3><form class="f" data-form="identidade">
       <label class="span2">Nome<input name="nome" required minlength="5" maxlength="80" value="${esc(c.nome)}"></label>
       <label>Responsável<input name="responsavel" maxlength="60" value="${esc(c.responsavel || '')}" placeholder="Nome de quem organiza"></label>
       <label>Local<input name="local" maxlength="80" value="${esc(c.local)}"></label>
@@ -241,35 +247,35 @@ function secretaria() {
       <div class="span2"><h4>Patrocinadores <small class="sub">(opcional)</small></h4><div class="pats" id="pats">${(c.patrocinadores || []).map(s => patRow(s)).join('')}</div>
         <button type="button" class="btn ghost sm" data-act="addpat" style="margin-top:8px">+ Adicionar patrocinador</button></div>
       <div class="span2"><button class="btn">Salvar identidade</button></div></form></div>
-    <div class="card"><h3>5. Horários dos jogos <small>veja como fica antes de aplicar</small></h3>${horarios()}</div>
-    <div class="card"><h3>Juízes <small>${D.juizes.length} cadastrado(s) · escale em cada jogo, no passo 4</small></h3>
+    <div class="card" data-aba="horarios"><h3>Horários dos jogos <small>veja como fica antes de aplicar</small></h3>${horarios()}</div>
+    <div class="card" data-aba="juizes"><h3>Juízes <small>${D.juizes.length} cadastrado(s) · escale em cada jogo, na seção Jogos</small></h3>
       <form class="f" data-form="juiz"><label class="span2">Nome do juiz<input name="nome" required minlength="3" maxlength="60" autocomplete="off" placeholder="Nome e sobrenome"></label><div class="span2"><button class="btn">Adicionar juiz</button></div></form>
       ${D.juizes.length && D.partidas.some(p => !p.juiz_id) ? `<div style="margin:8px 0"><button class="btn gold" data-act="distribuir">Distribuir os juízes nos ${D.partidas.filter(p => !p.juiz_id).length} jogos sem juiz</button><p class="sub" style="margin-top:4px">O sistema reparte igualmente, sorteando quem fica com cada jogo. Quem já foi escalado à mão não muda.</p></div>` : ''}
       ${D.juizes.map(j => `<div class="row"><span>${esc(j.nome)} <small class="sub">${D.partidas.filter(p => p.juiz_id === j.id).length} jogo(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_juizes" data-id="${j.id}">Excluir</button></div>`).join('')}</div>
-    <div class="card"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
+    <div class="card" data-aba="juizes"><h3>Link do juiz <small>lança placar e pênaltis direto</small></h3>${(() => { const lk = new URL('juiz.html?t=' + D.juiz, location.href).href
       return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
       <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Mesa do juiz - Jogos Escolares. Lance o placar e os pênaltis por este link: ' + lk)}">WhatsApp</a></div>` })()}</div>
-    <div class="card"><h3>1. Modalidades</h3><div class="btns">${Object.keys(PRESETS).map(n => `<button class="btn ${temMod(n) ? 'ghost' : ''}" data-act="mod" data-nome="${n}" ${temMod(n) ? 'disabled' : ''}>${temMod(n) ? '✓ ' : '+ '}${n}</button>`).join('')}</div>
+    <div class="card" data-aba="times"><h3>Modalidades</h3><div class="btns">${Object.keys(PRESETS).map(n => `<button class="btn ${temMod(n) ? 'ghost' : ''}" data-act="mod" data-nome="${n}" ${temMod(n) ? 'disabled' : ''}>${temMod(n) ? '✓ ' : '+ '}${n}</button>`).join('')}</div>
       <p class="sub" style="margin-top:6px">Futsal: 5 em quadra + até 10 reservas (máximo 15 por time), 2 tempos de 10 min. Queimada: sem limite de jogadores, 10 min; se empatar, mais 5 min até ter vencedor (sem pênaltis). Masculino e feminino em ambas. Sem pontos: mata-mata, empate vai a pênaltis.</p></div>
-    <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
+    <div class="card" data-aba="times"><h3>Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
       <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
       ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
-    <div class="card"><h3>Professores <small>um link por professor, com todas as turmas dele</small></h3>${professores()}</div>
-    <div class="card"><h3>Times e alunos <small>veja todos os nomes e ajuste: tirar, adicionar ou excluir time</small></h3>${timesAjuste()}</div>
-    <div class="card"><h3>3. Times e links dos professores <small>${D.times.filter(t => D.profs[t.id]).length} de ${D.times.length} com professor responsável</small></h3><form class="f" data-form="time">
+    <div class="card" data-aba="professores"><h3>Professores <small>um link por professor, com todas as turmas dele</small></h3>${professores()}</div>
+    <div class="card" data-aba="times"><h3>Times e alunos <small>veja todos os nomes e ajuste: tirar, adicionar ou excluir time</small></h3>${timesAjuste()}</div>
+    <div class="card" data-aba="times"><h3>Criar time e links por time <small>${D.times.filter(t => D.profs[t.id]).length} de ${D.times.length} com professor responsável</small></h3><form class="f" data-form="time">
       <label>Série (grupo)<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
       <label>Turma de origem<input name="origem" required maxlength="30" list="origens" placeholder="Ex.: 1º ano 01"></label><datalist id="origens">${ORIGENS.map(o => `<option value="${o}">`).join('')}</datalist>
       <label>Modalidade<select name="mod" required>${opcoes(D.mod, m => m.nome)}</select></label>
       <label>Gênero<select name="genero"><option value="masculino">Masculino</option><option value="feminino">Feminino</option></select></label>
       <label>Time<input name="nome" required minlength="1" maxlength="8" placeholder="Ex.: A"></label><div><button class="btn">Criar time</button></div></form>
       <div style="margin-top:10px">${tabela || '<p class="sub">Nenhum time ainda.</p>'}</div></div>
-    <div class="card"><h3>4. Sorteio dos jogos</h3><p class="sub" style="margin-bottom:6px">Os confrontos e os coletes são sorteados pelo sistema, não escolhidos. Mata-mata: cada fase só sai quando a anterior estiver toda decidida.</p>
+    <div class="card" data-aba="sorteio"><h3>Sorteio dos jogos</h3><p class="sub" style="margin-bottom:6px">Os confrontos e os coletes são sorteados pelo sistema, não escolhidos. Mata-mata: cada fase só sai quando a anterior estiver toda decidida.</p>
       ${D.mod.map(m => { const gs = grupos().filter(x => x.m.id === m.id); return gs.length ? pasta('s' + m.id, m.nome, `${gs.length} grupos · ${gs.filter(x => x.partidas.length).length} sorteados`, gs.map(x => `<div class="row"><span><b>${esc(x.t.nome)}</b> ${x.g} <small class="sub">${x.times.length} time(s)</small> ${incompletos(x) ? `<span class="pill amber">${incompletos(x)} time(s) com menos de ${MINIMO[x.m.nome]} alunos</span>` : ''}</span><span>${
         x.r.erro ? `<small class="sub">${esc(x.r.erro)}</small>`
         : x.r.campeao ? `<span class="pill green">${x.r.direto ? 'campeão direto' : 'campeão'}: ${esc(timeDe(x.r.campeao)?.nome)}</span>`
         : x.r.pendente ? `<span class="pill amber">aguardando ${x.r.pendente} resultado(s)</span> ${x.partidas.every(p => p.placar_a == null) ? `<button class="btn ghost sm" data-act="refazer" data-key="${x.chave}">Refazer sorteio</button>` : ''}`
         : `<button class="btn sm" data-act="sortear" data-key="${x.chave}">${x.partidas.length ? 'Sortear próxima fase' : 'Sortear jogos'}</button>`}</span></div>`).join('')) : '' }).join('') || '<p class="sub">Crie pelo menos 2 times no mesmo grupo.</p>'}
-      ${grupos().filter(x => !x.partidas.length && x.r.jogos).length > 1 ? '<div style="margin-top:10px"><button class="btn gold" data-act="todos">Sortear todos os grupos que ainda não têm jogos</button></div>' : ''}</div>`
+      ${grupos().filter(x => !x.partidas.length && x.r.jogos).length > 1 ? '<div style="margin-top:10px"><button class="btn gold" data-act="todos">Sortear todos os grupos que ainda não têm jogos</button></div>' : ''}</div><div data-aba="resultados">${publico()}</div></div>`
 }
 
 function publico() {
@@ -318,7 +324,7 @@ function login() {
     <div><button class="btn">Entrar</button></div></form></details>`
 }
 
-function render() { $('#app').innerHTML = (sec ? secretaria() : '') + publico() + (sec ? '' : login()) }
+function render() { $('#app').innerHTML = sec ? secretaria() : publico() + login() }
 
 // cada ação devolve o que gravar no banco; depois a tela recarrega
 const ACOES = {
@@ -358,6 +364,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b) return
   const act = b.dataset.act
   try {
+    if (act === 'aba') { aba = b.dataset.aba; render(); return typeof scrollTo === 'function' && scrollTo(0, 0) }
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
     if (act === 'renomear') {   // corrige o nome em todas as turmas e no WhatsApp; o numero continua o mesmo
       const novo = prompt('Nome correto do professor:', b.dataset.nome); if (!novo || novo.trim() === b.dataset.nome) return

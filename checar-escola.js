@@ -45,6 +45,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(!h.includes('campeão direto') && h.includes('aguardando outros times') && h.includes('Solo &lt;b&gt;') && !h.includes('Solo <b>'), 'portal: time único não vira campeão antes do sorteio (nome escapado)')
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
+  ok(h.includes('data-ativa="resumo"') && h.includes('Para resolver') && h.includes('data-act="aba" data-aba="horarios"') && h.includes('data-aba="resultados"'), 'Secretaria: painel em seções (uma por vez) e lista do que falta resolver')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')
   ok(h.includes('Professor: Maria da Silva') && h.includes('professor ainda não preencheu') && h.includes('1 de 3 com professor responsável'), 'Secretaria vê quem é o professor de cada time e quem falta')
   const pos = t => h.indexOf(t + ' <small class="sub">'); ok(pos('2º ano') > 0 && pos('2º ano') < pos('9º ano') && pos('9º ano') < pos('6ª etapa / 7º ano - EJAI'), 'séries em ordem numérica (1º ao 9º ano, depois EJAI), não alfabética')
@@ -56,7 +57,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(!h.includes('data-act="sortear" data-key="t2|'), 'grupo de time único não tem sorteio')
   ok(h.includes('turma.html?t=TURMATOK') && h.includes('data-form="addprof"') && h.includes('name="origem"') && h.includes('name="tel"') && h.includes('data-act="tirarprof"') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
   ok(h.includes('>Professores <small>') && h.includes('wa.me/5592999991234?text=') && h.includes('Enviar pelo WhatsApp') && h.includes('(92) 999991234') && h.includes('<b>Prof &lt;b&gt;</b>') && !h.includes('Prof <b>') && !h.includes('Links por turma'), 'Secretaria vê cada professor com o WhatsApp e o botão de enviar o link (turmas dele num link só)')
-  ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
+  ok(h.includes('data-form="agenda"') && h.includes('Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
   els = roda(['js/config.js', 'js/juiz.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
