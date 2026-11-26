@@ -732,3 +732,19 @@ body .sponsors.pub-spons{display:block;text-align:center;padding:24px 18px 22px;
 .pub-time ol{margin:0;padding-left:22px;font-size:13.5px;line-height:1.55}
 .pub-time ol li::marker{color:var(--muted);font-size:12px}
 .pub-time .vazio{margin:0;color:var(--muted);font-size:13px}
+
+/* Portal e lista de jogos do campeonato escolar (cartões) */
+.ehero{border-radius:18px;padding:24px 28px;margin-bottom:16px;background:linear-gradient(180deg,var(--tnt-painel),var(--tnt-marinho));border:1px solid var(--line);color:#fff}
+.ehero .eyebrow{color:var(--tnt-neon);letter-spacing:.18em}
+.ehead{display:flex;gap:16px;align-items:center;margin:10px 0 4px}
+.ehero h2{font-size:clamp(26px,4vw,48px);line-height:1;text-transform:uppercase;margin:0}
+.ec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:8px}
+.ec-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px;align-content:start}
+.ec-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ec-vs{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.ec-t{font:700 20px/1.1 "Barlow Condensed",sans-serif;text-transform:uppercase;border-left:6px solid var(--tnt-eletrico);padding-left:8px}
+.ec-t.vermelho{border-left-color:#ff4d4d}
+.ec-vs .ec-t:last-child{text-align:right;border-left:0;padding-left:0;border-right:6px solid var(--tnt-eletrico);padding-right:8px}
+.ec-vs .ec-t.vermelho:last-child{border-right-color:#ff4d4d}
+.ec-x{font:800 24px "Barlow Condensed",sans-serif;color:var(--muted)}.ec-pl{font:800 30px "Barlow Condensed",sans-serif;color:var(--tnt-neon)}
+.ec-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
