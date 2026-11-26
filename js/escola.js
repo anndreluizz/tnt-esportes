@@ -56,7 +56,7 @@ const diasEntre = (a, b) => { const out = []; for (let d = new Date(a + 'T12:00:
 function montaAgenda(partidas, mods, o) {
   const mins = h => +h.slice(0, 2) * 60 + +h.slice(3, 5), hm = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0')
   const dur = Object.fromEntries(mods.map(m => [m.id, m.tempos * m.tempo_min + (m.tempos > 1 ? 5 : 0) + 5]))
-  const jan = o.dias.flatMap(d => o.janelas.map(([a, b]) => ({d, a: mins(a), b: mins(b)}))).filter(j => j.b > j.a)
+  const jan = o.dias.flatMap(d => o.janelas.map(([a, b]) => ({d, a: mins(a), b: mins(b)}))).map(j => o.dia1 && j.d === o.dias[0] ? {...j, a: Math.max(j.a, mins(o.dia1))} : j).filter(j => j.b > j.a)   // dia1: 1º jogo do 1º dia (depois da abertura)
   const cur = Array.from({length: o.quadras}, () => ({w: 0, t: jan[0]?.a ?? 0}))
   for (const p of partidas.filter(p => p.data)) {   // já marcados: a quadra só continua depois deles
     const w = jan.findIndex(j => j.d === p.data && j.a <= mins(hh(p.hora)) && mins(hh(p.hora)) < j.b), c = cur[(p.quadra || 1) - 1], fim = mins(hh(p.hora)) + (dur[p.modalidade_id] || 30)
@@ -89,7 +89,7 @@ const hh = h => String(h || '').slice(0, 5)
 const dmCurto = d => d.slice(8) + '/' + d.slice(5, 7)
 const diaSemana = d => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(d + 'T12:00:00').getDay()]
 const cmpHorario = (x, y) => (x.data ? x.data + hh(x.hora) : '9').localeCompare(y.data ? y.data + hh(y.hora) : '9')   // com horário primeiro, por data e hora
-let ag = {quadras: 1, janelas: [['08:00', '11:30'], ['13:30', '17:00']], previa: null}   // parâmetros e prévia da agenda (só na tela até "Aplicar")
+let ag = {quadras: 1, janelas: [['07:30', '11:00'], ['13:00', '17:00']], dia1: '', previa: null}   // parâmetros e prévia da agenda (só na tela até "Aplicar")
 let D = {}, sec = false, aviso = ''
 
 async function carregar() {
@@ -195,6 +195,7 @@ function horarios() {
   const form = `<form class="f" data-form="agenda"><label>Quadras ao mesmo tempo<input name="quadras" type="number" min="1" max="9" required value="${ag.quadras}"></label>
     <label>Manhã: início<input name="a1" type="time" required value="${m1[0]}"></label><label>Manhã: fim<input name="b1" type="time" required value="${m1[1]}"></label>
     <label>Tarde: início<input name="a2" type="time" required value="${m2[0]}"></label><label>Tarde: fim<input name="b2" type="time" required value="${m2[1]}"></label>
+    <label class="span2">1º dia: primeiro jogo às (depois da abertura; vazio = começa no início da manhã)<input name="dia1" type="time" value="${ag.dia1}"></label>
     <div class="span2"><button class="btn">Ver como fica</button> <button type="button" class="btn danger sm" data-act="limpar">Limpar horários</button></div></form>`
   const info = `<p class="sub" style="margin-bottom:8px">Dias: ${diasEntre(D.c.inicio, D.c.fim).map(dmCurto).join(', ')}. Futsal: 2 tempos + 5 min de intervalo + 5 de troca. Queimada: 10 min + 5 de troca. ${marcados} jogo(s) já têm horário, ${livres.length} ainda não.</p>`
   if (!D.partidas.length) return info + '<p class="sub">Sorteie os jogos primeiro (passo 4).</p>' + form
@@ -335,8 +336,8 @@ const ACOES = {
     await q(sb.from('esc_campeonatos').update(upd).eq('id', D.c.id)) },
   juiz: async d => q(sb.from('esc_juizes').insert({campeonato_id: D.c.id, nome: d.nome.trim().replace(/\s+/g, ' ')})),
   agenda: async d => { const q1 = Math.max(1, Math.min(9, +d.quadras || 1))
-    ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], previa: null}
-    ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1}); return 'Prévia pronta. Confira abaixo e aplique.' },
+    ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], dia1: d.dia1 || '', previa: null}
+    ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1, dia1: ag.dia1}); return 'Prévia pronta. Confira abaixo e aplique.' },
   addaluno: async (d, f) => { await q(sb.from('esc_jogadores').insert({time_id: f.dataset.time, nome: d.nome.trim().replace(/\s+/g, ' ')})); return 'Aluno adicionado.' },
   addprof: async d => { const {error} = await sb.rpc('esc_secretaria_professor', {p_campeonato: D.c.id, p_origem: d.origem, p_nome: d.nome, p_telefone: d.tel || ''})
     if (error) throw new Error(/telefone/.test(error.message) ? 'Digite o WhatsApp com DDD, por exemplo 92 99999-9999.' : error.message); return 'Professor salvo.' },
