@@ -9,8 +9,8 @@ const MSG = {'elenco cheio': 'O time já está completo.', 'duplicate': 'Esse al
   'time ja tem jogo': 'Esse time já tem jogo sorteado. Procure a Secretaria.', 'ultimo time': 'A turma precisa ter pelo menos um time.', 'sem letra': 'Não há mais letras livres para novos times.'}
 const erroAmigavel = m => Object.entries(MSG).find(([k]) => m.includes(k))?.[1] || (/fetch/i.test(m) ? 'Sem internet. Confira a conexão e tente de novo.' : m)
 const MODALIDADES = ['Futsal', 'Queimada']
-const MINIMO = {Futsal: 5, Queimada: 10}
-const sexo = g => g === 'masculino' ? 'Meninos' : 'Meninas'
+const MINIMO = {Futsal: 5, Queimada: 1}   // queimada: sem limite; a turma inteira entra no time misto
+const sexo = g => g === 'masculino' ? 'Meninos' : g === 'misto' ? 'Meninos e meninas' : 'Meninas'
 const norm = s => String(s).trim().replace(/\s+/g, ' ').toLowerCase()
 const primeiro = n => String(n).split(' ')[0]
 const letra = nome => String(nome).split(' - ').pop()
@@ -18,6 +18,7 @@ const letra = nome => String(nome).split(' - ').pop()
 // estado da tela
 const S = {tela: null, i: 0, mod: 'Futsal', time: null, busca: '', excluindo: false}
 let turmas = []   // uma entrada por link: {token, turma, times, jogadores, candidatos}
+let sincronizou = false
 const abertos = {}
 let fila = Promise.resolve(), avisoTimer = null
 const profsDe = t => String(t.turma.professor || '').split(' / ').filter(Boolean)
@@ -46,6 +47,11 @@ async function carregar() {
   let r
   try { r = await Promise.all(tokens.map(carregarUma)) } catch { return aviso('Sem conexão. Confira a internet e abra o link de novo.') }
   if (r.some(x => !x)) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
+  if (!sincronizou) {   // queimada: a turma inteira vai para o time misto (uma vez por abertura da página)
+    sincronizou = true
+    await Promise.all(r.filter(e => e.turma.inscricoes_abertas && /^[1-5]º ano/.test(e.turma.origem)).map(e => sb.rpc('esc_turma_queimada_unica', {p_token: e.token})))   // por enquanto a queimada e so do 1º ao 5º ano
+    try { r = await Promise.all(tokens.map(carregarUma)) } catch { return aviso('Sem conexão. Confira a internet e abra o link de novo.') }
+  }
   turmas = r
   if (!S.tela) S.tela = turmas.length === 1 ? 'turma' : 'home'   // uma turma só: vai direto para os times
   render()
@@ -71,13 +77,14 @@ function telaTurma() {
   if (!ts.find(x => x.time_id === S.time)) S.time = ts[0]?.time_id || null
   const tm = ts.find(x => x.time_id === S.time), n = tm ? qtd(e, tm.time_id) : 0, min = MINIMO[S.mod] || 0, max = tm?.vagas || 0, pronto = n >= min
   const profs = profsDe(e), ocupa = ids(e, S.mod)
+  const regraQ = S.mod === 'Queimada' ? `<div class="card tp-resumo"><div class="tp-passo">Como funciona a queimada</div><p class="lead">Todos da turma jogam no mesmo time, meninos e meninas juntos. Não tem limite de jogadores.</p><p class="lead"><b>Vence</b> quem eliminar todos os adversários primeiro. Se os 10 minutos acabarem, vence quem eliminou mais.</p></div>` : ''
   // alunos ainda livres (fora de qualquer time desta modalidade); quem já está num time aparece na lista do time
   const ondeEsta = a => e.jogadores.find(j => ocupa.has(j.time_id) && norm(j.nome) === norm(a))
   const q = norm(S.busca), livres = e.candidatos.filter(a => !ondeEsta(a) && (!q || norm(a).includes(q)))
   const ordena = arr => [...arr].sort((x, y) => String(x).localeCompare(String(y), 'pt'))
   const nomesTime = tm ? ordena(e.jogadores.filter(j => j.time_id === tm.time_id).map(j => j.nome)) : []
   const timeLista = tm ? `<div class="card tp-timelista"><div class="tp-passo">Time ${esc(letra(tm.time_nome))} · ${sexo(tm.genero)} · ${nomesTime.length} escolhido(s)</div>
-    ${nomesTime.length ? `<ol class="tp-ol">${nomesTime.map(nm => `<li><span>${esc(nm)}</span>${ab ? `<button type="button" class="tp-mini" data-sair="${esc(nm)}" aria-label="Tirar ${esc(nm)} do time">Tirar</button>` : ''}</li>`).join('')}</ol>` : '<p class="lead">Nenhum aluno ainda. Toque nos nomes abaixo.</p>'}</div>` : ''
+    ${nomesTime.length ? `<ol class="tp-ol">${nomesTime.map(nm => `<li><span>${esc(nm)}</span>${ab && S.mod !== 'Queimada' ? `<button type="button" class="tp-mini" data-sair="${esc(nm)}" aria-label="Tirar ${esc(nm)} do time">Tirar</button>` : ''}</li>`).join('')}</ol>` : '<p class="lead">Nenhum aluno ainda. Toque nos nomes abaixo.</p>'}</div>` : ''
   const linhas = livres.map(a => `<button type="button" class="tp-aluno" aria-pressed="false" data-aluno="${esc(a)}"${!ab ? ' disabled' : ''}><span class="tp-caixa" aria-hidden="true">✓</span>
       <span class="tp-nome-a">${esc(a)}</span></button>`).join('')
   const profHtml = `${profs.map(p => `<div class="tp-prof"><span>${esc(p)}</span>${ab && profs.length > 1 ? `<button type="button" class="tp-mini" data-delprof="${esc(p)}" aria-label="Tirar ${esc(p)}">Tirar</button>` : ''}</div>`).join('') || '<p class="lead">Nenhum professor informado ainda.</p>'}
@@ -97,12 +104,13 @@ function telaTurma() {
   <div><div class="tp-passo">1. Escolha o esporte</div><div class="tp-seg">${MODALIDADES.map(m => `<button type="button" data-mod="${m}" aria-pressed="${S.mod === m}">${m}</button>`).join('')}</div></div>
   <div><div class="tp-passo">2. Escolha o time</div><div class="tp-times">${ts.map(x => `<button type="button" class="tp-time" data-time="${x.time_id}" aria-pressed="${x.time_id === S.time}"><small>${sexo(x.genero)}</small><b>Time ${esc(letra(x.time_nome))} · ${qtd(e, x.time_id)}</b></button>`).join('') || '<p class="lead">Esta turma ainda não tem time neste esporte. Abra “Mais opções” para criar.</p>'}</div></div>
   ${tm ? `<div class="card tp-head"><div><div class="tp-passo" style="margin:0">Time escolhido</div><h2>${S.mod} · ${sexo(tm.genero)} · Time ${esc(letra(tm.time_nome))}</h2></div><div class="tp-cont"><div class="tp-big">${n}</div><span class="tp-pill ${pronto ? 'ok' : 'wait'}">${pronto ? 'Pronto' : 'Faltam ' + (min - n)}</span></div></div>
+  ${regraQ}
   ${timeLista}
-  <div><div class="tp-passo">3. Toque nos alunos que vão jogar (saem desta lista e vão para o time)</div><input id="busca" class="tp-in" type="search" placeholder="Procurar aluno pelo nome" value="${esc(S.busca)}" autocomplete="off" aria-label="Procurar aluno"></div>
-  <div class="tp-lista">${linhas || '<p class="tp-vazio">Todos os alunos da lista já estão num time.</p>'}</div>
+  ${S.mod === 'Queimada' ? '' : `<div><div class="tp-passo">3. Toque nos alunos que vão jogar (saem desta lista e vão para o time)</div><input id="busca" class="tp-in" type="search" placeholder="Procurar aluno pelo nome" value="${esc(S.busca)}" autocomplete="off" aria-label="Procurar aluno"></div>
+  <div class="tp-lista">${linhas || '<p class="tp-vazio">Todos os alunos da lista já estão num time.</p>'}</div>`}
   ${n >= max ? `<p class="tp-pill wait" style="white-space:normal">O time já tem ${max} alunos, que é o máximo.</p>` : ''}` : ''}
   ${resumo}
-  ${ab ? `<details data-d="mais"${abertos.mais ? ' open' : ''}><summary>Mais opções (criar ou excluir time)</summary><div class="tp-in2">
+  ${ab && S.mod !== 'Queimada' ? `<details data-d="mais"${abertos.mais ? ' open' : ''}><summary>Mais opções (criar ou excluir time)</summary><div class="tp-in2">
     <p class="lead">Precisa de mais um time? Crie aqui. O sistema escolhe a letra sozinho.</p>
     <div class="tp-row2"><button type="button" class="btn tp-btn ghost" data-novo="masculino">+ Time de meninos</button><button type="button" class="btn tp-btn ghost" data-novo="feminino">+ Time de meninas</button></div>
     ${tm ? (S.excluindo ? `<div class="tp-conf"><b>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})?</b><span class="lead">Os ${n} alunos voltam para a lista da turma. Nada mais é apagado.</span><div class="tp-row2"><button type="button" class="btn tp-btn danger" data-exclui-sim>Sim, excluir</button><button type="button" class="btn tp-btn ghost" data-exclui-nao>Não</button></div></div>`

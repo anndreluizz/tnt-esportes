@@ -72,7 +72,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('Mais opções') && h.includes('data-novo="masculino"') && h.includes('data-novo="feminino"') && h.includes('data-exclui'), 'professor cria time novo (meninos ou meninas) e exclui time em "Mais opções"')
   vm.runInContext("alternar('Bia Lima')", ctxT); ok(vm.runInContext("turmas[0].jogadores.some(j => j.nome === 'Bia Lima' && j.time_id === 'a')", ctxT) && els['#rodape'].innerHTML.includes('2 alunos escolhidos'), 'tocar no nome coloca o aluno no time na hora (a tela não espera o banco)')
   vm.runInContext("S.mod = 'Queimada'; S.time = null; render(); 0", ctxT); h = els['#app'].innerHTML; rod = els['#rodape'].innerHTML
-  ok(h.includes('Queimada · Meninos · Time A') && rod.includes('Faltam 10 para o mínimo de 10'), 'queimada: o mínimo é 10')
+  ok(h.includes('Queimada · Meninos · Time A') && rod.includes('Faltam 1 para o mínimo de 1'), 'queimada: sem limite de jogadores, mínimo 1')
   const T2 = '33333333-3333-4333-8333-333333333333'
   els = roda(['js/config.js', 'js/turma.js'], {logado: false, busca: TOK + ',' + T2}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Você cuida de 2 turmas') && h.includes('data-turma="0"') && h.includes('data-turma="1"') && h.includes('data-nome-prof'), 'um link com duas turmas: começa na lista de turmas e pergunta o nome uma vez')
