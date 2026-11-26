@@ -130,7 +130,7 @@ async function fit(file, max = 400) {   // reduz a imagem (o bucket aceita até 
   cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k); cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height)
   return new Promise((ok, no) => cv.toBlob(b => b ? ok(b) : no(new Error('Imagem inválida.')), 'image/png'))
 }
-const sponsorsBar = c => (c.patrocinadores || []).length ? `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${c.patrocinadores.map(s => s.logo_path ? `<img src="${esc(marca(s.logo_path))}" alt="${esc(s.nome)}" title="${esc(s.nome)}">` : `<b>${esc(s.nome)}</b>`).join('')}</div>` : ''
+const sponsorsBar = c => (c.patrocinadores || []).length ? `<section class="sponsors pub-spons" aria-label="Patrocínio"><div class="eyebrow">Patrocínio</div><h3>Quem apoia os Jogos</h3><div class="pub-spons-grid">${c.patrocinadores.map(s => `<div class="pub-spon">${s.logo_path ? `<img src="${esc(marca(s.logo_path))}" alt="" loading="lazy">` : ''}<b>${esc(s.nome)}</b></div>`).join('')}</div></section>` : ''
 const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).href
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
@@ -245,9 +245,10 @@ function publico() {
   const grupos = D.mod.map(m => { const corpo = D.turmas.map(t => {
     const blocos = ['masculino', 'feminino'].map(g => {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
-      const camp = campeoes.get(`${t.id}|${m.id}|${g}`) || (times.length === 1 ? times[0].id : null), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
-      return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão${times.length === 1 ? ' direto' : ''}: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
-        ${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="elenco"><b>${esc(x.nome)}</b> (${js.length}/${m.jogadores_por_time + m.reservas_max}): ${js.length ? js.map(j => esc(j.nome)).join(', ') : 'sem alunos inscritos'}</div>` }).join('')}
+      const camp = campeoes.get(`${t.id}|${m.id}|${g}`), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
+      const cap = m.jogadores_por_time + m.reservas_max
+      return `<div class="bloco"><div class="pub-gen ${g}">${g}${camp ? ` <span class="pub-campeao">🏆 Campeão: ${esc(timeDe(camp)?.nome)}</span>` : times.length === 1 ? ' <small class="sub">· aguardando outros times</small>' : ''}</div>
+        <div class="pub-times">${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="pub-time"><h5><span>${esc(x.nome)}</span><span class="pill">${js.length}/${cap}</span></h5>${js.length ? `<ol>${js.map(j => `<li>${esc(j.nome)}</li>`).join('')}</ol>` : '<p class="vazio">Sem alunos inscritos ainda</p>'}</div>` }).join('')}</div>
         ${ps.map(p => jogo(p)).join('')}</div>` }).join('')
     return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3><div class="blocos">${blocos}</div></div>` : '' }).join('')
     const nt = D.times.filter(x => x.modalidade_id === m.id).length
@@ -258,8 +259,11 @@ function publico() {
   const aJogar = lista.filter(p => p.placar_a == null), feitos = lista.filter(p => p.placar_a != null)
   const portal = D.partidas.length ? `<div class="btns chips"><button class="btn ${fm ? 'ghost' : ''}" data-act="fm" data-m="">Todas</button>${D.mod.map(m => `<button class="btn ${fm === m.id ? '' : 'ghost'}" data-act="fm" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div>
     ${programacao(lista)}${pasta('ja', 'Jogos a jogar', `${aJogar.length}`, aJogar.map(linhaJogo).join('') || '<p class="sub">Nenhum jogo pendente.</p>')}${pasta('jr', 'Resultados', `${feitos.length}`, feitos.map(linhaJogo).join('') || '<p class="sub">Ainda sem resultados.</p>')}` : ''
-  return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><div style="display:flex;gap:14px;align-items:center">${c.logo_path ? `<img class="clogo" src="${esc(marca(c.logo_path))}" alt="" style="width:64px;height:64px">` : ''}<h2>${esc(c.nome)}</h2></div>
-    <div style="color:#d6e2f7;font-size:14px;margin-top:4px">${dmy(c.inicio)} a ${dmy(c.fim)} · ${esc(c.local)}${c.responsavel ? ` · Responsável: ${esc(c.responsavel)}` : ''}</div></div></div>${sponsorsBar(c)}${portal}${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
+  const nTurmas = D.turmas.filter(t => D.times.some(x => x.turma_id === t.id)).length
+  const stat = (n, r) => `<div class="pub-stat"><b>${n}</b><span>${r}</span></div>`
+  return `<div class="hero"><div><div class="eyebrow">Campeonato interno da escola</div><div style="display:flex;gap:16px;align-items:center">${c.logo_path ? `<img class="clogo" src="${esc(marca(c.logo_path))}" alt="" style="width:84px;height:84px">` : ''}<h2>${esc(c.nome)}</h2></div>
+    <div class="pub-chips"><span>${dmy(c.inicio)} a ${dmy(c.fim)}</span><span>${esc(c.local)}</span>${c.responsavel ? `<span>Responsável: ${esc(c.responsavel)}</span>` : ''}</div></div></div>
+    <div class="pub-stats">${stat(nTurmas, 'turmas')}${stat(D.times.length, 'times')}${stat(D.jog.length, 'alunos inscritos')}${stat(diasEntre(c.inicio, c.fim).length, 'dias de jogos')}</div>${sponsorsBar(c)}${portal}${grupos || '<div class="card empty">Ainda não há times cadastrados.</div>'}`
 }
 
 function login() {
