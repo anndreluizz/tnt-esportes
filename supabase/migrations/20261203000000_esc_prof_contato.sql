@@ -32,8 +32,30 @@ begin
   return query select c.origem, c.nome, c.telefone from esc_prof_contatos c where c.campeonato_id = p_campeonato order by c.origem, c.nome;
 end $$;
 
-revoke execute on function esc_turma_contato(uuid, text, text), esc_contatos_prof(uuid) from public;
-grant execute on function esc_turma_contato(uuid, text, text) to anon, authenticated;
-grant execute on function esc_contatos_prof(uuid) to authenticated;
+-- Secretaria: adiciona um professor a uma turma (nome em todos os times da turma, sem repetir) e guarda o WhatsApp, se informado.
+-- Para colocar o WhatsApp de quem ja esta na lista, basta repetir o nome.
+create function esc_secretaria_professor(p_campeonato uuid, p_origem text, p_nome text, p_telefone text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_tel text := regexp_replace(coalesce(p_telefone, ''), '\D', '', 'g'); v_nome text := btrim(regexp_replace(coalesce(p_nome, ''), '\s+', ' ', 'g'));
+begin
+  if not e_secretaria() then raise exception 'apenas a Secretaria'; end if;
+  if length(v_nome) not between 3 and 60 then raise exception 'check nome'; end if;
+  if v_tel <> '' then
+    if length(v_tel) in (10, 11) then v_tel := '55' || v_tel; end if;
+    if v_tel !~ '^55[0-9]{10,11}$' then raise exception 'check telefone'; end if;
+  end if;
+  update esc_times t set professor = case when t.professor is null then v_nome
+      when position(' / ' || v_nome || ' / ' in ' / ' || t.professor || ' / ') > 0 then t.professor else t.professor || ' / ' || v_nome end
+   where t.campeonato_id = p_campeonato and t.nome ~ ' - [^ ]+$' and esc_origem(t.nome) = p_origem;
+  if not found then raise exception 'turma sem times'; end if;
+  if v_tel <> '' then
+    insert into esc_prof_contatos (campeonato_id, origem, nome, telefone) values (p_campeonato, p_origem, v_nome, v_tel)
+      on conflict (campeonato_id, origem, nome) do update set telefone = excluded.telefone;
+  end if;
+end $$;
 
--- COMO DESFAZER: drop function esc_turma_contato(uuid, text, text), esc_contatos_prof(uuid); drop table esc_prof_contatos;
+revoke execute on function esc_turma_contato(uuid, text, text), esc_contatos_prof(uuid), esc_secretaria_professor(uuid, text, text, text) from public;
+grant execute on function esc_turma_contato(uuid, text, text) to anon, authenticated;
+grant execute on function esc_contatos_prof(uuid), esc_secretaria_professor(uuid, text, text, text) to authenticated;
+
+-- COMO DESFAZER: drop function esc_turma_contato(uuid, text, text), esc_contatos_prof(uuid), esc_secretaria_professor(uuid, text, text, text); drop table esc_prof_contatos;

@@ -54,7 +54,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
   ok(h.includes('com menos de 5 alunos') && h.includes('campeão direto: Solo'), 'Secretaria: aviso de futsal com menos de 5 alunos e campeão direto no sorteio')
   ok(!h.includes('data-act="sortear" data-key="t2|'), 'grupo de time único não tem sorteio')
-  ok(h.includes('turma.html?t=TURMATOK') && h.includes('Links por turma') && h.includes('data-form="turmaprof"') && h.includes('Prof &lt;b&gt;') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
+  ok(h.includes('turma.html?t=TURMATOK') && h.includes('Links por turma') && h.includes('data-form="addprof"') && h.includes('name="tel"') && h.includes('value="Prof &lt;b&gt;"') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
   ok(h.includes('Professores e WhatsApp') && h.includes('wa.me/5592999991234?text=') && h.includes('Enviar pelo WhatsApp') && h.includes('(92) 999991234') && h.includes('Prof &lt;b&gt;') && !h.includes('Prof <b>'), 'Secretaria vê cada professor com o WhatsApp e o botão de enviar o link (turmas dele num link só)')
   ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')

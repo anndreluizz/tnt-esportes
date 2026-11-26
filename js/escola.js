@@ -162,7 +162,7 @@ function linksTurmas() {
     return `<div class="row"><span><b>${esc(l.origem)}</b> <small class="sub">${l.times} time(s) · ${l.alunos} aluno(s) escolhido(s)</small><br>${l.professor ? `Professor: ${esc(l.professor)}` : '<span class="pill amber">professor ainda não preencheu</span>'}</span><span class="btns">
       <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
       <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Olá! Você é o professor responsável pela turma ' + l.origem + ' nos II Jogos Escolares. Escreva seu nome e monte os times da turma (alunos escolhidos para o futsal) por este link: ' + link)}">WhatsApp</a></span>
-      <form class="f" data-form="turmaprof" data-origem="${esc(l.origem)}" style="width:100%;margin-top:6px"><label>Nome do professor da turma<input name="nome" required minlength="3" maxlength="60" value="${esc(l.professor || '')}" placeholder="Opcional: a Secretaria pode preencher"></label><div><button class="btn ghost sm">Salvar nome</button></div></form></div>` }).join('')
+      <form class="f" data-form="addprof" data-origem="${esc(l.origem)}" style="width:100%;margin-top:6px"><label>Adicionar professor<input name="nome" required minlength="3" maxlength="60" list="profs-${esc(l.origem)}" placeholder="Nome completo"></label><datalist id="profs-${esc(l.origem)}">${String(l.professor || '').split(' / ').filter(Boolean).map(p => `<option value="${esc(p)}">`).join('')}</datalist><label>WhatsApp com DDD<input name="tel" type="tel" inputmode="tel" placeholder="92 99999-9999"></label><div><button class="btn ghost sm">Adicionar</button></div></form></div>` }).join('')
 }
 
 function horarios() {
@@ -312,7 +312,8 @@ const ACOES = {
   agenda: async d => { const q1 = Math.max(1, Math.min(9, +d.quadras || 1))
     ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], previa: null}
     ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1}); return 'Prévia pronta. Confira abaixo e aplique.' },
-  turmaprof: async (d, f) => q(sb.from('esc_times').update({professor: d.nome.trim().replace(/\s+/g, ' ')}).eq('campeonato_id', D.c.id).like('nome', f.dataset.origem + ' - %')),
+  addprof: async (d, f) => { const {error} = await sb.rpc('esc_secretaria_professor', {p_campeonato: D.c.id, p_origem: f.dataset.origem, p_nome: d.nome, p_telefone: d.tel || ''})
+    if (error) throw new Error(/telefone/.test(error.message) ? 'Digite o WhatsApp com DDD, por exemplo 92 99999-9999.' : error.message); return 'Professor salvo.' },
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
   login: async d => { const {error} = await sb.auth.signInWithPassword({email: d.email, password: d.senha}); if (error) throw new Error('E-mail ou senha incorretos.') },
