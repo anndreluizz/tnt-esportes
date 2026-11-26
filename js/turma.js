@@ -71,13 +71,15 @@ function telaTurma() {
   if (!ts.find(x => x.time_id === S.time)) S.time = ts[0]?.time_id || null
   const tm = ts.find(x => x.time_id === S.time), n = tm ? qtd(e, tm.time_id) : 0, min = MINIMO[S.mod] || 0, max = tm?.vagas || 0, pronto = n >= min
   const profs = profsDe(e), ocupa = ids(e, S.mod)
-  // todos os alunos da turma + quem está em time mas não está na lista (nome digitado à mão)
-  const nomesLista = new Set(e.candidatos.map(norm)), extras = [...new Map(e.jogadores.filter(j => ocupa.has(j.time_id) && !nomesLista.has(norm(j.nome))).map(j => [norm(j.nome), j.nome])).values()]
-  const q = norm(S.busca), todos = [...e.candidatos, ...extras].filter(a => !q || norm(a).includes(q))
+  // alunos ainda livres (fora de qualquer time desta modalidade); quem já está num time aparece na lista do time
   const ondeEsta = a => e.jogadores.find(j => ocupa.has(j.time_id) && norm(j.nome) === norm(a))
-  const linhas = todos.map(a => { const j = ondeEsta(a), aqui = tm && j?.time_id === tm.time_id, outro = j && !aqui, ot = outro && e.times.find(x => x.time_id === j.time_id), fora = !nomesLista.has(norm(a))
-    return `<button type="button" class="tp-aluno${outro ? ' outro' : ''}" aria-pressed="${!!aqui}" data-aluno="${esc(a)}"${!ab ? ' disabled' : ''}><span class="tp-caixa" aria-hidden="true">✓</span>
-      <span class="tp-nome-a">${esc(a)}${outro ? `<small>Já está no Time ${esc(letra(ot.time_nome))} (${sexo(ot.genero).toLowerCase()})</small>` : fora ? '<small>Nome fora da lista da turma</small>' : ''}</span>${outro && ab ? '<span class="tp-trazer">Trazer para cá</span>' : ''}</button>` }).join('')
+  const q = norm(S.busca), livres = e.candidatos.filter(a => !ondeEsta(a) && (!q || norm(a).includes(q)))
+  const ordena = arr => [...arr].sort((x, y) => String(x).localeCompare(String(y), 'pt'))
+  const nomesTime = tm ? ordena(e.jogadores.filter(j => j.time_id === tm.time_id).map(j => j.nome)) : []
+  const timeLista = tm ? `<div class="card tp-timelista"><div class="tp-passo">Time ${esc(letra(tm.time_nome))} · ${sexo(tm.genero)} · ${nomesTime.length} escolhido(s)</div>
+    ${nomesTime.length ? `<ol class="tp-ol">${nomesTime.map(nm => `<li><span>${esc(nm)}</span>${ab ? `<button type="button" class="tp-mini" data-sair="${esc(nm)}" aria-label="Tirar ${esc(nm)} do time">Tirar</button>` : ''}</li>`).join('')}</ol>` : '<p class="lead">Nenhum aluno ainda. Toque nos nomes abaixo.</p>'}</div>` : ''
+  const linhas = livres.map(a => `<button type="button" class="tp-aluno" aria-pressed="false" data-aluno="${esc(a)}"${!ab ? ' disabled' : ''}><span class="tp-caixa" aria-hidden="true">✓</span>
+      <span class="tp-nome-a">${esc(a)}</span></button>`).join('')
   const profHtml = `${profs.map(p => `<div class="tp-prof"><span>${esc(p)}</span>${ab && profs.length > 1 ? `<button type="button" class="tp-mini" data-delprof="${esc(p)}" aria-label="Tirar ${esc(p)}">Tirar</button>` : ''}</div>`).join('') || '<p class="lead">Nenhum professor informado ainda.</p>'}
     ${ab ? `<form class="tp-f" data-addprof><input name="prof" class="tp-in" required minlength="3" maxlength="60" autocomplete="name" placeholder="${profs.length ? 'Nome de outro professor' : 'Seu nome completo'}" aria-label="Nome do professor"><input name="tel" class="tp-in" type="tel" inputmode="tel" required autocomplete="tel" placeholder="WhatsApp com DDD (92 99999-9999)" aria-label="WhatsApp do professor"><p class="lead tp-nota">O número fica só com a Secretaria, para enviar o link pelo WhatsApp.</p><button class="btn tp-btn sm">${profs.length ? 'Adicionar' : 'Salvar meu nome'}</button></form>` : ''}`
   const rod = tm ? `<div class="tp-rin"><div class="tp-rtx"><b>${n} ${n === 1 ? 'aluno escolhido' : 'alunos escolhidos'}</b><span>${pronto ? 'Time pronto para jogar' : `Faltam ${min - n} para o mínimo de ${min}`}</span><span class="tp-bar" aria-hidden="true"><i style="width:${min ? Math.min(100, Math.round(n / min * 100)) : 100}%"></i></span></div>${turmas.length > 1 ? `<button type="button" class="btn tp-btn" data-home>${pronto ? 'Concluir' : 'Sair'}</button>` : ''}</div>` : ''
@@ -95,8 +97,9 @@ function telaTurma() {
   <div><div class="tp-passo">1. Escolha o esporte</div><div class="tp-seg">${MODALIDADES.map(m => `<button type="button" data-mod="${m}" aria-pressed="${S.mod === m}">${m}</button>`).join('')}</div></div>
   <div><div class="tp-passo">2. Escolha o time</div><div class="tp-times">${ts.map(x => `<button type="button" class="tp-time" data-time="${x.time_id}" aria-pressed="${x.time_id === S.time}"><small>${sexo(x.genero)}</small><b>Time ${esc(letra(x.time_nome))} · ${qtd(e, x.time_id)}</b></button>`).join('') || '<p class="lead">Esta turma ainda não tem time neste esporte. Abra “Mais opções” para criar.</p>'}</div></div>
   ${tm ? `<div class="card tp-head"><div><div class="tp-passo" style="margin:0">Time escolhido</div><h2>${S.mod} · ${sexo(tm.genero)} · Time ${esc(letra(tm.time_nome))}</h2></div><div class="tp-cont"><div class="tp-big">${n}</div><span class="tp-pill ${pronto ? 'ok' : 'wait'}">${pronto ? 'Pronto' : 'Faltam ' + (min - n)}</span></div></div>
-  <div><div class="tp-passo">3. Toque no nome de quem vai jogar</div><input id="busca" class="tp-in" type="search" placeholder="Procurar aluno pelo nome" value="${esc(S.busca)}" autocomplete="off" aria-label="Procurar aluno"></div>
-  <div class="tp-lista">${linhas || '<p class="tp-vazio">Nenhum aluno com esse nome.</p>'}</div>
+  ${timeLista}
+  <div><div class="tp-passo">3. Toque nos alunos que vão jogar (saem desta lista e vão para o time)</div><input id="busca" class="tp-in" type="search" placeholder="Procurar aluno pelo nome" value="${esc(S.busca)}" autocomplete="off" aria-label="Procurar aluno"></div>
+  <div class="tp-lista">${linhas || '<p class="tp-vazio">Todos os alunos da lista já estão num time.</p>'}</div>
   ${n >= max ? `<p class="tp-pill wait" style="white-space:normal">O time já tem ${max} alunos, que é o máximo.</p>` : ''}` : ''}
   ${resumo}
   ${ab ? `<details data-d="mais"${abertos.mais ? ' open' : ''}><summary>Mais opções (criar ou excluir time)</summary><div class="tp-in2">
@@ -160,6 +163,7 @@ $('#app').addEventListener('click', ev => {
   if (d.mod) { S.mod = d.mod; S.time = null; S.excluindo = false; return render() }
   if (d.time) { S.time = d.time; S.excluindo = false; return render() }
   if (d.aluno) return alternar(d.aluno)
+  if (d.sair !== undefined) return sairDe(d.sair, S.time)
   const e = turmas[S.i]
   if (d.novo) { const tm0 = S.mod; return fila = fila.then(async () => { const {data, error} = await rpc('esc_turma_criar_time', {p_token: e.token, p_modalidade: tm0, p_genero: d.novo}); if (error) return toast(erroAmigavel(error.message)); S.time = data; toast('Time criado.'); await carregar() }) }
   if (d.exclui !== undefined) { S.excluindo = true; return render() }
