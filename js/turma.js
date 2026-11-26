@@ -110,8 +110,8 @@ function telaTurma() {
   <div class="tp-lista">${linhas || '<p class="tp-vazio">Todos os alunos da lista já estão num time.</p>'}</div>`}
   ${n >= max ? `<p class="tp-pill wait" style="white-space:normal">O time já tem ${max} alunos, que é o máximo.</p>` : ''}` : ''}
   ${resumo}
-  ${ab && S.mod !== 'Queimada' ? `<details data-d="mais"${abertos.mais ? ' open' : ''}><summary>Mais opções (criar ou excluir time)</summary><div class="tp-in2">
-    <p class="lead">Precisa de mais um time? Crie aqui. O sistema escolhe a letra sozinho.</p>
+  ${ab && S.mod !== 'Queimada' ? `<details class="tp-mais" data-d="mais"${abertos.mais ? ' open' : ''}><summary>Adicionar ou excluir equipe</summary><div class="tp-in2">
+    <p class="lead">Quer mais uma equipe? Escolha o tipo. O sistema dá a letra sozinho (A, B, C...).</p>
     <div class="tp-row2"><button type="button" class="btn tp-btn ghost" data-novo="masculino">+ Time de meninos</button><button type="button" class="btn tp-btn ghost" data-novo="feminino">+ Time de meninas</button></div>
     ${tm ? (S.excluindo ? `<div class="tp-conf"><b>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})?</b><span class="lead">Os ${n} alunos voltam para a lista da turma. Nada mais é apagado.</span><div class="tp-row2"><button type="button" class="btn tp-btn danger" data-exclui-sim>Sim, excluir</button><button type="button" class="btn tp-btn ghost" data-exclui-nao>Não</button></div></div>`
       : `<button type="button" class="btn tp-btn danger" data-exclui>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})</button>`) : ''}</div></details>` : ''}
