@@ -1,23 +1,34 @@
-// Página do professor (turma.html?t=<link da turma>[,<link de outra turma>]): organiza os times das turmas (A, B, C...; masculino e feminino; futsal e queimada) com os alunos da própria turma.
+// Página do professor (turma.html?t=<link da turma>[,<link de outra turma>]): escolher os alunos de cada time, de forma simples (uma tarefa por tela).
 // Um professor com várias turmas recebe UM link com os links das turmas separados por vírgula. Cada turma pode ter mais de um professor responsável.
 // Sem conta. O banco confere o link, as inscrições abertas e o limite do elenco (funções esc_turma_*).
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {auth: {persistSession: false}})
 const tokens = [...new Set((new URLSearchParams(location.search).get('t') || '').split(',').map(s => s.trim()).filter(Boolean))]
 const $ = s => document.querySelector(s)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]))
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 4500) }
-const MSG = {'elenco cheio': 'O time já está completo (titulares + reservas).', 'duplicate': 'Esse aluno já está num time.', 'link invalido': 'Link inválido ou inscrições encerradas.', 'check': 'Digite o nome completo.',
+const MSG = {'elenco cheio': 'O time já está completo.', 'duplicate': 'Esse aluno já está num time.', 'link invalido': 'Link inválido ou inscrições encerradas.', 'check telefone': 'Digite o WhatsApp com DDD, por exemplo 92 99999-9999.', 'check': 'Digite o nome completo.',
   'time ja tem jogo': 'Esse time já tem jogo sorteado. Procure a Secretaria.', 'ultimo time': 'A turma precisa ter pelo menos um time.', 'sem letra': 'Não há mais letras livres para novos times.'}
 const erroAmigavel = m => Object.entries(MSG).find(([k]) => m.includes(k))?.[1] || (/fetch/i.test(m) ? 'Sem internet. Confira a conexão e tente de novo.' : m)
 const MODALIDADES = ['Futsal', 'Queimada']
 const MINIMO = {Futsal: 5, Queimada: 10}
+const sexo = g => g === 'masculino' ? 'Meninos' : 'Meninas'
 const norm = s => String(s).trim().replace(/\s+/g, ' ').toLowerCase()
-const abertas = new Set()
-document.addEventListener('toggle', e => { const k = e.target.dataset?.k; if (k) e.target.open ? abertas.add(k) : abertas.delete(k) }, true)
+const primeiro = n => String(n).split(' ')[0]
+const letra = nome => String(nome).split(' - ').pop()
 
+// estado da tela
+const S = {tela: null, i: 0, mod: 'Futsal', time: null, busca: '', excluindo: false}
 let turmas = []   // uma entrada por link: {token, turma, times, jogadores, candidatos}
-const aviso = msg => { $('#app').innerHTML = `<div class="card empty">${esc(msg)}</div>` }
+const abertos = {}
+let fila = Promise.resolve(), avisoTimer = null
 const profsDe = t => String(t.turma.professor || '').split(' / ').filter(Boolean)
+const aviso = msg => { $('#app').innerHTML = `<div class="card empty">${esc(msg)}</div>` }
+
+function toast(msg, desfazer) {
+  const el = $('#aviso'); if (!el) return
+  el.hidden = false; el.innerHTML = `<span>${esc(msg)}</span>${desfazer ? '<button type="button" data-desfazer>Desfazer</button>' : ''}`
+  el.desfazer = desfazer || null
+  clearTimeout(avisoTimer); avisoTimer = setTimeout(() => { el.hidden = true }, 5000)
+}
 
 async function carregarUma(token) {
   const m = await sb.rpc('esc_turma_meu', {p_token: token})
@@ -36,81 +47,135 @@ async function carregar() {
   try { r = await Promise.all(tokens.map(carregarUma)) } catch { return aviso('Sem conexão. Confira a internet e abra o link de novo.') }
   if (r.some(x => !x)) return aviso('Link inválido. Peça o link certo à Secretaria de Esportes.')
   turmas = r
-  if (!abertas.size) { abertas.add('T0'); const p = turmas[0].times[0]; if (p) abertas.add(p.time_id) }
+  if (!S.tela) S.tela = turmas.length === 1 ? 'turma' : 'home'   // uma turma só: vai direto para os times
   render()
 }
 
-function blocoTurma(e, i) {
-  const ab = e.turma.inscricoes_abertas, {times, jogadores, candidatos} = e
-  const profs = profsDe(e)
-  const timeDe = new Map(jogadores.map(j => [norm(j.nome), j.time_id]))   // aluno -> time (só desta turma)
-  const semTime = candidatos.filter(n => !timeDe.has(norm(n))).length
-  const profHtml = `<div class="card"><h3>Professores responsáveis</h3>
-      ${profs.map(p => `<div class="row"><span><b>${esc(p)}</b></span>${ab && profs.length > 1 ? `<button class="btn ghost sm" data-delprof="${i}" data-nome="${esc(p)}" aria-label="Tirar ${esc(p)}">Tirar</button>` : ''}</div>`).join('') || '<p class="sub">Nenhum professor informado ainda.</p>'}
-      ${ab ? `<form class="f" data-addprof="${i}"><label class="span2">${profs.length ? 'Outro professor desta turma' : 'Seu nome completo'}<input name="prof" required minlength="3" maxlength="60" autocomplete="name"></label>
-          <div class="span2"><button class="btn">${profs.length ? 'Adicionar professor' : 'Salvar meu nome'}</button></div></form>` : ''}</div>`
-  const mods = MODALIDADES.map(mod => {
-    const ts = times.filter(x => x.modalidade_nome === mod)
-    if (!ts.length && !ab) return ''
-    const ocupados = new Set(jogadores.filter(j => ts.some(x => x.time_id === j.time_id)).map(j => norm(j.nome)))
-    const livres = candidatos.filter(n => !ocupados.has(norm(n)))
-    const novo = ab ? `<div class="chips" style="margin:6px 0 10px"><button type="button" class="btn ghost sm" data-novo="${i}" data-mod="${mod}" data-gen="masculino">+ Novo time masculino</button><button type="button" class="btn ghost sm" data-novo="${i}" data-mod="${mod}" data-gen="feminino">+ Novo time feminino</button></div>` : ''
-    return `<h3 style="margin:18px 0 6px">${esc(mod)}</h3>${novo}` + ts.map(x => {
-      const js = jogadores.filter(j => j.time_id === x.time_id), cheio = js.length >= x.vagas, min = MINIMO[mod] || 0
-      const sit = js.length < min ? `<span class="pill amber">faltam ${min - js.length} para o mínimo</span>` : '<span class="pill green">completo para jogar</span>'
-      return `<details class="pasta" data-k="${x.time_id}"${abertas.has(x.time_id) ? ' open' : ''}><summary><b>${esc(mod)} ${esc(x.genero)} · ${esc(x.time_nome)}</b> <small>${js.length} de ${x.vagas}</small></summary><div class="pasta-corpo">
-        <p>${sit}</p>
-        ${js.length ? js.map(j => `<div class="row"><span>${esc(j.nome)}</span>${ab ? `<button class="btn ghost sm" data-del="${i}" data-id="${j.id}" aria-label="Remover ${esc(j.nome)}">Remover</button>` : ''}</div>`).join('') : '<p class="sub">Nenhum aluno ainda.</p>'}
-        ${ab && !cheio ? (livres.length ? `<div class="grupo">Toque no nome para colocar neste time (${esc(x.genero)})</div><div class="chips">${livres.map(n => `<button type="button" class="btn ghost sm" data-add="${x.time_id}" data-tk="${i}" data-nome="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>` : '<p class="sub">Todos os alunos da turma já estão em um time.</p>') : ''}
-        ${ab ? `<p style="margin-top:10px"><button type="button" class="btn ghost sm" data-exclui="${i}" data-id="${x.time_id}" data-nome="${esc(x.time_nome)}">Excluir este time</button></p>` : ''}
-      </div></details>` }).join('')
-  }).join('')
-  const cab = `${times.length} time(s) · ${candidatos.length} alunos na turma · ${semTime} ainda sem time`
-  return turmas.length === 1 ? `<div class="hero"><div><div class="eyebrow">II Jogos Escolares · professor da turma</div><h2>${esc(e.turma.origem)}</h2><div style="color:#d6e2f7;font-size:14px;margin-top:4px">${cab}</div></div></div>${profHtml}${mods}`
-    : `<details class="pasta turma" data-k="T${i}"${abertas.has('T' + i) ? ' open' : ''}><summary><b>${esc(e.turma.origem)}</b> <small>${cab}</small></summary><div class="pasta-corpo">${profHtml}${mods}</div></details>`
+const timesDe = (e, mod) => e.times.filter(x => x.modalidade_nome === mod)
+const qtd = (e, id) => e.jogadores.filter(j => j.time_id === id).length
+const ids = (e, mod) => new Set(timesDe(e, mod).map(x => x.time_id))
+const totalFutsal = e => new Set(e.jogadores.filter(j => ids(e, 'Futsal').has(j.time_id)).map(j => norm(j.nome))).size
+
+function telaHome() {
+  const semProf = turmas.some(e => !profsDe(e).length && e.turma.inscricoes_abertas)
+  const nome = semProf ? `<div class="card tp-nome"><h2>Qual é o seu nome?</h2><p class="lead">Assim a Secretaria sabe quem cuida de cada turma.</p>
+      <form data-nome-prof><input name="prof" class="tp-in" required minlength="3" maxlength="60" autocomplete="name" placeholder="Seu nome completo" aria-label="Seu nome completo"><input name="tel" class="tp-in" type="tel" inputmode="tel" required autocomplete="tel" placeholder="WhatsApp com DDD (92 99999-9999)" aria-label="WhatsApp do professor"><p class="lead tp-nota">O número fica só com a Secretaria, para enviar o link pelo WhatsApp.</p><button class="btn tp-btn">Salvar meu nome</button></form></div>` : ''
+  return `<div><h1>Olá!</h1><p class="lead">Você cuida de ${turmas.length} turmas. Toque numa turma para escolher os alunos que vão jogar.</p></div>${nome}
+    <div class="tp-turmas">${turmas.map((e, i) => { const tot = e.candidatos.length, n = totalFutsal(e)
+      return `<button type="button" class="card tp-turma" data-turma="${i}"><span class="tp-l"><b>${esc(e.turma.origem)}</b><span class="tp-pill ${n >= MINIMO.Futsal ? 'ok' : 'wait'}">${n ? `${n} no futsal` : 'Comece por aqui'}</span></span>
+        <span class="tp-bar" aria-hidden="true"><i style="width:${tot ? Math.min(100, Math.round(n / tot * 100)) : 0}%"></i></span><span class="lead">${tot} alunos na turma</span></button>` }).join('')}</div>`
+}
+
+function telaTurma() {
+  const e = turmas[S.i], ab = e.turma.inscricoes_abertas, ts = timesDe(e, S.mod)
+  if (!ts.find(x => x.time_id === S.time)) S.time = ts[0]?.time_id || null
+  const tm = ts.find(x => x.time_id === S.time), n = tm ? qtd(e, tm.time_id) : 0, min = MINIMO[S.mod] || 0, max = tm?.vagas || 0, pronto = n >= min
+  const profs = profsDe(e), ocupa = ids(e, S.mod)
+  // todos os alunos da turma + quem está em time mas não está na lista (nome digitado à mão)
+  const nomesLista = new Set(e.candidatos.map(norm)), extras = [...new Map(e.jogadores.filter(j => ocupa.has(j.time_id) && !nomesLista.has(norm(j.nome))).map(j => [norm(j.nome), j.nome])).values()]
+  const q = norm(S.busca), todos = [...e.candidatos, ...extras].filter(a => !q || norm(a).includes(q))
+  const ondeEsta = a => e.jogadores.find(j => ocupa.has(j.time_id) && norm(j.nome) === norm(a))
+  const linhas = todos.map(a => { const j = ondeEsta(a), aqui = tm && j?.time_id === tm.time_id, outro = j && !aqui, ot = outro && e.times.find(x => x.time_id === j.time_id), fora = !nomesLista.has(norm(a))
+    return `<button type="button" class="tp-aluno${outro ? ' outro' : ''}" aria-pressed="${!!aqui}" data-aluno="${esc(a)}"${!ab ? ' disabled' : ''}><span class="tp-caixa" aria-hidden="true">✓</span>
+      <span class="tp-nome-a">${esc(a)}${outro ? `<small>Já está no Time ${esc(letra(ot.time_nome))} (${sexo(ot.genero).toLowerCase()})</small>` : fora ? '<small>Nome fora da lista da turma</small>' : ''}</span>${outro && ab ? '<span class="tp-trazer">Trazer para cá</span>' : ''}</button>` }).join('')
+  const profHtml = `${profs.map(p => `<div class="tp-prof"><span>${esc(p)}</span>${ab && profs.length > 1 ? `<button type="button" class="tp-mini" data-delprof="${esc(p)}" aria-label="Tirar ${esc(p)}">Tirar</button>` : ''}</div>`).join('') || '<p class="lead">Nenhum professor informado ainda.</p>'}
+    ${ab ? `<form class="tp-f" data-addprof><input name="prof" class="tp-in" required minlength="3" maxlength="60" autocomplete="name" placeholder="${profs.length ? 'Nome de outro professor' : 'Seu nome completo'}" aria-label="Nome do professor"><input name="tel" class="tp-in" type="tel" inputmode="tel" required autocomplete="tel" placeholder="WhatsApp com DDD (92 99999-9999)" aria-label="WhatsApp do professor"><p class="lead tp-nota">O número fica só com a Secretaria, para enviar o link pelo WhatsApp.</p><button class="btn tp-btn sm">${profs.length ? 'Adicionar' : 'Salvar meu nome'}</button></form>` : ''}`
+  const rod = tm ? `<div class="tp-rin"><div class="tp-rtx"><b>${n} ${n === 1 ? 'aluno escolhido' : 'alunos escolhidos'}</b><span>${pronto ? 'Time pronto para jogar' : `Faltam ${min - n} para o mínimo de ${min}`}</span><span class="tp-bar" aria-hidden="true"><i style="width:${min ? Math.min(100, Math.round(n / min * 100)) : 100}%"></i></span></div>${turmas.length > 1 ? `<button type="button" class="btn tp-btn" data-home>${pronto ? 'Concluir' : 'Sair'}</button>` : ''}</div>` : ''
+  return {rod, html: `${turmas.length > 1 ? '<button type="button" class="tp-back" data-home>← Minhas turmas</button>' : ''}
+  <div><div class="tp-passo">Turma</div><h1>${esc(e.turma.origem)}</h1></div>
+  ${!ab ? '<div class="card empty">As inscrições estão encerradas. Procure a Secretaria para qualquer ajuste.</div>' : ''}
+  ${ab && !profs.length ? `<div class="card tp-nome"><h2>Qual é o seu nome?</h2><form class="tp-f" data-addprof><input name="prof" class="tp-in" required minlength="3" maxlength="60" autocomplete="name" placeholder="Seu nome completo" aria-label="Seu nome completo"><input name="tel" class="tp-in" type="tel" inputmode="tel" required autocomplete="tel" placeholder="WhatsApp com DDD (92 99999-9999)" aria-label="WhatsApp do professor"><p class="lead tp-nota">O número fica só com a Secretaria, para enviar o link pelo WhatsApp.</p><button class="btn tp-btn">Salvar meu nome</button></form></div>` : ''}
+  <div><div class="tp-passo">1. Escolha o esporte</div><div class="tp-seg">${MODALIDADES.map(m => `<button type="button" data-mod="${m}" aria-pressed="${S.mod === m}">${m}</button>`).join('')}</div></div>
+  <div><div class="tp-passo">2. Escolha o time</div><div class="tp-times">${ts.map(x => `<button type="button" class="tp-time" data-time="${x.time_id}" aria-pressed="${x.time_id === S.time}"><small>${sexo(x.genero)}</small><b>Time ${esc(letra(x.time_nome))} · ${qtd(e, x.time_id)}</b></button>`).join('') || '<p class="lead">Esta turma ainda não tem time neste esporte. Abra “Mais opções” para criar.</p>'}</div></div>
+  ${tm ? `<div class="card tp-head"><div><div class="tp-passo" style="margin:0">Time escolhido</div><h2>${S.mod} · ${sexo(tm.genero)} · Time ${esc(letra(tm.time_nome))}</h2></div><div class="tp-cont"><div class="tp-big">${n}</div><span class="tp-pill ${pronto ? 'ok' : 'wait'}">${pronto ? 'Pronto' : 'Faltam ' + (min - n)}</span></div></div>
+  <div><div class="tp-passo">3. Toque no nome de quem vai jogar</div><input id="busca" class="tp-in" type="search" placeholder="Procurar aluno pelo nome" value="${esc(S.busca)}" autocomplete="off" aria-label="Procurar aluno"></div>
+  <div class="tp-lista">${linhas || '<p class="tp-vazio">Nenhum aluno com esse nome.</p>'}</div>
+  ${n >= max ? `<p class="tp-pill wait" style="white-space:normal">O time já tem ${max} alunos, que é o máximo.</p>` : ''}` : ''}
+  ${ab ? `<details data-d="mais"${abertos.mais ? ' open' : ''}><summary>Mais opções (criar ou excluir time)</summary><div class="tp-in2">
+    <p class="lead">Precisa de mais um time? Crie aqui. O sistema escolhe a letra sozinho.</p>
+    <div class="tp-row2"><button type="button" class="btn tp-btn ghost" data-novo="masculino">+ Time de meninos</button><button type="button" class="btn tp-btn ghost" data-novo="feminino">+ Time de meninas</button></div>
+    ${tm ? (S.excluindo ? `<div class="tp-conf"><b>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})?</b><span class="lead">Os ${n} alunos voltam para a lista da turma. Nada mais é apagado.</span><div class="tp-row2"><button type="button" class="btn tp-btn danger" data-exclui-sim>Sim, excluir</button><button type="button" class="btn tp-btn ghost" data-exclui-nao>Não</button></div></div>`
+      : `<button type="button" class="btn tp-btn danger" data-exclui>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})</button>`) : ''}</div></details>` : ''}
+  <details data-d="prof"${abertos.prof ? ' open' : ''}><summary>Professores desta turma (${profs.length})</summary><div class="tp-in2">${profHtml}</div></details>`}
 }
 
 function render() {
-  const ab = turmas.some(e => e.turma.inscricoes_abertas)
-  const topo = turmas.length > 1 ? `<div class="hero"><div><div class="eyebrow">II Jogos Escolares · professor</div><h2>Suas ${turmas.length} turmas</h2><div style="color:#d6e2f7;font-size:14px;margin-top:4px">${turmas.map(e => esc(e.turma.origem)).join(' · ')}</div></div></div>` : ''
-  $('#app').innerHTML = topo
-    + (ab ? '<p class="note">Você monta os times: toque no nome para colocar o aluno no time (masculino ou feminino). Pode criar um time novo ou excluir um time que não vai usar. Um aluno fica em um time só por modalidade. Os alunos escolhidos aparecem no portal público do campeonato.</p>' : '<div class="card empty">As inscrições estão encerradas. Procure a Secretaria para qualquer ajuste.</div>')
-    + turmas.map(blocoTurma).join('')
+  const f = document.activeElement?.id === 'busca', pos = f ? document.activeElement.selectionStart : 0
+  const rod = $('#rodape')
+  if (S.tela === 'turma' && turmas[S.i]) { const t = telaTurma(); $('#app').innerHTML = t.html; rod.hidden = !t.rod; rod.innerHTML = t.rod }
+  else { $('#app').innerHTML = telaHome(); rod.hidden = true }
+  if (f) { const el = $('#busca'); el?.focus(); el?.setSelectionRange?.(pos, pos) }
 }
 
-const chamar = async (fn, args, ok) => {
-  const {error} = await sb.rpc(fn, args)
-  if (error) return toast(erroAmigavel(error.message))
-  if (ok) toast(ok)
-  await carregar()
+// ação com resposta imediata na tela; o banco confirma em segundo plano (uma de cada vez) e a tela volta atrás se ele recusar
+function agir(local, remoto, ok, desfazer) {
+  const antes = JSON.parse(JSON.stringify(turmas))
+  local(); render(); if (ok) toast(ok, desfazer)
+  fila = fila.then(async () => {
+    const {error} = await remoto()
+    if (error) { turmas = antes; render(); toast(erroAmigavel(error.message)) }
+    await carregar()
+  })
 }
-const salvaProfs = (i, lista, ok) => chamar('esc_turma_definir_professor', {p_token: turmas[i].token, p_nome: lista.join(' / ')}, ok)
+const rpc = (fn, args) => sb.rpc(fn, args)
+const topo = () => { try { scrollTo(0, 0) } catch {} }
 
-$('#app').addEventListener('click', e => {
-  const b = e.target.closest?.('button'); if (!b) return
-  const d = b.dataset, i = Number(d.tk ?? d.del ?? d.novo ?? d.exclui ?? d.delprof)
-  if (d.add) return chamar('esc_turma_inscrever', {p_token: turmas[i].token, p_time: d.add, p_nome: d.nome}, `${d.nome} adicionado.`)
-  if (d.del !== undefined) {
-    const j = turmas[i].jogadores.find(x => x.id === d.id)
-    if (!confirm(`Remover ${j?.nome || 'o aluno'} do time?`)) return
-    return chamar('esc_turma_remover', {p_token: turmas[i].token, p_jogador: d.id})
+function alternar(nome) {
+  const e = turmas[S.i], tm = e.times.find(x => x.time_id === S.time); if (!tm) return
+  const ocupa = ids(e, S.mod), j = e.jogadores.find(x => ocupa.has(x.time_id) && norm(x.nome) === norm(nome))
+  const cheio = qtd(e, tm.time_id) >= tm.vagas
+  if (j?.time_id === tm.time_id) return agir(() => { e.jogadores = e.jogadores.filter(x => x !== j) }, () => rpc('esc_turma_remover', {p_token: e.token, p_jogador: j.id}), `${primeiro(nome)} saiu do Time ${letra(tm.time_nome)}.`, () => inscrever(nome, tm.time_id))
+  if (cheio) return toast(`O time já tem ${tm.vagas} alunos.`)
+  if (j) {   // está em outro time da mesma modalidade: sai de lá e entra aqui
+    const antigo = j.time_id
+    return agir(() => { j.time_id = tm.time_id }, async () => { const r = await rpc('esc_turma_remover', {p_token: e.token, p_jogador: j.id}); if (r.error) return r
+      const i = await rpc('esc_turma_inscrever', {p_token: e.token, p_time: tm.time_id, p_nome: nome}); if (i.error) await rpc('esc_turma_inscrever', {p_token: e.token, p_time: antigo, p_nome: nome}); return i },
+      `${primeiro(nome)} agora está no Time ${letra(tm.time_nome)}.`, () => trocar(nome, tm.time_id, antigo))
   }
-  if (d.novo !== undefined) return chamar('esc_turma_criar_time', {p_token: turmas[i].token, p_modalidade: d.mod, p_genero: d.gen}, 'Time criado.')
-  if (d.exclui !== undefined) {
-    const n = turmas[i].jogadores.filter(j => j.time_id === d.id).length
-    if (!confirm(`Excluir o time ${d.nome}?${n ? ` Os ${n} aluno(s) dele voltam para a lista da turma.` : ''}`)) return
-    return chamar('esc_turma_excluir_time', {p_token: turmas[i].token, p_time: d.id}, 'Time excluído.')
-  }
-  if (d.delprof !== undefined) return salvaProfs(i, profsDe(turmas[i]).filter(p => p !== d.nome), 'Professor retirado.')
+  agir(() => { e.jogadores.push({id: 'novo-' + Date.now(), time_id: tm.time_id, nome}) }, () => rpc('esc_turma_inscrever', {p_token: e.token, p_time: tm.time_id, p_nome: nome}),
+    `${primeiro(nome)} está no Time ${letra(tm.time_nome)}.`, () => sairDe(nome, tm.time_id))
+}
+function inscrever(nome, time) { const e = turmas[S.i]; agir(() => { e.jogadores.push({id: 'novo-' + Date.now(), time_id: time, nome}) }, () => rpc('esc_turma_inscrever', {p_token: e.token, p_time: time, p_nome: nome})) }
+function sairDe(nome, time) { const e = turmas[S.i], j = e.jogadores.find(x => x.time_id === time && norm(x.nome) === norm(nome)); if (!j || String(j.id).startsWith('novo-')) return carregar()
+  agir(() => { e.jogadores = e.jogadores.filter(x => x !== j) }, () => rpc('esc_turma_remover', {p_token: e.token, p_jogador: j.id})) }
+function trocar(nome, de, para) { const e = turmas[S.i], j = e.jogadores.find(x => x.time_id === de && norm(x.nome) === norm(nome)); if (!j) return
+  agir(() => { j.time_id = para }, async () => { const r = await rpc('esc_turma_remover', {p_token: e.token, p_jogador: j.id}); if (r.error) return r; return rpc('esc_turma_inscrever', {p_token: e.token, p_time: para, p_nome: nome}) }) }
+
+const chamar = async (fn, args, ok) => { const {error} = await rpc(fn, args); if (error) return toast(erroAmigavel(error.message)); if (ok) toast(ok); await carregar() }
+const salvaProfs = (e, lista, ok) => chamar('esc_turma_definir_professor', {p_token: e.token, p_nome: lista.join(' / ')}, ok)
+
+document.addEventListener('toggle', ev => { const d = ev.target.dataset?.d; if (d) abertos[d] = ev.target.open }, true)
+$('#app').addEventListener('click', ev => {
+  const b = ev.target.closest?.('button'); if (!b) return; const d = b.dataset
+  if (d.turma !== undefined) { S.i = +d.turma; S.tela = 'turma'; S.time = null; S.busca = ''; S.excluindo = false; render(); topo(); return }
+  if (d.home !== undefined) { S.tela = 'home'; render(); topo(); return }
+  if (d.mod) { S.mod = d.mod; S.time = null; S.excluindo = false; return render() }
+  if (d.time) { S.time = d.time; S.excluindo = false; return render() }
+  if (d.aluno) return alternar(d.aluno)
+  const e = turmas[S.i]
+  if (d.novo) { const tm0 = S.mod; return fila = fila.then(async () => { const {data, error} = await rpc('esc_turma_criar_time', {p_token: e.token, p_modalidade: tm0, p_genero: d.novo}); if (error) return toast(erroAmigavel(error.message)); S.time = data; toast('Time criado.'); await carregar() }) }
+  if (d.exclui !== undefined) { S.excluindo = true; return render() }
+  if (d.excluiNao !== undefined) { S.excluindo = false; return render() }
+  if (d.excluiSim !== undefined) { const id = S.time; S.excluindo = false; S.time = null; return fila = fila.then(() => chamar('esc_turma_excluir_time', {p_token: e.token, p_time: id}, 'Time excluído. Os alunos voltaram para a lista.')) }
+  if (d.delprof) return salvaProfs(e, profsDe(e).filter(p => p !== d.delprof), 'Professor retirado.')
 })
-$('#app').addEventListener('submit', e => {
-  const i = e.target.dataset?.addprof; if (i === undefined) return
-  e.preventDefault()
-  const nome = e.target.prof.value.trim().replace(/\s+/g, ' ')
+$('#rodape').addEventListener('click', ev => { if (ev.target.closest?.('[data-home]')) { S.tela = 'home'; render(); topo() } })
+$('#aviso').addEventListener('click', ev => { const el = $('#aviso'); if (ev.target.closest?.('[data-desfazer]') && el.desfazer) { const f = el.desfazer; el.desfazer = null; el.hidden = true; f() } })
+$('#app').addEventListener('input', ev => { if (ev.target.id === 'busca') { S.busca = ev.target.value; render() } })
+$('#app').addEventListener('submit', ev => {
+  const f = ev.target, nome = String(f.prof?.value || '').trim().replace(/\s+/g, ' '), tel = String(f.tel?.value || '')
+  if (f.dataset?.addprof === undefined && f.dataset?.nomeProf === undefined) return
+  ev.preventDefault()
   if (nome.length < 3) return toast('Digite o nome completo.')
-  const lista = profsDe(turmas[i])
+  const contato = e => rpc('esc_turma_contato', {p_token: e.token, p_nome: nome, p_telefone: tel})
+  if (f.dataset.nomeProf !== undefined) {   // tela inicial: o nome e o WhatsApp valem para todas as turmas ainda sem professor
+    return fila = fila.then(async () => { for (const e of turmas) if (!profsDe(e).length && e.turma.inscricoes_abertas) {
+      const c = await contato(e); if (c.error) return toast(erroAmigavel(c.error.message))
+      await rpc('esc_turma_definir_professor', {p_token: e.token, p_nome: nome}) }
+      toast('Nome salvo.'); await carregar() }) }
+  const e = turmas[S.i], lista = profsDe(e)
   if (lista.some(p => norm(p) === norm(nome))) return toast('Esse professor já está na lista.')
-  salvaProfs(i, [...lista, nome], 'Nome salvo.')
+  fila = fila.then(async () => { const c = await contato(e); if (c.error) return toast(erroAmigavel(c.error.message)); await salvaProfs(e, [...lista, nome], 'Nome salvo.') })
 })
 
 carregar().catch(err => aviso(`Não foi possível carregar (${err.message}). Confira a internet.`))

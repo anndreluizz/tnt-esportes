@@ -13,11 +13,57 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="estilo.css">
 <style>
-  .insc{max-width:720px;margin:18px auto 40px}
-  .insc .hero{margin-bottom:12px}
-  .insc .f{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end}
-  .insc .f .span2{grid-column:1/-1}
-  .insc .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .insc{max-width:480px;margin:0 auto;padding:16px max(14px,env(safe-area-inset-left,0px)) 150px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;font-size:18px}
+  .insc h1{font:700 34px/1.05 "Barlow Condensed";text-transform:uppercase;margin:0;text-wrap:balance}
+  .insc h2{font:700 24px/1.1 "Barlow Condensed";text-transform:uppercase;margin:0}
+  .insc p{margin:0}.insc .lead{color:var(--muted)}
+  .tp-btn{min-height:56px;padding:12px 20px;border-radius:14px;font-weight:700;font-size:18px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center}
+  .tp-btn.sm{min-height:48px;padding:8px 16px;font-size:16px}
+  .tp-btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+  .tp-btn.danger{background:transparent;color:#ff8794;border:2px solid #ff8794}
+  .tp-in{width:100%;min-height:52px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px;font:inherit}
+  .tp-pill{display:inline-block;font-size:15px;font-weight:700;padding:4px 12px;border-radius:99px;background:var(--bluebg);color:var(--blue);white-space:nowrap}
+  .tp-pill.ok{background:rgba(0,230,118,.16);color:var(--tnt-neon)}.tp-pill.wait{background:var(--amberbg);color:var(--amber)}
+  .tp-back{align-self:flex-start;border:0;background:none;color:var(--blue);font:700 18px "Barlow";padding:8px 0;min-height:44px;cursor:pointer}
+  .tp-turmas{display:flex;flex-direction:column;gap:12px}
+  .tp-turma{display:flex;flex-direction:column;gap:12px;text-align:left;cursor:pointer;color:var(--ink);font:inherit}
+  .tp-l{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.tp-l b{font:700 24px "Barlow Condensed";text-transform:uppercase}
+  .tp-bar{display:block;height:12px;border-radius:99px;background:var(--line);overflow:hidden}.tp-bar i{display:block;height:100%;background:var(--tnt-neon);border-radius:99px;transition:width .25s}
+  .tp-passo{font:700 13px "Barlow";text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px}
+  .tp-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tp-seg button{min-height:56px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:700 20px "Barlow Condensed";text-transform:uppercase;letter-spacing:.03em;cursor:pointer}
+  .tp-seg button[aria-pressed="true"]{background:var(--tnt-neon);color:#04210f;border-color:var(--tnt-neon)}
+  .tp-times{display:flex;flex-wrap:wrap;gap:8px}
+  .tp-time{min-height:56px;padding:6px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);text-align:left;display:flex;flex-direction:column;justify-content:center;line-height:1.1;cursor:pointer}
+  .tp-time small{font-size:13px;color:var(--muted);font-weight:600}.tp-time b{font:700 20px "Barlow Condensed";text-transform:uppercase}
+  .tp-time[aria-pressed="true"]{border-color:var(--tnt-neon);background:rgba(0,230,118,.16)}.tp-time[aria-pressed="true"] b{color:var(--tnt-neon)}
+  .tp-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .tp-cont{text-align:right}.tp-big{font:700 44px/1 "Barlow Condensed";color:var(--tnt-neon)}
+  .tp-lista{display:flex;flex-direction:column;gap:8px}
+  .tp-aluno{display:flex;align-items:center;gap:14px;width:100%;min-height:64px;padding:10px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
+  .tp-caixa{flex:none;width:32px;height:32px;border-radius:50%;border:3px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:20px;color:transparent}
+  .tp-aluno[aria-pressed="true"]{border-color:var(--tnt-neon);background:rgba(0,230,118,.16)}
+  .tp-aluno[aria-pressed="true"] .tp-caixa{background:var(--tnt-neon);border-color:var(--tnt-neon);color:#04210f}
+  .tp-nome-a{flex:1;min-width:0;overflow-wrap:anywhere}.tp-aluno small{display:block;color:var(--muted);font-size:14px;font-weight:600}
+  .tp-aluno.outro{opacity:.75;border-style:dashed}.tp-aluno:disabled{cursor:default}
+  .tp-trazer{flex:none;font-size:14px;font-weight:700;color:var(--blue);padding:6px 10px;border-radius:10px;background:var(--bluebg)}
+  .tp-nota{font-size:14px;margin:-4px 0 0}
+  .tp-vazio{color:var(--muted);text-align:center;padding:18px 0}
+  .insc details{border:1px solid var(--line);border-radius:16px;background:var(--card)}
+  .insc details summary{min-height:56px;padding:14px 16px;font-weight:700;cursor:pointer;display:flex;align-items:center}
+  .tp-in2{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+  .tp-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tp-conf{border:2px solid #ff8794;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .tp-prof{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .tp-mini{min-height:44px;padding:6px 14px;border-radius:12px;border:2px solid var(--line);background:transparent;color:var(--ink);font-weight:700;cursor:pointer}
+  .tp-f{display:flex;gap:8px;flex-wrap:wrap}.tp-f .tp-in{flex:1 1 200px;width:auto}
+  .tp-nome form{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .tp-rodape{position:fixed;left:0;right:0;bottom:0;background:var(--tnt-painel);color:var(--ink);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 24px rgba(0,0,0,.35);z-index:5;border-top:1px solid var(--line)}
+  .tp-rin{max-width:480px;margin:0 auto;display:flex;align-items:center;gap:14px}.tp-rtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .tp-rtx b{font:700 22px/1.1 "Barlow Condensed";text-transform:uppercase}.tp-rtx span:not(.tp-bar){font-size:15px}.tp-rtx .tp-bar{height:10px;margin-top:4px;background:rgba(255,255,255,.2)}
+  .tp-toast{position:fixed;left:50%;bottom:calc(120px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#f5f7fa;color:#071426;padding:12px 18px;border-radius:14px;display:flex;gap:14px;align-items:center;font-weight:600;z-index:9;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .tp-toast button{border:0;background:none;color:inherit;text-decoration:underline;font-weight:700;padding:4px 6px;min-height:36px;cursor:pointer}
+  .tp-toast[hidden],.tp-rodape[hidden]{display:none}
 </style>
 </head>
 <body class="escuro">
@@ -25,6 +71,8 @@
 <header class="top"><div class="wrap brand"><img class="logo" src="img/marca.svg" alt="" width="44" height="44">
   <div><div class="bname">TNT <span>ESPORTES</span></div><div class="bsub">Secretaria Municipal de Esportes · Tonantins/AM</div></div></div></header>
 <main id="app" tabindex="-1" class="wrap insc"><div class="card empty">Carregando…</div></main>
+<div id="rodape" class="tp-rodape" hidden></div>
+<div id="aviso" class="tp-toast" role="status" aria-live="polite" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="js/config.js"></script>

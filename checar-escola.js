@@ -16,7 +16,7 @@ const rows = {
   esc_juizes: [{id: 'z1', campeonato_id: 'c1', nome: 'Carlos <u>Silva'}],
   perfis: [{papel: 'secretaria'}],
 }
-const rpcs = {esc_links_turmas: [{origem: '1º ano 01', token: 'TURMATOK', professor: 'Prof <b>', times: 2, alunos: 3}], esc_turma_meu: [{origem: '1º ano 01', professor: null, inscricoes_abertas: true}], esc_turma_times: [{time_id: 'a', time_nome: '1º ano 01 - A', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 15}, {time_id: 'q', time_nome: '1º ano 01 - A', modalidade_nome: 'Queimada', genero: 'masculino', vagas: 10}], esc_turma_candidatos: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_candidatos_time: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
+const rpcs = {esc_contatos_prof: [{origem: '1º ano 01', nome: 'Prof <b>', telefone: '5592999991234'}], esc_links_turmas: [{origem: '1º ano 01', token: 'TURMATOK', professor: 'Prof <b>', times: 2, alunos: 3}], esc_turma_meu: [{origem: '1º ano 01', professor: null, inscricoes_abertas: true}], esc_turma_times: [{time_id: 'a', time_nome: '1º ano 01 - A', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 15}, {time_id: 'q', time_nome: '1º ano 01 - A', modalidade_nome: 'Queimada', genero: 'masculino', vagas: 10}], esc_turma_candidatos: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_candidatos_time: [{nome: 'Ana <i>Souza'}, {nome: 'Bia Lima'}], esc_juiz_link: 'JUIZTOK', esc_juiz_valido: 'c1', esc_links_times: [{time_id: 'a', token: TOK, professor: 'Maria da Silva'}, {time_id: 'b', token: '22222222-2222-4222-8222-222222222222', professor: null}], esc_meu_time: [{time_id: 'a', time_nome: 'Time A', turma_nome: '1º ano 01', modalidade_nome: 'Futsal', genero: 'masculino', vagas: 10, inscricoes_abertas: true, professor: null}]}
 
 function roda(arquivos, {logado, busca = TOK}) {
   const els = {}, el = () => ({innerHTML: '', textContent: '', classList: {add() {}, remove() {}}, addEventListener() {}})
@@ -54,7 +54,8 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
   ok(h.includes('com menos de 5 alunos') && h.includes('campeão direto: Solo'), 'Secretaria: aviso de futsal com menos de 5 alunos e campeão direto no sorteio')
   ok(!h.includes('data-act="sortear" data-key="t2|'), 'grupo de time único não tem sorteio')
-  ok(h.includes('turma.html?t=TURMATOK') && h.includes('Links por turma') && h.includes('data-form="turmaprof"') && h.includes('Prof &lt;b&gt;') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
+  ok(h.includes('turma.html?t=TURMATOK') && h.includes('Links por turma') && h.includes('data-form="addprof"') && h.includes('name="tel"') && h.includes('value="Prof &lt;b&gt;"') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
+  ok(h.includes('Professores e WhatsApp') && h.includes('wa.me/5592999991234?text=') && h.includes('Enviar pelo WhatsApp') && h.includes('(92) 999991234') && h.includes('Prof &lt;b&gt;') && !h.includes('Prof <b>'), 'Secretaria vê cada professor com o WhatsApp e o botão de enviar o link (turmas dele num link só)')
   ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
@@ -63,16 +64,20 @@ function roda(arquivos, {logado, busca = TOK}) {
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   ok(h.includes('Alunos da turma') && h.includes('data-add="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor de futsal vê a lista da turma para escolher (nome escapado)')
-  els = roda(['js/config.js', 'js/turma.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
-  ok(h.includes('1º ano 01') && h.includes('Futsal masculino') && h.includes('Queimada masculino') && h.includes('data-add="q"') && h.includes('data-add="a"') && h.includes('data-nome="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor da turma vê os times de futsal e a lista da turma (nomes escapados)')
-  ok(h.includes('Professores responsáveis') && h.includes('name="prof"') && h.includes('faltam 4 para o mínimo'), 'professor da turma escreve o nome e vê o que falta para o mínimo')
-  ok(h.includes('data-novo="0" data-mod="Futsal" data-gen="feminino"') && h.includes('data-novo="0" data-mod="Queimada"') && h.includes('data-exclui="0" data-id="a"'), 'professor da turma cria time novo (por modalidade e gênero) e exclui time')
+  els = roda(['js/config.js', 'js/turma.js'], {logado: false}); await espera(); h = els['#app'].innerHTML; let ctxT = els.__ctx, rod = els['#rodape'].innerHTML
+  ok(h.includes('1º ano 01') && h.includes('Time A') && h.includes('data-aluno="Ana &lt;i&gt;Souza"') && h.includes('data-mod="Queimada"') && !h.includes('Ana <i>') && !h.includes('Minhas turmas'), 'uma turma só: vai direto para os times e a lista da turma (nomes escapados)')
+  ok(h.includes('Qual é o seu nome?') && h.includes('name="prof"') && h.includes('name="tel"') && h.includes('fica só com a Secretaria') && rod.includes('Faltam 4 para o mínimo de 5') && rod.includes('1 aluno escolhido'), 'professor sem nome vê o campo, e a barra de baixo mostra o que falta para o mínimo')
+  ok(h.includes('Aluno &lt;i&gt;1&lt;/i&gt;') && h.includes('Nome fora da lista da turma'), 'aluno de nome digitado à mão aparece na lista, marcado, para poder ser removido')
+  ok(h.includes('Mais opções') && h.includes('data-novo="masculino"') && h.includes('data-novo="feminino"') && h.includes('data-exclui'), 'professor cria time novo (meninos ou meninas) e exclui time em "Mais opções"')
+  vm.runInContext("alternar('Bia Lima')", ctxT); ok(vm.runInContext("turmas[0].jogadores.some(j => j.nome === 'Bia Lima' && j.time_id === 'a')", ctxT) && els['#rodape'].innerHTML.includes('2 alunos escolhidos'), 'tocar no nome coloca o aluno no time na hora (a tela não espera o banco)')
+  vm.runInContext("S.mod = 'Queimada'; S.time = null; render(); 0", ctxT); h = els['#app'].innerHTML; rod = els['#rodape'].innerHTML
+  ok(h.includes('Queimada · Meninos · Time A') && rod.includes('Faltam 10 para o mínimo de 10'), 'queimada: o mínimo é 10')
   const T2 = '33333333-3333-4333-8333-333333333333'
   els = roda(['js/config.js', 'js/turma.js'], {logado: false, busca: TOK + ',' + T2}); await espera(); h = els['#app'].innerHTML
-  ok(h.includes('Suas 2 turmas') && h.includes('data-k="T0"') && h.includes('data-k="T1"') && h.includes('data-tk="1"'), 'um link com duas turmas: cada turma numa pasta')
+  ok(h.includes('Você cuida de 2 turmas') && h.includes('data-turma="0"') && h.includes('data-turma="1"') && h.includes('data-nome-prof'), 'um link com duas turmas: começa na lista de turmas e pergunta o nome uma vez')
   rpcs.esc_turma_meu = [{origem: '1º ano 01', professor: 'Ana Lima / Bia <b>Souza', inscricoes_abertas: true}]
   els = roda(['js/config.js', 'js/turma.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
-  ok(h.includes('Ana Lima') && h.includes('Bia &lt;b&gt;Souza') && !h.includes('Bia <b>') && h.includes('data-delprof="0"') && h.includes('Outro professor desta turma'), 'turma com vários professores: lista, tirar e adicionar outro')
+  ok(h.includes('Ana Lima') && h.includes('Bia &lt;b&gt;Souza') && !h.includes('Bia <b>') && h.includes('data-delprof="Ana Lima"') && h.includes('Nome de outro professor') && !h.includes('Qual é o seu nome?'), 'turma com vários professores: lista, tirar e adicionar outro')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Professor responsável') && h.includes('name="prof"'), 'professor sem nome cadastrado vê o campo para preencher')
   // juízes: distribuição igual, sem mexer em quem já foi escalado
