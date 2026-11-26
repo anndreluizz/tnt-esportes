@@ -42,7 +42,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('Resultados') && h.includes('Jogos a jogar') && h.includes('data-act="fm"') && !h.includes('JUIZTOK'), 'portal público lista os jogos (a jogar e resultados), com filtro, sem o link do juiz')
   ok(h.includes('Respons') && h.includes('Prof. Carlos &lt;b&gt;') && h.includes('marcas/escola/c1/logo.png') && h.includes('class="sponsors"') && h.includes('Mercado Bom') && h.includes('<b>Sem Logo</b>'), 'portal mostra logo, responsável (escapado) e patrocinadores')
   ok(h.includes('seg 07/12') && h.includes('08:00') && h.includes('Quadra 1'), 'portal mostra o dia, a hora e a quadra do jogo')
-  ok(h.includes('campeão direto: Solo &lt;b&gt;') && !h.includes('Solo <b>'), 'portal: time único é campeão direto (nome escapado)')
+  ok(!h.includes('campeão direto') && h.includes('aguardando outros times') && h.includes('Solo &lt;b&gt;') && !h.includes('Solo <b>'), 'portal: time único não vira campeão antes do sorteio (nome escapado)')
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
   ok(h.includes('Painel da Secretaria') && h.includes('data-form="placar"') && h.includes('professor.html?t=' + TOK), 'Secretaria vê painel, edita placar e pega o link do professor')
   ok(h.includes('wa.me/?text='), 'link do professor pode ir por WhatsApp')

@@ -245,8 +245,8 @@ function publico() {
   const grupos = D.mod.map(m => { const corpo = D.turmas.map(t => {
     const blocos = ['masculino', 'feminino'].map(g => {
       const times = D.times.filter(x => x.turma_id === t.id && x.modalidade_id === m.id && x.genero === g); if (!times.length) return ''
-      const camp = campeoes.get(`${t.id}|${m.id}|${g}`) || (times.length === 1 ? times[0].id : null), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
-      return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão${times.length === 1 ? ' direto' : ''}: ${esc(timeDe(camp)?.nome)}</span>` : ''}</h4>
+      const camp = campeoes.get(`${t.id}|${m.id}|${g}`), ps = D.partidas.filter(p => p.turma_id === t.id && p.modalidade_id === m.id && p.genero === g)
+      return `<div class="bloco"><h4>${esc(m.nome)} ${g}${camp ? ` · <span class="pill green">campeão: ${esc(timeDe(camp)?.nome)}</span>` : times.length === 1 ? ' <small class="sub">· aguardando outros times</small>' : ''}</h4>
         ${times.map(x => { const js = D.jog.filter(j => j.time_id === x.id); return `<div class="elenco"><b>${esc(x.nome)}</b> (${js.length}/${m.jogadores_por_time + m.reservas_max}): ${js.length ? js.map(j => esc(j.nome)).join(', ') : 'sem alunos inscritos'}</div>` }).join('')}
         ${ps.map(p => jogo(p)).join('')}</div>` }).join('')
     return blocos ? `<div class="card"><h3>${esc(t.nome)}</h3><div class="blocos">${blocos}</div></div>` : '' }).join('')
