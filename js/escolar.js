@@ -37,13 +37,15 @@ const escMod = (c, id) => c.esc.mod.find(m => m.id === id)?.nome || '?'
 const escPasta = (titulo, resumo, corpo, aberta) => `<details class="pasta"${aberta ? ' open' : ''}><summary><b>${esc(titulo)}</b> <small>${esc(resumo)}</small></summary><div class="pasta-corpo">${corpo}</div></details>`
 const escGerir = () => role() === 'secretaria' ? '<button class="btn ghost sm" data-act="tab" data-tab="escolar">Gerenciar em Jogos Escolares</button>' : ''
 
-function escJogo(c, p) {
-  const a = escTime(c, p.time_a_id), b = escTime(c, p.time_b_id), cb = p.colete_a === 'azul' ? 'vermelho' : 'azul'
-  const lado = (t, cor) => `<b>${esc(t?.nome)}</b> <span class="pill ${cor === 'azul' ? 'blue' : 'red'}">${cor}</span>`
-  const res = p.placar_a == null ? '<span class="pill">a jogar</span>' : `<b>${p.placar_a} x ${p.placar_b}</b>${p.penaltis_a != null ? ` <small class="sub">(pên. ${p.penaltis_a} x ${p.penaltis_b})</small>` : ''}`
-  return `<div class="sub" style="margin-top:8px">${esc(escMod(c, p.modalidade_id))} ${p.genero} · ${esc(escSerie(c, p.turma_id))}</div>
-    <div class="row"><span>${p.data ? `<span class="pill blue">${escDia(p.data)} ${escDm(p.data)} · ${escHora(p.hora)} · Quadra ${p.quadra}</span> ` : ''}<span class="pill">${esc(p.fase)}</span> ${lado(a, p.colete_a)} × ${lado(b, cb)}</span><span>${p.juiz_id ? `<small class="sub">Juiz: ${esc(c.esc.juizes.find(j => j.id === p.juiz_id)?.nome)}</small> ` : ''}${res}${p.vencedor_id ? ` <span class="pill green">vence ${esc(escTime(c, p.vencedor_id)?.nome)}</span>` : ''}</span></div>`
+function escJogo(c, p) {   // cartão do jogo: série e fase em cima, os dois times (cor do colete) e o placar no meio, horário e juiz embaixo
+  const a = escTime(c, p.time_a_id), b = escTime(c, p.time_b_id), cb = p.colete_a === 'azul' ? 'vermelho' : 'azul', feito = p.placar_a != null
+  const juiz = p.juiz_id ? c.esc.juizes.find(j => j.id === p.juiz_id)?.nome : ''
+  return `<article class="ec-card"><div class="ec-top"><span>${esc(escMod(c, p.modalidade_id))} ${p.genero} · ${esc(escSerie(c, p.turma_id))}</span><span class="pill">${esc(p.fase)}</span></div>
+    <div class="ec-vs"><span class="ec-t ${p.colete_a}">${esc(a?.nome)}</span>${feito ? `<b class="ec-pl">${p.placar_a} x ${p.placar_b}</b>` : '<span class="ec-x">×</span>'}<span class="ec-t ${cb}">${esc(b?.nome)}</span></div>
+    ${feito && p.penaltis_a != null ? `<div class="sub" style="text-align:center">pênaltis ${p.penaltis_a} x ${p.penaltis_b}</div>` : ''}${p.vencedor_id ? `<div style="text-align:center"><span class="pill green">vence ${esc(escTime(c, p.vencedor_id)?.nome)}</span></div>` : ''}
+    <div class="ec-foot"><span>${p.data ? `<b>${escDia(p.data)} ${escDm(p.data)} · ${escHora(p.hora)} · Quadra ${p.quadra}</b>` : 'Horário a definir'}</span>${juiz ? `<span>Juiz: ${esc(juiz)}</span>` : ''}</div></article>`
 }
+const escJogos = (c, l) => l.length ? `<div class="ec-grid">${l.map(p => escJogo(c, p)).join('')}</div>` : ''
 function escListaJogos(c) {
   const fm = ui.escfm || '', ps = c.esc.partidas.filter(p => !fm || p.modalidade_id === fm)
     .sort((x, y) => escCmpH(x, y) || ESC_ORDEM.indexOf(x.fase) - ESC_ORDEM.indexOf(y.fase) || escNat(escSerie(c, x.turma_id), escSerie(c, y.turma_id)))
@@ -52,9 +54,9 @@ function escListaJogos(c) {
   if (!c.esc.partidas.length) return '<div class="card empty mt">Os jogos ainda não foram sorteados.</div>'
   const dias = [...new Set(ps.filter(p => p.data).map(p => p.data))].sort(), hoje = new Date().toISOString().slice(0, 10), alvo = dias.find(d => d >= hoje) || dias[0]
   const programacao = dias.map(d => { const js = ps.filter(p => p.data === d)
-    return escPasta(`${escDia(d)} ${escDm(d)}`, `${js.length} jogo(s) · ${escHora(js[0].hora)} às ${escHora(js[js.length - 1].hora)}`, js.map(p => escJogo(c, p)).join(''), d === alvo) }).join('')
-  return chips + programacao + escPasta('Jogos a jogar', String(ja.length), ja.map(p => escJogo(c, p)).join('') || '<p class="sub">Nenhum jogo pendente.</p>', true)
-    + escPasta('Resultados', String(feitos.length), feitos.map(p => escJogo(c, p)).join('') || '<p class="sub">Ainda sem resultados.</p>')
+    return escPasta(`${escDia(d)} ${escDm(d)}`, `${js.length} jogo(s) · ${escHora(js[0].hora)} às ${escHora(js[js.length - 1].hora)}`, escJogos(c, js), d === alvo) }).join('')
+  return chips + programacao + escPasta('Jogos a jogar', String(ja.length), escJogos(c, ja) || '<p class="sub">Nenhum jogo pendente.</p>', true)
+    + escPasta('Resultados', String(feitos.length), escJogos(c, feitos) || '<p class="sub">Ainda sem resultados.</p>')
 }
 const escHead = (c, olho, titulo, extra = '') => `<div class="head"><div><div class="eyebrow">${olho}</div><h2>${titulo}</h2><p class="sub">${esc(c.name)}</p></div>${extra}</div>`
 // campeões: quem venceu a final + time único do grupo (campeão direto, sem jogo)
@@ -83,8 +85,9 @@ const ESC_VIEWS = {
     + (c.esc.partidas.length ? `<div class="grid g3">${ESC_CARDS.map((n, i) => `<div class="card"><div class="cv" id="cv${i}"></div><div class="btns" style="margin-top:10px"><button class="btn" data-act="share" data-i="${i}">Compartilhar</button><button class="btn ghost" data-act="dl" data-i="${i}">Baixar</button></div></div>`).join('')}</div>`
       : '<div class="card empty">As imagens ficam disponíveis depois do sorteio dos jogos.</div>'),
   portal: c => `<div class="chips">${S.champs.map(x => `<button class="${x.id === c.id ? 'on' : ''}" data-act="pchamp" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>
-    <div class="phero"><div><div class="eyebrow">Portal público · sem login</div><div style="display:flex;gap:14px;align-items:center">${clogo(c.logo, 64)}<h2>${esc(c.name)}</h2></div>
-    <p>${dmy(c.start)} a ${dmy(c.end)} · ${esc(c.venue)}${c.responsible ? ` · Responsável: ${esc(c.responsible)}` : ''}</p></div></div>${sponsorsBar(c)}
+    <header class="ehero"><div class="eyebrow">Campeonato interno da escola</div><div class="ehead">${clogo(c.logo, 72)}<h2>${esc(c.name)}</h2></div>
+    <div class="pub-chips"><span>${dmy(c.start)} a ${dmy(c.end)}</span><span>${esc(c.venue)}</span>${c.responsible ? `<span>Responsável: ${esc(c.responsible)}</span>` : ''}</div>
+    <div class="pub-stats">${[[c.esc.turmas.length, 'séries'], [c.esc.times.length, 'times'], [c.esc.jog.length, 'alunos'], [new Set(c.esc.partidas.map(p => p.data).filter(Boolean)).size || 3, 'dias de jogos']].map(([n, r]) => `<div class="pub-stat"><b>${n}</b><span>${r}</span></div>`).join('')}</div></header>${sponsorsBar(c)}
     ${escCampeoes(c) ? `<div class="card mt"><h3>Campeões</h3>${escCampeoes(c)}</div>` : ''}<div class="mt">${escListaJogos(c)}</div>`,
 }
 for (const k of Object.keys(VIEWS)) { const orig = VIEWS[k]; if (ESC_VIEWS[k]) VIEWS[k] = () => C()?.escolar ? ESC_VIEWS[k](C()) : orig() }
