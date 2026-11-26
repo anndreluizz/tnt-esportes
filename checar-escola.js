@@ -60,7 +60,13 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
   els = roda(['js/config.js', 'js/juiz.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
-  ok(h.includes('Mesa do juiz') && h.includes('name="pa"') && h.includes('name="ea"') && h.includes('Corrigir resultado'), 'juiz vê os jogos com campos de placar e pênaltis')
+  ok(h.includes('Mesa do juiz') && h.includes('data-abrir="p1"') && h.includes('Corrigir') && !h.includes('name="pa"') && !h.includes('sumclock'), 'juiz vê a lista de jogos (um toque abre a mesa do jogo)')
+  const ctxJ = els.__ctx; vm.runInContext("abrir('p1')", ctxJ); h = els['#app'].innerHTML
+  ok(h.includes('sumclock') && h.includes('10 min') && h.includes('name="pa"') && h.includes('name="ea"') && h.includes('Corrigir resultado') && h.includes('data-voltar') && h.includes('Imprimir súmula'), 'mesa do jogo: relógio, placar, pênaltis (jogo empatado) e voltar')
+  vm.runInContext("sumAcao('p1', 'gol', 'a')", ctxJ); h = els['#app'].innerHTML
+  ok(h.includes('name="pa" value="3"') && !h.includes('name="ea"') && h.includes('Gol ·'), 'gol muda o placar, esconde os pênaltis (não empata mais) e entra no log')
+  vm.runInContext("sumAcao('p1', 'desfazer')", ctxJ); h = els['#app'].innerHTML
+  ok(h.includes('name="pa" value="2"') && h.includes('name="ea"'), 'desfazer volta o placar e os pênaltis')
   els = roda(['js/config.js', 'js/professor.js'], {logado: false}); await espera(); h = els['#app'].innerHTML
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   ok(h.includes('Alunos da turma') && h.includes('data-add="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor de futsal vê a lista da turma para escolher (nome escapado)')
