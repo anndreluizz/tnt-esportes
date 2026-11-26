@@ -136,28 +136,35 @@ const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).hre
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
 const incompletos = x => MINIMO[x.m.nome] ? x.times.filter(t => D.jog.filter(j => j.time_id === t.id).length < MINIMO[x.m.nome]).length : 0
-// Uma lista só de professores: cada pessoa aparece UMA vez, com todas as turmas dela num link só (turma.html?t=tok1,tok2)
+// Uma lista só de professores. Mesmo WhatsApp = mesma pessoa (ex.: Sebastiana e Sebastiana Rocha); sem WhatsApp, nome igual sem diferença de maiúscula.
+// Cada pessoa aparece UMA vez, com todas as turmas dela num link só (turma.html?t=tok1,tok2).
 function professores() {
   const sp = o => { const i = SERIES.findIndex(s => o.startsWith(s) || (s === 'EJAI' && /EJAI/.test(o))); return i < 0 ? 99 : i }
-  const porNome = new Map()
+  const nrm = s => String(s).trim().replace(/\s+/g, ' ').toLowerCase()
+  const foneDe = (origem, nome) => D.contatos.find(c => c.origem === origem && nrm(c.nome) === nrm(nome))?.telefone || D.contatos.find(c => nrm(c.nome) === nrm(nome))?.telefone || null
+  const grupos = new Map()
   for (const l of D.turmasLinks) for (const nome of String(l.professor || '').split(' / ').filter(Boolean)) {
-    const g = porNome.get(nome) || {nome, turmas: [], tel: D.contatos.find(c => c.nome === nome)?.telefone || null}
-    g.turmas.push(l); porNome.set(nome, g)
+    const tel = foneDe(l.origem, nome), k = tel || 'nome:' + nrm(nome)
+    const g = grupos.get(k) || {nomes: [], turmas: [], tel: null}
+    g.nomes.push(nome); if (!g.turmas.some(t => t.l.origem === l.origem)) g.turmas.push({l, nome}); g.tel = g.tel || tel
+    grupos.set(k, g)
   }
+  const pessoas = [...grupos.values()].map(g => ({nome: g.nomes.reduce((a, b) => (b.length > a.length ? b : a)), tel: g.tel, turmas: g.turmas}))
   const add = `<form class="f" data-form="addprof" style="margin-bottom:12px">
     <label>Nome completo<input name="nome" required minlength="3" maxlength="60" autocomplete="off" placeholder="Nome completo"></label>
     <label>WhatsApp com DDD<input name="tel" type="tel" inputmode="tel" placeholder="92 99999-9999"></label>
     <label>Turma<select name="origem" required>${[...D.turmasLinks].sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem)).map(l => `<option value="${esc(l.origem)}">${esc(l.origem)}</option>`).join('')}</select></label>
     <div><button class="btn ghost sm">Adicionar professor</button></div>
-    <p class="sub span2">Para pôr o mesmo professor em outra turma, escreva o nome igual e escolha a outra turma. Para tirar, use "Tirar de..." na linha dele.</p></form>`
-  const lista = [...porNome.values()].sort((a, b) => nat(a.nome, b.nome)).map(g => {
-    const ts = g.turmas.sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem)), link = new URL('turma.html?t=' + ts.map(t => t.token).join(','), location.href).href
-    const msg = `Olá, ${g.nome.split(' ')[0]}! Você é professor(a) responsável pela(s) turma(s) ${ts.map(t => t.origem).join(', ')} nos II Jogos Escolares. Por este link você escolhe os alunos que vão jogar: ${link}`
+    <p class="sub span2">Para pôr o mesmo professor em outra turma, escreva o nome (ou o mesmo WhatsApp) e escolha a outra turma. Para tirar, use "Tirar de..." na linha dele.</p></form>`
+  const lista = pessoas.sort((a, b) => nat(a.nome, b.nome)).map(g => {
+    const ts = [...g.turmas].sort((x, y) => sp(x.l.origem) - sp(y.l.origem) || nat(x.l.origem, y.l.origem))
+    const link = new URL('turma.html?t=' + ts.map(t => t.l.token).join(','), location.href).href
+    const msg = `Olá, ${g.nome.split(' ')[0]}! Você é professor(a) responsável pela(s) turma(s) ${ts.map(t => t.l.origem).join(', ')} nos II Jogos Escolares. Por este link você escolhe os alunos que vão jogar: ${link}`
     const fone = g.tel ? g.tel.replace(/^55(\d{2})(\d+)$/, '($1) $2') : ''
-    return `<div class="row" style="flex-wrap:wrap"><span><b>${esc(g.nome)}</b> ${g.tel ? `<small class="sub">${esc(fone)}</small>` : '<span class="pill amber">sem WhatsApp</span>'}<br><small class="sub">${ts.length} turma(s): ${ts.map(t => esc(t.origem)).join(' · ')}</small></span><span class="btns">
+    return `<div class="row" style="flex-wrap:wrap"><span><b>${esc(g.nome)}</b> ${g.tel ? `<small class="sub">${esc(fone)}</small>` : '<span class="pill amber">sem WhatsApp</span>'}<br><small class="sub">${ts.length} turma(s): ${ts.map(t => esc(t.l.origem)).join(' · ')}</small></span><span class="btns">
       <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
       <a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${g.tel ? esc(g.tel) : ''}?text=${encodeURIComponent(msg)}">Enviar pelo WhatsApp</a></span>
-      <div class="btns" style="width:100%;margin-top:6px">${ts.map(t => `<button class="btn ghost sm" data-act="tirarprof" data-origem="${esc(t.origem)}" data-nome="${esc(g.nome)}">Tirar de ${esc(t.origem)}</button>`).join('')}</div></div>` }).join('')
+      <div class="btns" style="width:100%;margin-top:6px">${ts.map(t => `<button class="btn ghost sm" data-act="tirarprof" data-origem="${esc(t.l.origem)}" data-nome="${esc(t.nome)}">Tirar de ${esc(t.l.origem)}</button>`).join('')}</div></div>` }).join('')
   const semProf = [...D.turmasLinks].filter(l => !l.professor).sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem))
   const faltam = semProf.length ? `<h4>Turmas sem professor</h4>` + semProf.map(l => `<div class="row"><span><b>${esc(l.origem)}</b> <span class="pill amber">professor ainda não preencheu</span></span><span class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(new URL('turma.html?t=' + l.token, location.href).href)}">Copiar link</button></span></div>`).join('') : ''
   return add + (lista || '<p class="sub">Adicione o primeiro professor acima.</p>') + faltam
