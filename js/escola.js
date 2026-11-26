@@ -163,6 +163,7 @@ function professores() {
     const fone = g.tel ? g.tel.replace(/^55(\d{2})(\d+)$/, '($1) $2') : ''
     return `<div class="row" style="flex-wrap:wrap"><span><b>${esc(g.nome)}</b> ${g.tel ? `<small class="sub">${esc(fone)}</small>` : '<span class="pill amber">sem WhatsApp</span>'}<br><small class="sub">${ts.length} turma(s): ${ts.map(t => esc(t.l.origem)).join(' · ')}</small></span><span class="btns">
       <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
+      <button class="btn ghost sm" data-act="renomear" data-nome="${esc(g.nome)}">Corrigir nome</button>
       <a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${g.tel ? esc(g.tel) : ''}?text=${encodeURIComponent(msg)}">Enviar pelo WhatsApp</a></span>
       <div class="btns" style="width:100%;margin-top:6px">${ts.map(t => `<button class="btn ghost sm" data-act="tirarprof" data-origem="${esc(t.l.origem)}" data-nome="${esc(t.nome)}">Tirar de ${esc(t.l.origem)}</button>`).join('')}</div></div>` }).join('')
   const semProf = [...D.turmasLinks].filter(l => !l.professor).sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem))
@@ -336,6 +337,11 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
+    if (act === 'renomear') {   // corrige o nome em todas as turmas e no WhatsApp; o numero continua o mesmo
+      const novo = prompt('Nome correto do professor:', b.dataset.nome); if (!novo || novo.trim() === b.dataset.nome) return
+      await q(sb.rpc('esc_secretaria_renomear_professor', {p_campeonato: D.c.id, p_antigo: b.dataset.nome, p_novo: novo}))
+      toast('Nome corrigido.'); return carregar()
+    }
     if (act === 'tirarprof') {   // tira o professor só desta turma; as outras turmas dele continuam
       if (!confirm(`Tirar ${b.dataset.nome} da turma ${b.dataset.origem}? As outras turmas dele continuam.`)) return
       await q(sb.rpc('esc_secretaria_tirar_professor', {p_campeonato: D.c.id, p_origem: b.dataset.origem, p_nome: b.dataset.nome}))
