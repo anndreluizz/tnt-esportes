@@ -54,8 +54,8 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('data-form="identidade"') && h.includes('name="logo"') && h.includes('name="sp0"') && h.includes('data-act="addpat"') && h.includes('name="responsavel"'), 'Secretaria edita logo, responsável e patrocinadores')
   ok(h.includes('com menos de 5 alunos') && h.includes('campeão direto: Solo'), 'Secretaria: aviso de futsal com menos de 5 alunos e campeão direto no sorteio')
   ok(!h.includes('data-act="sortear" data-key="t2|'), 'grupo de time único não tem sorteio')
-  ok(h.includes('turma.html?t=TURMATOK') && h.includes('Links por turma') && h.includes('data-form="addprof"') && h.includes('name="tel"') && h.includes('value="Prof &lt;b&gt;"') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
-  ok(h.includes('Professores e WhatsApp') && h.includes('wa.me/5592999991234?text=') && h.includes('Enviar pelo WhatsApp') && h.includes('(92) 999991234') && h.includes('Prof &lt;b&gt;') && !h.includes('Prof <b>'), 'Secretaria vê cada professor com o WhatsApp e o botão de enviar o link (turmas dele num link só)')
+  ok(h.includes('turma.html?t=TURMATOK') && h.includes('data-form="addprof"') && h.includes('name="origem"') && h.includes('name="tel"') && h.includes('data-act="tirarprof"') && !h.includes('Prof <b>'), 'Secretaria pega o link de cada turma (professor escapado)')
+  ok(h.includes('>Professores <small>') && h.includes('wa.me/5592999991234?text=') && h.includes('Enviar pelo WhatsApp') && h.includes('(92) 999991234') && h.includes('<b>Prof &lt;b&gt;</b>') && !h.includes('Prof <b>') && !h.includes('Links por turma'), 'Secretaria vê cada professor com o WhatsApp e o botão de enviar o link (turmas dele num link só)')
   ok(h.includes('data-form="agenda"') && h.includes('5. Horários dos jogos') && h.includes('Ver como fica'), 'Secretaria vê o card de horários')
   ok(h.includes('data-form="juiz"') && h.includes('Carlos &lt;u&gt;Silva') && h.includes('data-juiz="p1"') && !h.includes('Carlos <u>'), 'Secretaria cadastra juízes (nome escapado) e escala em cada jogo')
   ok(h.includes('juiz.html?t=JUIZTOK') && h.includes('Link do juiz'), 'Secretaria pega o link do juiz')
@@ -65,6 +65,7 @@ function roda(arquivos, {logado, busca = TOK}) {
   ok(h.includes('Time A') && h.includes('1 de 10') && h.includes('Inscrever aluno') && h.includes('Aluno &lt;i&gt;1&lt;/i&gt;'), 'professor vê o time, as vagas e o formulário')
   ok(h.includes('Alunos da turma') && h.includes('data-add="Ana &lt;i&gt;Souza"') && !h.includes('Ana <i>'), 'professor de futsal vê a lista da turma para escolher (nome escapado)')
   els = roda(['js/config.js', 'js/turma.js'], {logado: false}); await espera(); h = els['#app'].innerHTML; let ctxT = els.__ctx, rod = els['#rodape'].innerHTML
+  ok(h.includes('Quem vai jogar') && h.includes('Ficaram de fora') && h.includes('tp-rtime'), 'professor vê o resumo dos times e quem ficou de fora')
   ok(h.includes('1º ano 01') && h.includes('Time A') && h.includes('data-aluno="Ana &lt;i&gt;Souza"') && h.includes('data-mod="Queimada"') && !h.includes('Ana <i>') && !h.includes('Minhas turmas'), 'uma turma só: vai direto para os times e a lista da turma (nomes escapados)')
   ok(h.includes('Qual é o seu nome?') && h.includes('name="prof"') && h.includes('name="tel"') && h.includes('fica só com a Secretaria') && rod.includes('Faltam 4 para o mínimo de 5') && rod.includes('1 aluno escolhido'), 'professor sem nome vê o campo, e a barra de baixo mostra o que falta para o mínimo')
   ok(h.includes('Aluno &lt;i&gt;1&lt;/i&gt;') && h.includes('Nome fora da lista da turma'), 'aluno de nome digitado à mão aparece na lista, marcado, para poder ser removido')

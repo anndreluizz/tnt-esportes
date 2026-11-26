@@ -81,6 +81,13 @@ function telaTurma() {
   const profHtml = `${profs.map(p => `<div class="tp-prof"><span>${esc(p)}</span>${ab && profs.length > 1 ? `<button type="button" class="tp-mini" data-delprof="${esc(p)}" aria-label="Tirar ${esc(p)}">Tirar</button>` : ''}</div>`).join('') || '<p class="lead">Nenhum professor informado ainda.</p>'}
     ${ab ? `<form class="tp-f" data-addprof><input name="prof" class="tp-in" required minlength="3" maxlength="60" autocomplete="name" placeholder="${profs.length ? 'Nome de outro professor' : 'Seu nome completo'}" aria-label="Nome do professor"><input name="tel" class="tp-in" type="tel" inputmode="tel" required autocomplete="tel" placeholder="WhatsApp com DDD (92 99999-9999)" aria-label="WhatsApp do professor"><p class="lead tp-nota">O número fica só com a Secretaria, para enviar o link pelo WhatsApp.</p><button class="btn tp-btn sm">${profs.length ? 'Adicionar' : 'Salvar meu nome'}</button></form>` : ''}`
   const rod = tm ? `<div class="tp-rin"><div class="tp-rtx"><b>${n} ${n === 1 ? 'aluno escolhido' : 'alunos escolhidos'}</b><span>${pronto ? 'Time pronto para jogar' : `Faltam ${min - n} para o mínimo de ${min}`}</span><span class="tp-bar" aria-hidden="true"><i style="width:${min ? Math.min(100, Math.round(n / min * 100)) : 100}%"></i></span></div>${turmas.length > 1 ? `<button type="button" class="btn tp-btn" data-home>${pronto ? 'Concluir' : 'Sair'}</button>` : ''}</div>` : ''
+  // resumo: quem está em cada time desta modalidade e quem ficou de fora (da lista da turma)
+  const dentro = new Set(e.jogadores.filter(j => ocupa.has(j.time_id)).map(j => norm(j.nome))), fora = e.candidatos.filter(a => !dentro.has(norm(a)))
+  const ordenar = arr => [...arr].sort((x, y) => String(x).localeCompare(String(y), 'pt'))
+  const resumo = `<div class="card tp-resumo"><div class="tp-passo">Quem vai jogar · ${S.mod}</div>
+    <div class="tp-rgrid">${ts.map(x => { const nomes = ordenar(e.jogadores.filter(j => j.time_id === x.time_id).map(j => j.nome)), c = nomes.length
+      return `<div class="tp-rtime${x.time_id === S.time ? ' atual' : ''}"><div class="tp-rh"><b>Time ${esc(letra(x.time_nome))}</b><span>${sexo(x.genero)} · ${c}/${x.vagas}</span></div>${c ? `<ol>${nomes.map(n => `<li>${esc(n)}</li>`).join('')}</ol>` : '<p class="lead">Ninguém ainda.</p>'}</div>` }).join('') || '<p class="lead">Esta turma ainda não tem time neste esporte.</p>'}</div>
+    <div class="tp-fora"><b>Ficaram de fora (${fora.length})</b>${fora.length ? `<div class="tp-chips">${ordenar(fora).map(n => `<span>${esc(n)}</span>`).join('')}</div>` : '<p class="lead">Todos da lista já estão num time.</p>'}</div></div>`
   return {rod, html: `${turmas.length > 1 ? '<button type="button" class="tp-back" data-home>← Minhas turmas</button>' : ''}
   <div><div class="tp-passo">Turma</div><h1>${esc(e.turma.origem)}</h1></div>
   ${!ab ? '<div class="card empty">As inscrições estão encerradas. Procure a Secretaria para qualquer ajuste.</div>' : ''}
@@ -91,6 +98,7 @@ function telaTurma() {
   <div><div class="tp-passo">3. Toque no nome de quem vai jogar</div><input id="busca" class="tp-in" type="search" placeholder="Procurar aluno pelo nome" value="${esc(S.busca)}" autocomplete="off" aria-label="Procurar aluno"></div>
   <div class="tp-lista">${linhas || '<p class="tp-vazio">Nenhum aluno com esse nome.</p>'}</div>
   ${n >= max ? `<p class="tp-pill wait" style="white-space:normal">O time já tem ${max} alunos, que é o máximo.</p>` : ''}` : ''}
+  ${resumo}
   ${ab ? `<details data-d="mais"${abertos.mais ? ' open' : ''}><summary>Mais opções (criar ou excluir time)</summary><div class="tp-in2">
     <p class="lead">Precisa de mais um time? Crie aqui. O sistema escolhe a letra sozinho.</p>
     <div class="tp-row2"><button type="button" class="btn tp-btn ghost" data-novo="masculino">+ Time de meninos</button><button type="button" class="btn tp-btn ghost" data-novo="feminino">+ Time de meninas</button></div>

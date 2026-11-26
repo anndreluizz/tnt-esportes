@@ -136,33 +136,31 @@ const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).hre
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
 const incompletos = x => MINIMO[x.m.nome] ? x.times.filter(t => D.jog.filter(j => j.time_id === t.id).length < MINIMO[x.m.nome]).length : 0
-// Um link por professor (todas as turmas dele) para enviar pelo WhatsApp do número que foi informado ao adicionar o professor
-function linksProfessores() {
+// Uma lista só de professores: cada pessoa aparece UMA vez, com todas as turmas dela num link só (turma.html?t=tok1,tok2)
+function professores() {
   const sp = o => { const i = SERIES.findIndex(s => o.startsWith(s) || (s === 'EJAI' && /EJAI/.test(o))); return i < 0 ? 99 : i }
-  const porTel = new Map()
-  for (const c of D.contatos) {
-    const l = D.turmasLinks.find(x => x.origem === c.origem); if (!l || !String(l.professor || '').split(' / ').includes(c.nome)) continue   // só quem ainda é professor da turma
-    const g = porTel.get(c.telefone) || {tel: c.telefone, nome: c.nome, turmas: []}; if (!g.turmas.some(t => t.origem === c.origem)) g.turmas.push(l); porTel.set(c.telefone, g)
+  const porNome = new Map()
+  for (const l of D.turmasLinks) for (const nome of String(l.professor || '').split(' / ').filter(Boolean)) {
+    const g = porNome.get(nome) || {nome, turmas: [], tel: D.contatos.find(c => c.nome === nome)?.telefone || null}
+    g.turmas.push(l); porNome.set(nome, g)
   }
-  if (!porTel.size) return '<p class="sub">Quando um professor for adicionado com o WhatsApp, ele aparece aqui com o botão de enviar o link.</p>'
-  return [...porTel.values()].sort((a, b) => a.nome.localeCompare(b.nome)).map(g => {
+  const add = `<form class="f" data-form="addprof" style="margin-bottom:12px">
+    <label>Nome completo<input name="nome" required minlength="3" maxlength="60" autocomplete="off" placeholder="Nome completo"></label>
+    <label>WhatsApp com DDD<input name="tel" type="tel" inputmode="tel" placeholder="92 99999-9999"></label>
+    <label>Turma<select name="origem" required>${[...D.turmasLinks].sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem)).map(l => `<option value="${esc(l.origem)}">${esc(l.origem)}</option>`).join('')}</select></label>
+    <div><button class="btn ghost sm">Adicionar professor</button></div>
+    <p class="sub span2">Para pôr o mesmo professor em outra turma, escreva o nome igual e escolha a outra turma. Para tirar, use "Tirar de..." na linha dele.</p></form>`
+  const lista = [...porNome.values()].sort((a, b) => nat(a.nome, b.nome)).map(g => {
     const ts = g.turmas.sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem)), link = new URL('turma.html?t=' + ts.map(t => t.token).join(','), location.href).href
     const msg = `Olá, ${g.nome.split(' ')[0]}! Você é professor(a) responsável pela(s) turma(s) ${ts.map(t => t.origem).join(', ')} nos II Jogos Escolares. Por este link você escolhe os alunos que vão jogar: ${link}`
-    const fone = g.tel.replace(/^55(\d{2})(\d+)$/, '($1) $2')
-    return `<div class="row"><span><b>${esc(g.nome)}</b> <small class="sub">${esc(fone)}</small><br><small class="sub">${ts.map(t => esc(t.origem)).join(' · ')} · ${ts.reduce((n, t) => n + t.alunos, 0)} aluno(s) escolhido(s)</small></span><span class="btns">
+    const fone = g.tel ? g.tel.replace(/^55(\d{2})(\d+)$/, '($1) $2') : ''
+    return `<div class="row" style="flex-wrap:wrap"><span><b>${esc(g.nome)}</b> ${g.tel ? `<small class="sub">${esc(fone)}</small>` : '<span class="pill amber">sem WhatsApp</span>'}<br><small class="sub">${ts.length} turma(s): ${ts.map(t => esc(t.origem)).join(' · ')}</small></span><span class="btns">
       <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
-      <a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${esc(g.tel)}?text=${encodeURIComponent(msg)}">Enviar pelo WhatsApp</a></span></div>` }).join('')
-}
-
-function linksTurmas() {
-  const sp = o => { const i = SERIES.findIndex(s => o.startsWith(s) || (s === 'EJAI' && /EJAI/.test(o))); return i < 0 ? 99 : i }
-  const lista = [...D.turmasLinks].sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem))
-  if (!lista.length) return '<p class="sub">Cadastre os times para gerar os links das turmas.</p>'
-  return lista.map(l => { const link = new URL('turma.html?t=' + l.token, location.href).href
-    return `<div class="row"><span><b>${esc(l.origem)}</b> <small class="sub">${l.times} time(s) · ${l.alunos} aluno(s) escolhido(s)</small><br>${l.professor ? `Professor: ${esc(l.professor)}` : '<span class="pill amber">professor ainda não preencheu</span>'}</span><span class="btns">
-      <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
-      <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Olá! Você é o professor responsável pela turma ' + l.origem + ' nos II Jogos Escolares. Escreva seu nome e monte os times da turma (alunos escolhidos para o futsal) por este link: ' + link)}">WhatsApp</a></span>
-      <form class="f" data-form="addprof" data-origem="${esc(l.origem)}" style="width:100%;margin-top:6px"><label>Adicionar professor<input name="nome" required minlength="3" maxlength="60" list="profs-${esc(l.origem)}" placeholder="Nome completo"></label><datalist id="profs-${esc(l.origem)}">${String(l.professor || '').split(' / ').filter(Boolean).map(p => `<option value="${esc(p)}">`).join('')}</datalist><label>WhatsApp com DDD<input name="tel" type="tel" inputmode="tel" placeholder="92 99999-9999"></label><div><button class="btn ghost sm">Adicionar</button></div></form></div>` }).join('')
+      <a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${g.tel ? esc(g.tel) : ''}?text=${encodeURIComponent(msg)}">Enviar pelo WhatsApp</a></span>
+      <div class="btns" style="width:100%;margin-top:6px">${ts.map(t => `<button class="btn ghost sm" data-act="tirarprof" data-origem="${esc(t.origem)}" data-nome="${esc(g.nome)}">Tirar de ${esc(t.origem)}</button>`).join('')}</div></div>` }).join('')
+  const semProf = [...D.turmasLinks].filter(l => !l.professor).sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem))
+  const faltam = semProf.length ? `<h4>Turmas sem professor</h4>` + semProf.map(l => `<div class="row"><span><b>${esc(l.origem)}</b> <span class="pill amber">professor ainda não preencheu</span></span><span class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(new URL('turma.html?t=' + l.token, location.href).href)}">Copiar link</button></span></div>`).join('') : ''
+  return add + (lista || '<p class="sub">Adicione o primeiro professor acima.</p>') + faltam
 }
 
 function horarios() {
@@ -228,8 +226,7 @@ function secretaria() {
     <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
       <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
       ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
-    <div class="card"><h3>Professores e WhatsApp <small>um link por professor, com todas as turmas dele</small></h3>${linksProfessores()}</div>
-    <div class="card"><h3>Links por turma <small>o professor da turma organiza os times A, B, C... (masculino e feminino) num link só</small></h3>${linksTurmas()}</div>
+    <div class="card"><h3>Professores <small>um link por professor, com todas as turmas dele</small></h3>${professores()}</div>
     <div class="card"><h3>3. Times e links dos professores <small>${D.times.filter(t => D.profs[t.id]).length} de ${D.times.length} com professor responsável</small></h3><form class="f" data-form="time">
       <label>Série (grupo)<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
       <label>Turma de origem<input name="origem" required maxlength="30" list="origens" placeholder="Ex.: 1º ano 01"></label><datalist id="origens">${ORIGENS.map(o => `<option value="${o}">`).join('')}</datalist>
@@ -312,7 +309,7 @@ const ACOES = {
   agenda: async d => { const q1 = Math.max(1, Math.min(9, +d.quadras || 1))
     ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], previa: null}
     ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1}); return 'Prévia pronta. Confira abaixo e aplique.' },
-  addprof: async (d, f) => { const {error} = await sb.rpc('esc_secretaria_professor', {p_campeonato: D.c.id, p_origem: f.dataset.origem, p_nome: d.nome, p_telefone: d.tel || ''})
+  addprof: async d => { const {error} = await sb.rpc('esc_secretaria_professor', {p_campeonato: D.c.id, p_origem: d.origem, p_nome: d.nome, p_telefone: d.tel || ''})
     if (error) throw new Error(/telefone/.test(error.message) ? 'Digite o WhatsApp com DDD, por exemplo 92 99999-9999.' : error.message); return 'Professor salvo.' },
   placar: async (d, f) => { const n = v => v === '' ? null : +v
     await q(sb.from('esc_partidas').update({placar_a: n(d.pa), placar_b: n(d.pb), penaltis_a: n(d.ea), penaltis_b: n(d.eb)}).eq('id', f.dataset.id)) },
@@ -332,6 +329,11 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act
   try {
     if (act === 'copiar') { await navigator.clipboard.writeText(b.dataset.link); return toast('Link copiado. Mande só ao professor deste time.') }
+    if (act === 'tirarprof') {   // tira o professor só desta turma; as outras turmas dele continuam
+      if (!confirm(`Tirar ${b.dataset.nome} da turma ${b.dataset.origem}? As outras turmas dele continuam.`)) return
+      await q(sb.rpc('esc_secretaria_tirar_professor', {p_campeonato: D.c.id, p_origem: b.dataset.origem, p_nome: b.dataset.nome}))
+      toast('Professor tirado da turma.'); return carregar()
+    }
     if (act === 'distribuir') {   // reparte os jogos sem juiz de forma igual (sempre o juiz com menos jogos; empate sorteado)
       if (!D.juizes.length) return toast('Cadastre os juízes primeiro.')
       const por = reparteJuizes(D.juizes, D.partidas), n = [...por.values()].reduce((s, l) => s + l.length, 0)
