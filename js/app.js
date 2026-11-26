@@ -308,7 +308,7 @@ function vPainel() {
 const clogo = (url, size = 44) => url ? `<img class="clogo" src="${esc(url)}" alt="" style="width:${size}px;height:${size}px">` : ''
 function sponsorsBar(c) {
   if (!c.sponsors?.length) return ''
-  return `<div class="sponsors"><span class="eyebrow">Patrocínio</span>${c.sponsors.map(s => s.logo ? `<img src="${esc(s.logo)}" alt="${esc(s.name)}" title="${esc(s.name)}">` : `<b>${esc(s.name)}</b>`).join('')}</div>`
+  return `<section class="sponsors pub-spons" aria-label="Patrocínio"><div class="eyebrow">Patrocínio</div><h3>Quem apoia o campeonato</h3><div class="pub-spons-grid">${c.sponsors.map(s => `<div class="pub-spon">${s.logo ? `<img src="${esc(s.logo)}" alt="" loading="lazy">` : ''}<b>${esc(s.name)}</b></div>`).join('')}</div></section>`
 }
 function calendarioCampos(c) {
   const r = c ? regras(c) : regrasPadrao(Object.keys(SPORTS)[0])
@@ -1397,7 +1397,7 @@ function render() {
   if (REAL && c && !ui.draw && c.pendingDraw) ui.draw = {...c.pendingDraw}
   $('#hright').innerHTML = (r === 'equipe' ? `<span class="who"><span><b>${esc(T(c, S.session.teamId).name)}</b>Equipe</span></span>`
     : `<select class="hsel" id="sel-champ" aria-label="Campeonato">${S.champs.map(x => `<option value="${x.id}" ${x.id === c?.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select><span class="who"><span><b>${esc(S.session.name || ROLES[r].name)}</b>${ROLES[r].label}</span></span>`)
-    + '<button class="out" data-act="logout">Trocar perfil</button>'
+    + `<button class="out" data-act="logout">${S.session?.visitante ? (S.session.volta ? 'Voltar ao painel' : 'Entrar') : 'Trocar perfil'}</button>`
   const agrupa = r === 'secretaria', rotulo = k => (tabs.find(t => t[0] === k) || [])[1] || ''
   const tabBtn = (k, l, on, ic = '', cls = '') => `<button class="${[cls, on ? 'on' : ''].filter(Boolean).join(' ')}" data-act="tab" data-tab="${k}" ${on ? 'aria-current="page"' : ''}>${ic}${l}</button>`
   ui.ultimo ??= {}   // última tela vista em cada grupo: tocar no grupo volta para ela

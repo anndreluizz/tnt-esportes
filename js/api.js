@@ -383,7 +383,8 @@ const atleta = (id, campos) => q(sb.from('atletas').update(campos).eq('id', id))
 
 const DEMO = {ev: A.ev, pick: A.pick}
 const REAL_A = {
-  logout: async () => { await sb.auth.signOut(); S.session = ui.noProfile = null; resetTransient(); ui.doc = null; render(); await loadAll() },
+  logout: async () => { if (S.session?.visitante) { location.href = location.pathname; return }   // visão de visitante: não derruba a sessão guardada, só volta para ela
+    await sb.auth.signOut(); S.session = ui.noProfile = null; resetTransient(); ui.doc = null; render(); await loadAll() },
   signupmode: d => { ui.signup = d.tipo || null; ui.signupDone = null },
   auth: write(d => atleta(d.id, {autorizacao: true})),
   approve: write(d => atleta(d.id, {aprovado: true})),
@@ -608,6 +609,11 @@ async function startReal() {
   S.offline = !navigator.onLine
   try {
     const {data: {session}} = await sb.auth.getSession()
+    if (location.hash === '#portal') {   // "Ver o portal" da tela inicial: vê como a população, mesmo com login guardado (que fica intacto)
+      sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {auth: {persistSession: false, autoRefreshToken: false, detectSessionInUrl: false}})
+      S.session = {role: 'publico', visitante: true, volta: !!session}
+      await loadAll(); render(); return
+    }
     if (session) await enter(session.user)
     if (S.session && location.hash === '#escolar') ui.tab = 'escolar'
     if (!S.session && (location.hash === '#portal' || location.hash === '#escolar')) { S.session = {role: 'publico'}; if (location.hash === '#escolar') ui.tab = 'escolar' }
