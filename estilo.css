@@ -708,3 +708,27 @@ body.escuro fieldset.step legend > span{color:var(--tnt-marinho)}   /* número d
 .pasta>summary small{font:500 13px Barlow;color:var(--muted);margin-left:auto}
 .pasta-corpo{padding:0 12px 12px}
 .grupo{font:600 13px Barlow;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 2px}
+
+/* Portal público dos Jogos Escolares: visual da estreia */
+.pub-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pub-chips span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);border-radius:99px;padding:5px 13px;font-size:13.5px;color:#eaf1ff}
+.pub-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
+.pub-stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.pub-stat b{display:block;font:700 36px/1 "Barlow Condensed";color:var(--tnt-neon)}
+.pub-stat span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em}
+body .sponsors.pub-spons{display:block;text-align:center;padding:24px 18px 22px;margin:14px 0;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid var(--line)}
+.pub-spons h3{font:700 28px "Barlow Condensed";text-transform:uppercase;margin:2px 0 18px}
+.pub-spons-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
+.pub-spon{background:#fff;color:#142036;border-radius:18px;padding:18px 22px;flex:1 1 260px;max-width:380px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:0 8px 28px rgba(0,0,0,.28)}
+.pub-spons .pub-spon img{height:150px;width:auto;max-width:100%;object-fit:contain}
+.pub-spon b{font:700 18px "Barlow Condensed";text-transform:uppercase;letter-spacing:.05em;text-align:center}
+.pub-gen{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:16px 0 8px;font:700 14px Barlow;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.pub-gen::before{content:"";width:10px;height:10px;border-radius:50%;background:#5aa0ff}
+.pub-gen.feminino::before{background:#ff6fae}
+.pub-campeao{background:linear-gradient(135deg,#ffd76a,#f3a712);color:#3a2600;border-radius:99px;padding:3px 13px;font-weight:700;font-size:13px;letter-spacing:.02em;text-transform:none}
+.pub-times{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.pub-time{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.pub-time h5{display:flex;justify-content:space-between;align-items:center;gap:8px;font:700 19px "Barlow Condensed";margin:0 0 8px}
+.pub-time ol{margin:0;padding-left:22px;font-size:13.5px;line-height:1.55}
+.pub-time ol li::marker{color:var(--muted);font-size:12px}
+.pub-time .vazio{margin:0;color:var(--muted);font-size:13px}

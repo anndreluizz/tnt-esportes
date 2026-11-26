@@ -35,12 +35,12 @@ function roda(arquivos, {logado, busca = TOK}) {
   let els = roda(['js/config.js', 'js/escola.js'], {logado: false}); await espera()
   let h = els['#app'].innerHTML
   ok(h.includes('II Jogos Escolares Internos') && h.includes('1º ano 01') && h.includes('Time A'), 'público vê campeonato, turma e times')
-  ok(h.includes('campeão: Time A') && h.includes('pên. 4 x 3'), 'campeão = vencedor da final, com pênaltis')
+  ok(h.includes('Campeão: Time A') && h.includes('pên. 4 x 3'), 'campeão = vencedor da final, com pênaltis')
   ok(h.includes('azul') && h.includes('vermelho'), 'mostra os coletes dos dois lados')
   ok(h.includes('Aluno &lt;i&gt;1&lt;/i&gt;') && h.includes('Quadra &lt;b&gt;x&lt;/b&gt;') && !h.includes('<i>1</i>'), 'nomes e textos do banco são escapados (sem HTML injetado)')
   ok(h.includes('Sou da Secretaria') && !h.includes('Painel da Secretaria') && !h.includes('data-form="placar"') && !h.includes(TOK), 'público não vê painel, edição de placar nem link do professor')
   ok(h.includes('Resultados') && h.includes('Jogos a jogar') && h.includes('data-act="fm"') && !h.includes('JUIZTOK'), 'portal público lista os jogos (a jogar e resultados), com filtro, sem o link do juiz')
-  ok(h.includes('Respons') && h.includes('Prof. Carlos &lt;b&gt;') && h.includes('marcas/escola/c1/logo.png') && h.includes('class="sponsors"') && h.includes('Mercado Bom') && h.includes('<b>Sem Logo</b>'), 'portal mostra logo, responsável (escapado) e patrocinadores')
+  ok(h.includes('Respons') && h.includes('Prof. Carlos &lt;b&gt;') && h.includes('marcas/escola/c1/logo.png') && h.includes('class="sponsors pub-spons"') && h.includes('Mercado Bom') && h.includes('<b>Sem Logo</b>'), 'portal mostra logo, responsável (escapado) e patrocinadores')
   ok(h.includes('seg 07/12') && h.includes('08:00') && h.includes('Quadra 1'), 'portal mostra o dia, a hora e a quadra do jogo')
   ok(!h.includes('campeão direto') && h.includes('aguardando outros times') && h.includes('Solo &lt;b&gt;') && !h.includes('Solo <b>'), 'portal: time único não vira campeão antes do sorteio (nome escapado)')
   els = roda(['js/config.js', 'js/escola.js'], {logado: true}); await espera(); h = els['#app'].innerHTML; const ctxEscola = els.__ctx
