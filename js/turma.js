@@ -77,7 +77,7 @@ function telaTurma() {
   if (!ts.find(x => x.time_id === S.time)) S.time = ts[0]?.time_id || null
   const tm = ts.find(x => x.time_id === S.time), n = tm ? qtd(e, tm.time_id) : 0, min = MINIMO[S.mod] || 0, max = tm?.vagas || 0, pronto = n >= min
   const profs = profsDe(e), ocupa = ids(e, S.mod)
-  const regraQ = S.mod === 'Queimada' ? `<div class="card tp-resumo"><div class="tp-passo">Como funciona a queimada</div><p class="lead">Todos da turma jogam no mesmo time, meninos e meninas juntos. Não tem limite de jogadores.</p><p class="lead"><b>Vence</b> quem eliminar todos os adversários primeiro. Se os 10 minutos acabarem, vence quem eliminou mais.</p></div>` : ''
+  const regraQ = S.mod === 'Queimada' ? `<div class="card tp-resumo"><div class="tp-passo">Como funciona a queimada</div><p class="lead">Todos da turma jogam no mesmo time, meninos e meninas juntos. Não tem limite de jogadores.</p><p class="lead"><b>Vence</b> quem eliminar todos os adversários primeiro. Se os 10 minutos acabarem, vence quem eliminou mais. Se empatar, joga mais 5 minutos (repete até ter vencedor). Sem pênaltis.</p></div>` : ''
   // alunos ainda livres (fora de qualquer time desta modalidade); quem já está num time aparece na lista do time
   const ondeEsta = a => e.jogadores.find(j => ocupa.has(j.time_id) && norm(j.nome) === norm(a))
   const q = norm(S.busca), livres = e.candidatos.filter(a => !ondeEsta(a) && (!q || norm(a).includes(q)))

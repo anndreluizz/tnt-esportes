@@ -5,10 +5,10 @@ const $ = s => document.querySelector(s)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]))
 const dmy = d => d.split('-').reverse().join('/')
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 4500) }
-async function q(p) { const {data, error} = await p; if (error) throw new Error(error.code === '23514' ? 'Dado fora do permitido (pênaltis só em empate e nunca empatados).' : error.code === '23505' ? 'Já existe um registro igual.' : error.message); return data }
+async function q(p) { const {data, error} = await p; if (error) throw new Error(error.code === '23514' ? (/queimada/.test(error.message) ? error.message : 'Dado fora do permitido (pênaltis só em empate e nunca empatados).') : error.code === '23505' ? 'Já existe um registro igual.' : error.message); return data }
 
-// Regras de cada modalidade (a Secretaria pode editar no banco). Futsal: 5 + reservas (até 15 por time), 2x10. Queimada: 10 participantes, 10 min.
-const PRESETS = {Futsal: {jogadores_por_time: 5, reservas_max: 10, tempos: 2, tempo_min: 10}, Queimada: {jogadores_por_time: 10, reservas_max: 0, tempos: 1, tempo_min: 10}}
+// Regras de cada modalidade (a Secretaria pode editar no banco). Futsal: 5 + reservas (até 15 por time), 2x10. Queimada: sem limite de jogadores, 10 min; se empatar, mais 5 min até ter vencedor (sem pênaltis).
+const PRESETS = {Futsal: {jogadores_por_time: 5, reservas_max: 10, tempos: 2, tempo_min: 10}, Queimada: {jogadores_por_time: 30, reservas_max: 30, tempos: 1, tempo_min: 10}}
 // Grupo = SERIE: as turmas da serie (ex.: 1º ano 01 e 1º ano 02) viram times que se enfrentam num mini campeonato. Portal 2026.
 const SERIES = ['1º ano', '2º ano', '3º ano', '4º ano', '5º ano', '6º ano', '7º ano', '8º ano', '9º ano', 'EJAI']
 const ORIGENS = ['1º ano 01', '1º ano 02', '2º ano 01', '2º ano 02', '3º ano 01', '3º ano 02', '4º ano 01', '4º ano 02', '5º ano 01', '5º ano 02', '6º ano 01', '6º ano 02',
@@ -229,7 +229,7 @@ function secretaria() {
       return `<p class="sub" style="margin-bottom:8px">Um link só para todos os jogos. Quem tem o link grava o resultado, então mande só aos juízes.</p><div class="btns"><button class="btn ghost sm" data-act="copiar" data-link="${esc(lk)}">Copiar link</button>
       <a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('Mesa do juiz - Jogos Escolares. Lance o placar e os pênaltis por este link: ' + lk)}">WhatsApp</a></div>` })()}</div>
     <div class="card"><h3>1. Modalidades</h3><div class="btns">${Object.keys(PRESETS).map(n => `<button class="btn ${temMod(n) ? 'ghost' : ''}" data-act="mod" data-nome="${n}" ${temMod(n) ? 'disabled' : ''}>${temMod(n) ? '✓ ' : '+ '}${n}</button>`).join('')}</div>
-      <p class="sub" style="margin-top:6px">Futsal: 5 em quadra + até 10 reservas (máximo 15 por time), 2 tempos de 10 min. Queimada: 10 participantes, 10 min. Masculino e feminino em ambas. Sem pontos: mata-mata, empate vai a pênaltis.</p></div>
+      <p class="sub" style="margin-top:6px">Futsal: 5 em quadra + até 10 reservas (máximo 15 por time), 2 tempos de 10 min. Queimada: sem limite de jogadores, 10 min; se empatar, mais 5 min até ter vencedor (sem pênaltis). Masculino e feminino em ambas. Sem pontos: mata-mata, empate vai a pênaltis.</p></div>
     <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
       <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
       ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
