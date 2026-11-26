@@ -62,7 +62,7 @@ const escLista = c => [
   ...c.esc.partidas.filter(p => p.fase === 'final' && p.vencedor_id).map(p => ({mdl: escMod(c, p.modalidade_id), genero: p.genero, serie: escSerie(c, p.turma_id), nome: escTime(c, p.vencedor_id)?.nome, direto: false})),
   ...c.esc.turmas.flatMap(u => c.esc.mod.flatMap(m => ['masculino', 'feminino'].map(g => ({u, m, g, ts: c.esc.times.filter(t => t.turma_id === u.id && t.modalidade_id === m.id && t.genero === g)})))).filter(x => x.ts.length === 1)
     .map(x => ({mdl: x.m.nome, genero: x.g, serie: x.u.nome, nome: x.ts[0].nome, direto: true}))]
-const escCampeoes = c => escLista(c).map(x => `<div class="row"><span>${esc(x.mdl)} ${x.genero} · ${esc(x.serie)}</span><span class="pill green">${x.direto ? 'campeão direto' : 'campeão'}: ${esc(x.nome)}</span></div>`).join('')
+const escCampeoes = c => escLista(c).filter(x => !x.direto || role() === 'secretaria').map(x => `<div class="row"><span>${esc(x.mdl)} ${x.genero} · ${esc(x.serie)}</span><span class="pill green">${x.direto ? 'campeão direto' : 'campeão'}: ${esc(x.nome)}</span></div>`).join('')
 
 const ESC_VIEWS = {
   painel: c => { const e = c.esc, feitos = e.partidas.filter(p => p.placar_a != null).length
