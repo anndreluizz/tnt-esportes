@@ -99,6 +99,11 @@ function telaTurma() {
     <div class="tp-fora"><b>Ficaram de fora (${fora.length})</b>${fora.length ? `<div class="tp-chips">${ordenar(fora).map(n => `<span>${esc(n)}</span>`).join('')}</div>` : '<p class="lead">Todos da lista já estão num time.</p>'}</div></div>`
   return {rod, html: `${turmas.length > 1 ? '<button type="button" class="tp-back" data-home>← Minhas turmas</button>' : ''}
   <div><div class="tp-passo">Turma</div><h1>${esc(e.turma.origem)}</h1><p class="lead"><b>Professores responsáveis:</b> ${profs.length ? profs.map(p => esc(p)).join(' · ') : 'ainda não informado'}</p></div>
+  ${ab && S.mod !== 'Queimada' ? `<details class="tp-mais" data-d="mais"${abertos.mais ? ' open' : ''}><summary>Adicionar ou excluir equipe</summary><div class="tp-in2">
+    <p class="lead">Quer mais uma equipe? Escolha o tipo. O sistema dá a letra sozinho (A, B, C...).</p>
+    <div class="tp-row2"><button type="button" class="btn tp-btn ghost" data-novo="masculino">+ Time de meninos</button><button type="button" class="btn tp-btn ghost" data-novo="feminino">+ Time de meninas</button></div>
+    ${tm ? (S.excluindo ? `<div class="tp-conf"><b>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})?</b><span class="lead">Os ${n} alunos voltam para a lista da turma. Nada mais é apagado.</span><div class="tp-row2"><button type="button" class="btn tp-btn danger" data-exclui-sim>Sim, excluir</button><button type="button" class="btn tp-btn ghost" data-exclui-nao>Não</button></div></div>`
+      : `<button type="button" class="btn tp-btn danger" data-exclui>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})</button>`) : ''}</div></details>` : ''}
   ${!ab ? '<div class="card empty">As inscrições estão encerradas. Procure a Secretaria para qualquer ajuste.</div>' : ''}
   ${ab && !profs.length ? `<div class="card tp-nome"><h2>Qual é o seu nome?</h2><form class="tp-f" data-addprof><input name="prof" class="tp-in" required minlength="3" maxlength="60" autocomplete="name" placeholder="Seu nome completo" aria-label="Seu nome completo"><input name="tel" class="tp-in" type="tel" inputmode="tel" required autocomplete="tel" placeholder="WhatsApp com DDD (92 99999-9999)" aria-label="WhatsApp do professor"><p class="lead tp-nota">O número fica só com a Secretaria, para enviar o link pelo WhatsApp.</p><button class="btn tp-btn">Salvar meu nome</button></form></div>` : ''}
   <div><div class="tp-passo">1. Escolha o esporte</div><div class="tp-seg">${MODALIDADES.map(m => `<button type="button" data-mod="${m}" aria-pressed="${S.mod === m}">${m}</button>`).join('')}</div></div>
@@ -110,11 +115,6 @@ function telaTurma() {
   <div class="tp-lista">${linhas || '<p class="tp-vazio">Todos os alunos da lista já estão num time.</p>'}</div>`}
   ${n >= max ? `<p class="tp-pill wait" style="white-space:normal">O time já tem ${max} alunos, que é o máximo.</p>` : ''}` : ''}
   ${resumo}
-  ${ab && S.mod !== 'Queimada' ? `<details class="tp-mais" data-d="mais"${abertos.mais ? ' open' : ''}><summary>Adicionar ou excluir equipe</summary><div class="tp-in2">
-    <p class="lead">Quer mais uma equipe? Escolha o tipo. O sistema dá a letra sozinho (A, B, C...).</p>
-    <div class="tp-row2"><button type="button" class="btn tp-btn ghost" data-novo="masculino">+ Time de meninos</button><button type="button" class="btn tp-btn ghost" data-novo="feminino">+ Time de meninas</button></div>
-    ${tm ? (S.excluindo ? `<div class="tp-conf"><b>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})?</b><span class="lead">Os ${n} alunos voltam para a lista da turma. Nada mais é apagado.</span><div class="tp-row2"><button type="button" class="btn tp-btn danger" data-exclui-sim>Sim, excluir</button><button type="button" class="btn tp-btn ghost" data-exclui-nao>Não</button></div></div>`
-      : `<button type="button" class="btn tp-btn danger" data-exclui>Excluir o Time ${esc(letra(tm.time_nome))} (${sexo(tm.genero).toLowerCase()})</button>`) : ''}</div></details>` : ''}
   <details data-d="prof"${abertos.prof ? ' open' : ''}><summary>Professores desta turma (${profs.length})</summary><div class="tp-in2">${profHtml}</div></details>`}
 }
 
