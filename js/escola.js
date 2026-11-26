@@ -96,7 +96,7 @@ async function carregar() {
   const {data: {session}} = await sb.auth.getSession()
   sec = !!session && (await sb.from('perfis').select('papel').eq('id', session.user.id)).data?.[0]?.papel === 'secretaria'
   const [c] = await q(sb.from('esc_campeonatos').select('*').order('inicio', {ascending: false}).limit(1))
-  D = {c, mod: [], turmas: [], times: [], jog: [], partidas: [], juizes: [], turmasLinks: [], links: {}, profs: {}}
+  D = {c, mod: [], turmas: [], times: [], jog: [], partidas: [], juizes: [], turmasLinks: [], contatos: [], links: {}, profs: {}}
   if (c) {
     const por = t => q(sb.from(t).select('*').eq('campeonato_id', c.id))
     ;[D.mod, D.turmas] = await Promise.all([por('esc_modalidades'), por('esc_turmas')])
@@ -106,6 +106,7 @@ async function carregar() {
     D.jog = ids.length ? await q(sb.from('esc_jogadores').select('id,time_id,nome').in('time_id', ids).order('nome')) : []
     D.partidas = tid.length ? await q(sb.from('esc_partidas').select('*').in('turma_id', tid).order('fase').order('id')) : []
     if (sec) D.juiz = await q(sb.rpc('esc_juiz_link', {p_campeonato: c.id}))
+    if (sec) D.contatos = await q(sb.rpc('esc_contatos_prof', {p_campeonato: c.id}))   // WhatsApp dos professores (só a Secretaria vê)
     if (sec) D.turmasLinks = await q(sb.rpc('esc_links_turmas', {p_campeonato: c.id}))   // um link por turma (professor responsável da turma)
     if (sec) for (const l of await q(sb.rpc('esc_links_times', {p_campeonato: c.id}))) { D.links[l.time_id] = l.token; D.profs[l.time_id] = l.professor }
     const pos = n => { const i = SERIES.indexOf(n); return i < 0 ? 99 : i }   // série na ordem do ensino (1º ano ... 9º ano, EJAI); fora da lista, no fim
@@ -135,6 +136,24 @@ const linkProfessor = tk => new URL('professor.html?t=' + tk, location.href).hre
 const opcoes = (lista, rot) => lista.map(x => `<option value="${x.id}">${esc(rot(x))}</option>`).join('')
 
 const incompletos = x => MINIMO[x.m.nome] ? x.times.filter(t => D.jog.filter(j => j.time_id === t.id).length < MINIMO[x.m.nome]).length : 0
+// Um link por professor (todas as turmas dele) para enviar pelo WhatsApp do número que foi informado ao adicionar o professor
+function linksProfessores() {
+  const sp = o => { const i = SERIES.findIndex(s => o.startsWith(s) || (s === 'EJAI' && /EJAI/.test(o))); return i < 0 ? 99 : i }
+  const porTel = new Map()
+  for (const c of D.contatos) {
+    const l = D.turmasLinks.find(x => x.origem === c.origem); if (!l || !String(l.professor || '').split(' / ').includes(c.nome)) continue   // só quem ainda é professor da turma
+    const g = porTel.get(c.telefone) || {tel: c.telefone, nome: c.nome, turmas: []}; if (!g.turmas.some(t => t.origem === c.origem)) g.turmas.push(l); porTel.set(c.telefone, g)
+  }
+  if (!porTel.size) return '<p class="sub">Quando um professor for adicionado com o WhatsApp, ele aparece aqui com o botão de enviar o link.</p>'
+  return [...porTel.values()].sort((a, b) => a.nome.localeCompare(b.nome)).map(g => {
+    const ts = g.turmas.sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem)), link = new URL('turma.html?t=' + ts.map(t => t.token).join(','), location.href).href
+    const msg = `Olá, ${g.nome.split(' ')[0]}! Você é professor(a) responsável pela(s) turma(s) ${ts.map(t => t.origem).join(', ')} nos II Jogos Escolares. Por este link você escolhe os alunos que vão jogar: ${link}`
+    const fone = g.tel.replace(/^55(\d{2})(\d+)$/, '($1) $2')
+    return `<div class="row"><span><b>${esc(g.nome)}</b> <small class="sub">${esc(fone)}</small><br><small class="sub">${ts.map(t => esc(t.origem)).join(' · ')} · ${ts.reduce((n, t) => n + t.alunos, 0)} aluno(s) escolhido(s)</small></span><span class="btns">
+      <button class="btn ghost sm" data-act="copiar" data-link="${esc(link)}">Copiar link</button>
+      <a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/${esc(g.tel)}?text=${encodeURIComponent(msg)}">Enviar pelo WhatsApp</a></span></div>` }).join('')
+}
+
 function linksTurmas() {
   const sp = o => { const i = SERIES.findIndex(s => o.startsWith(s) || (s === 'EJAI' && /EJAI/.test(o))); return i < 0 ? 99 : i }
   const lista = [...D.turmasLinks].sort((x, y) => sp(x.origem) - sp(y.origem) || nat(x.origem, y.origem))
@@ -209,6 +228,7 @@ function secretaria() {
     <div class="card"><h3>2. Séries (grupos) <small>${D.turmas.length} cadastrada(s)</small></h3><p class="sub" style="margin-bottom:6px">Cada série é um mini campeonato: os times das turmas dela (ex.: 1º ano 01 e 1º ano 02) se enfrentam entre si.</p><form data-form="turmas"><label>Uma série por linha (as que já existem são ignoradas)
       <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
       ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
+    <div class="card"><h3>Professores e WhatsApp <small>um link por professor, com todas as turmas dele</small></h3>${linksProfessores()}</div>
     <div class="card"><h3>Links por turma <small>o professor da turma organiza os times A, B, C... (masculino e feminino) num link só</small></h3>${linksTurmas()}</div>
     <div class="card"><h3>3. Times e links dos professores <small>${D.times.filter(t => D.profs[t.id]).length} de ${D.times.length} com professor responsável</small></h3><form class="f" data-form="time">
       <label>Série (grupo)<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
