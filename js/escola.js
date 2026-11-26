@@ -171,6 +171,25 @@ function professores() {
   return add + (lista || '<p class="sub">Adicione o primeiro professor acima.</p>') + faltam
 }
 
+// Times e alunos: a Secretaria ve todos os nomes de cada time e ajusta (tirar, adicionar, excluir time)
+function timesAjuste() {
+  const serie = t => D.turmas.find(x => x.id === t.turma_id)?.nome || '?'
+  const ordem = [...D.turmas].sort((x, y) => nat(x.nome, y.nome))
+  if (!D.times.length) return '<p class="sub">Ainda não há times cadastrados.</p>'
+  return ordem.map(sr => {
+    const ts = D.times.filter(t => t.turma_id === sr.id).sort((x, y) => nat(x.nome, y.nome))
+    if (!ts.length) return ''
+    const corpo = ts.map(t => {
+      const js = D.jog.filter(j => j.time_id === t.id).sort((x, y) => nat(x.nome, y.nome))
+      return `<div class="row" style="flex-wrap:wrap"><span><b>${esc(t.nome)}</b> <small class="sub">${esc(nomeMod(t.modalidade_id))} · ${t.genero} · ${js.length} aluno(s)</small></span>
+        <button class="btn danger sm" data-act="excluitime" data-id="${t.id}" data-nome="${esc(t.nome)}">Excluir time</button>
+        <ol style="width:100%;margin:6px 0 6px 18px">${js.map(j => `<li style="display:flex;gap:8px;align-items:center;justify-content:space-between"><span>${esc(j.nome)}</span><button class="btn ghost sm" data-act="tiraaluno" data-id="${j.id}" data-nome="${esc(j.nome)}">Tirar</button></li>`).join('') || '<li class="sub">Nenhum aluno ainda.</li>'}</ol>
+        <form class="f" data-form="addaluno" data-time="${t.id}" style="width:100%"><label>Adicionar aluno<input name="nome" required minlength="2" maxlength="80" placeholder="Nome e sobrenome"></label><div><button class="btn ghost sm">Adicionar</button></div></form></div>`
+    }).join('')
+    return `<details style="margin:8px 0"${/^1º ano/.test(sr.nome) ? ' open' : ''}><summary style="cursor:pointer;font:600 18px 'Barlow Condensed'">${esc(sr.nome)} <small class="sub">${ts.length} time(s)</small></summary>${corpo}</details>`
+  }).join('')
+}
+
 function horarios() {
   const livres = D.partidas.filter(p => !p.data), marcados = D.partidas.length - livres.length, [m1, m2] = ag.janelas
   const form = `<form class="f" data-form="agenda"><label>Quadras ao mesmo tempo<input name="quadras" type="number" min="1" max="9" required value="${ag.quadras}"></label>
@@ -235,6 +254,7 @@ function secretaria() {
       <textarea name="nomes">${esc(SERIES.filter(n => !D.turmas.some(t => t.nome === n)).join('\n'))}</textarea></label><button class="btn" style="margin-top:8px">Cadastrar séries</button></form>
       ${D.turmas.map(t => `<div class="row"><span>${esc(t.nome)} <small class="sub">${D.times.filter(x => x.turma_id === t.id).length} time(s)</small></span><button class="btn danger sm" data-act="del" data-tab="esc_turmas" data-id="${t.id}">Excluir</button></div>`).join('')}</div>
     <div class="card"><h3>Professores <small>um link por professor, com todas as turmas dele</small></h3>${professores()}</div>
+    <div class="card"><h3>Times e alunos <small>veja todos os nomes e ajuste: tirar, adicionar ou excluir time</small></h3>${timesAjuste()}</div>
     <div class="card"><h3>3. Times e links dos professores <small>${D.times.filter(t => D.profs[t.id]).length} de ${D.times.length} com professor responsável</small></h3><form class="f" data-form="time">
       <label>Série (grupo)<select name="turma" required>${opcoes(D.turmas, t => t.nome)}</select></label>
       <label>Turma de origem<input name="origem" required maxlength="30" list="origens" placeholder="Ex.: 1º ano 01"></label><datalist id="origens">${ORIGENS.map(o => `<option value="${o}">`).join('')}</datalist>
@@ -317,6 +337,7 @@ const ACOES = {
   agenda: async d => { const q1 = Math.max(1, Math.min(9, +d.quadras || 1))
     ag = {quadras: q1, janelas: [[d.a1, d.b1], [d.a2, d.b2]], previa: null}
     ag.previa = montaAgenda(D.partidas, D.mod, {dias: diasEntre(D.c.inicio, D.c.fim), janelas: ag.janelas, quadras: q1}); return 'Prévia pronta. Confira abaixo e aplique.' },
+  addaluno: async (d, f) => { await q(sb.from('esc_jogadores').insert({time_id: f.dataset.time, nome: d.nome.trim().replace(/\s+/g, ' ')})); return 'Aluno adicionado.' },
   addprof: async d => { const {error} = await sb.rpc('esc_secretaria_professor', {p_campeonato: D.c.id, p_origem: d.origem, p_nome: d.nome, p_telefone: d.tel || ''})
     if (error) throw new Error(/telefone/.test(error.message) ? 'Digite o WhatsApp com DDD, por exemplo 92 99999-9999.' : error.message); return 'Professor salvo.' },
   placar: async (d, f) => { const n = v => v === '' ? null : +v
@@ -342,6 +363,8 @@ document.addEventListener('click', async e => {
       await q(sb.rpc('esc_secretaria_renomear_professor', {p_campeonato: D.c.id, p_antigo: b.dataset.nome, p_novo: novo}))
       toast('Nome corrigido.'); return carregar()
     }
+    if (act === 'tiraaluno') { if (!confirm(`Tirar ${b.dataset.nome} do time?`)) return; await q(sb.from('esc_jogadores').delete().eq('id', b.dataset.id)); toast('Aluno tirado do time.'); return carregar() }
+    if (act === 'excluitime') { if (!confirm(`Excluir o time ${b.dataset.nome}? Os alunos dele saem junto e os jogos ligados a ele também somem.`)) return; await q(sb.from('esc_times').delete().eq('id', b.dataset.id)); toast('Time excluído.'); return carregar() }
     if (act === 'tirarprof') {   // tira o professor só desta turma; as outras turmas dele continuam
       if (!confirm(`Tirar ${b.dataset.nome} da turma ${b.dataset.origem}? As outras turmas dele continuam.`)) return
       await q(sb.rpc('esc_secretaria_tirar_professor', {p_campeonato: D.c.id, p_origem: b.dataset.origem, p_nome: b.dataset.nome}))
